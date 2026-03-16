@@ -16,9 +16,18 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     
     List<Event> findByStatus(EventStatus status);
     
+    List<Event> findByCategoryId(Long categoryId);
+    
+    List<Event> findByStatusAndCategoryId(EventStatus status, Long categoryId);
+    
     @Query("SELECT e FROM Event e WHERE e.venue = :venue AND e.status = 'APPROVED' " +
            "AND e.startTime < :endTime AND e.endTime > :startTime")
     List<Event> findConflictingEvents(@Param("venue") String venue,
                                       @Param("startTime") LocalDateTime startTime,
                                       @Param("endTime") LocalDateTime endTime);
+    
+    @Query("SELECT e FROM Event e WHERE e.status = 'APPROVED' " +
+           "AND e.startTime >= :now AND e.startTime <= :oneHourLater")
+    List<Event> findUpcomingApprovedEvents(@Param("now") LocalDateTime now,
+                                           @Param("oneHourLater") LocalDateTime oneHourLater);
 }

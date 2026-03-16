@@ -150,16 +150,17 @@ public class AuthService {
     /**
      * Generates and sends OTP for password reset
      */
-    public void sendResetOtp(String email) {
-        // Check if user exists
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-
-        // Generate and send OTP
-        String otp = otpService.generateOtp();
-        otpService.saveOtp(email, otp, OtpType.RESET_PASSWORD);
-        emailService.sendPasswordResetEmail(email, otp);
+  public void sendResetOtp(String email) {
+    // Check if user exists
+    if (userRepository.findByEmail(email).isEmpty()) {
+        throw new RuntimeException("User not found with email: " + email);
     }
+
+    // Generate and send OTP
+    String otp = otpService.generateOtp();
+    otpService.saveOtp(email, otp, OtpType.RESET_PASSWORD);
+    emailService.sendPasswordResetEmail(email, otp);
+}
 
     /**
      * Validates OTP and updates password

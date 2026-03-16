@@ -133,6 +133,28 @@ public class EmailService {
     }
 
     /**
+     * Sends event reminder email to attendee
+     */
+    @Async
+    public void sendEventReminderEmail(String email, String eventTitle, java.time.LocalDateTime startTime) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setFrom(fromEmail);
+            helper.setTo(email);
+            helper.setSubject(appName + " - Event Reminder: " + eventTitle);
+
+            String htmlContent = buildEventReminderEmail(eventTitle, startTime);
+            helper.setText(htmlContent, true);
+
+            javaMailSender.send(message);
+        } catch (MessagingException e) {
+            System.err.println("Failed to send event reminder email: " + e.getMessage());
+        }
+    }
+
+    /**
      * Builds HTML content for OTP email
      */
     private String buildOtpEmail(String otp, String type) {
@@ -235,6 +257,42 @@ public class EmailService {
                 "<p>Please log in to the admin panel to manage this conflict.</p>" +
                 "<div class='footer'>" +
                 "<p>This is an automated alert from " + appName + ".</p>" +
+                "</div>" +
+                "</div>" +
+                "</body>" +
+                "</html>";
+    }
+
+    /**
+     * Builds HTML content for event reminder email
+     */
+    private String buildEventReminderEmail(String eventTitle, java.time.LocalDateTime startTime) {
+        return "<!DOCTYPE html>" +
+                "<html>" +
+                "<head>" +
+                "<style>" +
+                "body { font-family: Arial, sans-serif; background-color: #f4f4f4; }" +
+                ".container { max-width: 600px; margin: 50px auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }" +
+                ".header { text-align: center; color: #0056b3; }" +
+                ".reminder-box { background-color: #e7f3ff; border-left: 4px solid #0056b3; padding: 15px; margin: 20px 0; }" +
+                ".footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }" +
+                "</style>" +
+                "</head>" +
+                "<body>" +
+                "<div class='container'>" +
+                "<div class='header'>" +
+                "<h2>🔔 Event Reminder</h2>" +
+                "</div>" +
+                "<p>Hello,</p>" +
+                "<p>This is a reminder about an upcoming event:</p>" +
+                "<div class='reminder-box'>" +
+                "<p><strong>Event:</strong> " + eventTitle + "</p>" +
+                "<p><strong>Starting at:</strong> " + startTime + "</p>" +
+                "<p>Don't forget to attend!</p>" +
+                "</div>" +
+                "<p>See you there!</p>" +
+                "<div class='footer'>" +
+                "<p>This is an automated reminder from " + appName + ".</p>" +
                 "</div>" +
                 "</div>" +
                 "</body>" +

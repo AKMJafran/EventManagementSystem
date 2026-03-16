@@ -101,7 +101,7 @@ CREATE TABLE notifications (
 
 ```
 authify/
-└── src/main/java/com/jafran/authify/
+└── src/main/java/com/project/ems_server/
     │
     ├── 📁 config/
     │   ├── SecurityConfig.java           ← JWT filter, CORS, route permissions

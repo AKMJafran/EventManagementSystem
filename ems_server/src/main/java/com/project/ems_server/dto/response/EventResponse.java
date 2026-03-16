@@ -18,6 +18,8 @@ public class EventResponse {
     
     private String title;
     
+    private String description;
+    
     private String venue;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -31,4 +33,6 @@ public class EventResponse {
     private String categoryName;
     
     private String createdByName;
+    
+    private String rejectReason;
 }

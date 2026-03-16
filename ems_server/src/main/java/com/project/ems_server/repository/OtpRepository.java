@@ -13,5 +13,6 @@ public interface OtpRepository extends JpaRepository<OtpVerification, Long> {
     
     Optional<OtpVerification> findByEmailAndTypeAndIsUsedFalse(String email, OtpType type);
     
+
     void deleteByEmail(String email);
 }
