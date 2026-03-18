@@ -9,7 +9,7 @@ export default function ConflictsPage() {
   useEffect(() => {
     async function fetchConflicts() {
       try {
-        const res = await axiosInstance.get('/admin/conflicts');
+        const res = await axiosInstance.get('/events/admin/conflicts');
         setConflicts(res.data);
       } catch (err) {
         toast.error('Failed to load conflicts');

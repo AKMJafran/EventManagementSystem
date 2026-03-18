@@ -205,6 +205,16 @@ public class EventService {
     }
 
     /**
+ * Gets all events created by a specific user
+ */
+public List<EventResponse> getEventsByUserId(Long userId) {
+    return eventRepository.findByUserId(userId)
+            .stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+}
+
+    /**
      * Maps Event entity to EventResponse
      */
     private EventResponse mapToResponse(Event event) {

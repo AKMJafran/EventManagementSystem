@@ -11,24 +11,25 @@ export default function StudentDashboard() {
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const approvedRes = await axiosInstance.get('/events', {
-          params: { status: 'APPROVED' },
-        });
-        setApprovedEvents(approvedRes.data);
-       const myRes = await axiosInstance.get('/events');
-        setMyEvents(myRes.data.filter(event => event.userId === user.id));
-        
-      } catch (err) {
-        toast.error('Failed to load events');
-      } finally {
-        setLoading(false);
-      }
+ useEffect(() => {
+  async function fetchData() {
+    try {
+      const approvedRes = await axiosInstance.get('/events', {
+        params: { status: 'APPROVED' },
+      });
+      setApprovedEvents(approvedRes.data);
+
+      const myRes = await axiosInstance.get('/events/user/my-events'); // ✅ updated path
+      setMyEvents(myRes.data); // ✅ no filtering needed, remove the old filter line
+
+    } catch (err) {
+      toast.error('Failed to load events');
+    } finally {
+      setLoading(false);
     }
-    fetchData();
-  }, [user]);
+  }
+  fetchData();
+}, [user]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">

@@ -9,8 +9,9 @@ import { toast } from 'react-hot-toast';
 const emailSchema = z.object({
   email: z.string().email('Invalid email'),
 });
+
+// ✅ Removed email from resetSchema
 const resetSchema = z.object({
-  email: z.string().email(),
   otp: z.string().length(6, 'OTP must be 6 digits'),
   newPassword: z.string().min(6, 'Password must be at least 6 characters'),
 });
@@ -30,11 +31,11 @@ export default function ResetPasswordPage() {
     register: registerReset,
     handleSubmit: handleResetSubmit,
     formState: { errors: resetErrors, isSubmitting: isResetSubmitting },
-  } = useForm({ resolver: zodResolver(resetSchema), defaultValues: { email } });
+  } = useForm({ resolver: zodResolver(resetSchema) });
 
   const onEmailSubmit = async (data) => {
     try {
-      await axiosInstance.post('/auth/send-reset-otp', { email: data.email });
+      await axiosInstance.post(`/auth/send-reset-otp?email=${data.email}`);
       setEmail(data.email);
       setStep(2);
       toast.success('OTP sent to your email.');
@@ -46,7 +47,7 @@ export default function ResetPasswordPage() {
   const onResetSubmit = async (data) => {
     try {
       await axiosInstance.post('/auth/reset-password', {
-        email: data.email,
+        email: email,        // ✅ from state, not from form
         otp: data.otp,
         newPassword: data.newPassword,
       });
@@ -77,7 +78,8 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleResetSubmit(onResetSubmit)}>
             <div className="mb-4">
               <label className="block mb-1">Email</label>
-              <input {...registerReset('email')} className="w-full px-3 py-2 border rounded" value={email} readOnly />
+              {/* ✅ Plain input — just for display, not registered in RHF */}
+              <input className="w-full px-3 py-2 border rounded bg-gray-100" value={email} readOnly />
             </div>
             <div className="mb-4">
               <label className="block mb-1">OTP</label>

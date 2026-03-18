@@ -61,6 +61,18 @@ public class EventController {
         List<EventResponse> events = eventService.getEvents(eventStatus, categoryId);
         return ResponseEntity.ok(events);
     }
+    
+    /**
+ * Gets events created by the logged-in student
+ * GET /events/user/my-events
+ */
+@GetMapping("/user/my-events")
+@PreAuthorize("hasRole('STUDENT')")
+public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentication) {
+    Long userId = extractUserIdFromAuthentication(authentication);
+    List<EventResponse> events = eventService.getEventsByUserId(userId);
+    return ResponseEntity.ok(events);
+}
 
     /**
      * Gets a single event by ID

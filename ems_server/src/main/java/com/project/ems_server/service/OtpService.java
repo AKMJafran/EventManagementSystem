@@ -5,6 +5,7 @@ import com.project.ems_server.enums.OtpType;
 import com.project.ems_server.repository.OtpRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Random;
@@ -27,6 +28,7 @@ public class OtpService {
     /**
      * Saves OTP to the database with 10 minute expiry
      */
+    @Transactional
     public void saveOtp(String email, String otp, OtpType type) {
         // Delete any existing OTP for this email to avoid duplicates
         otpRepository.deleteByEmail(email);

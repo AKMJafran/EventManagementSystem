@@ -2,6 +2,8 @@ package com.project.ems_server.repository;
 
 import com.project.ems_server.entity.OtpVerification;
 import com.project.ems_server.enums.OtpType;
+
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,5 +16,6 @@ public interface OtpRepository extends JpaRepository<OtpVerification, Long> {
     Optional<OtpVerification> findByEmailAndTypeAndIsUsedFalse(String email, OtpType type);
     
 
+    @Transactional
     void deleteByEmail(String email);
 }
