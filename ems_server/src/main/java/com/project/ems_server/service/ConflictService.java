@@ -7,6 +7,7 @@ import com.project.ems_server.entity.Notification;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.NotificationType;
 import com.project.ems_server.enums.Role;
+import com.project.ems_server.exception.VenueAlreadyBookedException;
 import com.project.ems_server.repository.EventConflictRepository;
 import com.project.ems_server.repository.EventRepository;
 import com.project.ems_server.repository.NotificationRepository;
@@ -50,6 +51,23 @@ public class ConflictService {
         }
 
         return conflictingEvents;
+    }
+
+    /**
+     * Strict conflict check that throws exception if conflicts found.
+     * Demonstrates custom exception handling in advanced Java.
+     */
+    public void checkStrictConflict(EventRequest newEvent) throws VenueAlreadyBookedException {
+        List<Event> conflicts = detectConflict(newEvent);
+        if (!conflicts.isEmpty()) {
+            String conflictTitles = conflicts.stream()
+                    .map(Event::getTitle)
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("Unknown");
+            throw new VenueAlreadyBookedException(
+                "Venue '" + newEvent.getVenue() + "' is already booked during this time. Conflicting events: " + conflictTitles
+            );
+        }
     }
 
     /**

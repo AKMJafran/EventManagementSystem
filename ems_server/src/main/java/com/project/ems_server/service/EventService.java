@@ -86,6 +86,18 @@ public class EventService {
     }
 
     /**
+     * Demonstrates Streams API: Filters approved events by venue.
+     * Shows functional programming and lambda usage in advanced Java.
+     */
+    public List<EventResponse> getApprovedEventsByVenue(String venue) {
+        return eventRepository.findAll().stream()
+                .filter(event -> event.getStatus() == EventStatus.APPROVED) // Lambda filter
+                .filter(event -> venue.equalsIgnoreCase(event.getVenue())) // Another filter
+                .map(this::mapToResponse) // Method reference
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Gets a single event by ID
      */
     public EventResponse getEventById(Long eventId) {
