@@ -168,3 +168,35 @@ New access token issued
 | Security | Spring Security |
 | Frontend | React.js + Tailwind CSS |
 | Build | Maven |
+
+
+
+
+
+design...prompt
+
+Apply this exact design system to the [PAGE NAME] page:
+
+THEME: Dark futuristic mission-control UI
+BACKGROUND: #060810 base, dot-grid overlay (rgba(0,210,255,0.018), 60px), animated particle canvas with connected nodes, scanline sweep effect
+FONTS: Orbitron (monospace) for headings/labels/buttons, Syne for card titles, DM Sans for body text — load from Google Fonts
+COLORS:
+  - Primary accent: #00d2ff (cyan)
+  - Success: #00e5a0
+  - Warning: #ffb340
+  - Danger: #ff4d6d
+  - Purple: #a78bfa
+  - Background: #060810
+  - Cards: rgba(255,255,255,0.02) base, rgba(0,210,255,0.04) on hover
+  - Borders: rgba(255,255,255,0.06) base, rgba(0,210,255,0.35) on hover
+
+NAVBAR: Sticky, frosted glass (backdrop-filter blur 20px), rgba(6,8,16,0.88), height 64px, Orbitron logo badge with gpulse animation, cyan active tab underline indicator
+CARDS: borderRadius 20px, hover lifts translateY(-4 to -6px), colored top-edge gradient bar, box-shadow glow on hover matching accent color
+BUTTONS: Primary = linear-gradient(135deg,#00d2ff,#0099bb), dark text, Orbitron font, lift + glow shadow on hover. Secondary = rgba border style matching section accent color
+ANIMATIONS: cardIn (fadeUp from translateY 22px), fadeIn, gpulse (glow pulse), blink (opacity), scanln (scanline sweep), spin (loader), slideD (dropdown)
+SECTION HEADERS: Orbitron 13px, 0.14em letter-spacing, uppercase, colored left vertical bar (3px wide gradient), count pill badge
+EMPTY STATES: Dashed border rgba(0,210,255,0.08), centered icon + Orbitron message
+LOADING: Cyan spinner + blinking Orbitron text "LOADING..."
+FOOTER: Orbitron 9px links, cyan on hover, subtle top border
+
+Write all styles as inline React style objects. Use <style> tag only for @keyframes, @import, :hover class overrides, and scrollbar styles. Keep all logic and data fetching intact.
