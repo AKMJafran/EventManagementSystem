@@ -41,23 +41,34 @@ Based on faculty activities (e.g., HackTrail, Technospirits), this system handle
 ### Backend Setup (Spring Boot)
 1. Clone the repo: `git clone <repo-url>`
 2. Navigate to `ems_server/`: `cd ems_server`
-3. Configure database in `src/main/resources/application.properties`:
+3. Create `src/main/resources/application.properties` (copy from `application-template.properties`):
    ```
-   spring.datasource.url=jdbc:mysql://localhost:3306/eventdb
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   spring.mail.username=your_email@gmail.com  # For notifications
+   # Database
+   spring.datasource.url=jdbc:mysql://localhost:3306/event_db
+   spring.datasource.username=your_mysql_username
+   spring.datasource.password=your_mysql_password
+   
+   # JWT Secret (generate a secure key)
+   jwt.secret=your_secure_jwt_secret_here
+   
+   # Email (for notifications)
+   spring.mail.username=your_email@gmail.com
    spring.mail.password=your_app_password
    ```
+   **Security Note**: `application.properties` is gitignored. Never commit real secrets!
 4. Install dependencies: `mvn clean install`
 5. Run the app: `mvn spring-boot:run`
-6. API available at `http://localhost:8080`
+6. API available at `http://localhost:8081`
 
 ### Frontend Setup (React)
 1. Navigate to `frontend/`: `cd frontend`
-2. Install dependencies: `npm install`
-3. Run the app: `npm run dev`
-4. Open `http://localhost:5173` in browser
+2. Create `.env` file (if not present):
+   ```
+   VITE_API_BASE_URL=http://localhost:8081/api
+   ```
+3. Install dependencies: `npm install`
+4. Run the app: `npm run dev`
+5. Open `http://localhost:5173` in browser
 
 ### Testing
 - Use Postman for API testing (import collection from `Details/` if available).
