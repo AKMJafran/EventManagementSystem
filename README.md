@@ -41,24 +41,40 @@ Based on faculty activities (e.g., HackTrail, Technospirits), this system handle
 ### Backend Setup (Spring Boot)
 1. Clone the repo: `git clone <repo-url>`
 2. Navigate to `ems_server/`: `cd ems_server`
-3. Create `src/main/resources/application.properties` (copy from `application-template.properties`):
+3. DataSource configuration uses Spring singleton `@Bean` in `src/main/java/com/project/ems_server/config/DataSourceConfig.java`:
+   - `@Configuration`
+   - `@Bean` with `DataSourceProperties.initializeDataSourceBuilder().build()`
+   - This keeps exactly one `DataSource` instance in the Spring context (singleton scope)
+
+4. Create `src/main/resources/application.properties` (copy from `application-template.properties`):
    ```
    # Database
    spring.datasource.url=jdbc:mysql://localhost:3306/event_db
    spring.datasource.username=your_mysql_username
    spring.datasource.password=your_mysql_password
-   
+
+   # For local tests with H2 (optional)
+   # spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+
+   # JPA
+   spring.jpa.hibernate.ddl-auto=update
+   spring.jpa.show-sql=true
+
    # JWT Secret (generate a secure key)
    jwt.secret=your_secure_jwt_secret_here
-   
+
    # Email (for notifications)
+   spring.mail.host=localhost
+   spring.mail.port=25
    spring.mail.username=your_email@gmail.com
    spring.mail.password=your_app_password
+   spring.mail.properties.mail.smtp.auth=false
+   spring.mail.properties.mail.smtp.starttls.enable=false
    ```
    **Security Note**: `application.properties` is gitignored. Never commit real secrets!
-4. Install dependencies: `mvn clean install`
-5. Run the app: `mvn spring-boot:run`
-6. API available at `http://localhost:8081`
+5. Install dependencies: `mvn clean install`
+6. Run the app: `mvn spring-boot:run`
+7. API available at `http://localhost:8081`
 
 ### Frontend Setup (React)
 1. Navigate to `frontend/`: `cd frontend`
