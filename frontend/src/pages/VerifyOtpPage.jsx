@@ -11,7 +11,7 @@ const schema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
-function OtpInput({ value, onChange }) {
+function OtpInput({ onChange }) {
   const [inputs, setInputs] = useState(Array(6).fill(''));
 
   const handleInput = (e, idx) => {
@@ -86,7 +86,7 @@ export default function VerifyOtpPage() {
           {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
         </div>
         <label className="block mb-1">Enter 6-digit OTP</label>
-        <OtpInput value={''} onChange={onOtpChange} />
+        <OtpInput onChange={onOtpChange} />
         {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp.message}</p>}
         <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mb-2" disabled={isSubmitting}>
           {isSubmitting ? 'Verifying...' : 'Verify'}

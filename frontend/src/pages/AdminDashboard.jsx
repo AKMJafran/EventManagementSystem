@@ -17,8 +17,9 @@ export default function AdminDashboard() {
         const conflictsRes = await axiosInstance.get('/events/admin/conflicts');
         setStats({ total, pending, conflicts: conflictsRes.data.length });
         setConflicts(conflictsRes.data.slice(0, 5)); // show recent 5
-      } catch (err) {
+      } catch (e) {
         toast.error('Failed to load admin stats');
+        console.error(e);
       } finally {
         setLoading(false);
       }

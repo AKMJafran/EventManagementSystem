@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
 
@@ -10,18 +10,19 @@ export default function ManageCategories() {
   const [subName, setSubName] = useState('');
   const [parentId, setParentId] = useState(null);
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  async function fetchCategories() {
+  const fetchCategories = useCallback(async () => {
     try {
       const res = await axiosInstance.get('/categories');
       setCategories(res.data);
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to load categories');
+      console.error(e);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   async function addMainCategory() {
     try {
@@ -30,8 +31,9 @@ export default function ManageCategories() {
       setShowMainModal(false);
       setMainName('');
       fetchCategories();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to add main category');
+      console.error(e);
     }
   }
 
@@ -42,8 +44,9 @@ export default function ManageCategories() {
       setShowSubModal(false);
       setSubName('');
       fetchCategories();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to add sub-category');
+      console.error(e);
     }
   }
 
@@ -52,8 +55,9 @@ export default function ManageCategories() {
       await axiosInstance.delete(`/categories/${id}`);
       toast.success('Category deleted');
       fetchCategories();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to delete category');
+      console.error(e);
     }
   }
 

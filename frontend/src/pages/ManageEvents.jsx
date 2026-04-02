@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
 
@@ -9,27 +9,29 @@ export default function ManageEvents() {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectId, setRejectId] = useState(null);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [status]);
-
-  async function fetchEvents() {
+  const fetchEvents = useCallback(async () => {
     try {
       const params = status !== 'ALL' ? { status } : {};
       const res = await axiosInstance.get('/events', { params });
       setEvents(res.data);
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to load events');
+      console.error(e);
     }
-  }
+  }, [status]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   async function approveEvent(id) {
     try {
       await axiosInstance.patch(`/events/${id}/approve`);
       toast.success('Event approved');
       fetchEvents();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to approve event');
+      console.error(e);
     }
   }
 
@@ -41,8 +43,9 @@ export default function ManageEvents() {
       setRejectReason('');
       setRejectId(null);
       fetchEvents();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to reject event');
+      console.error(e);
     }
   }
 

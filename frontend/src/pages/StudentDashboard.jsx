@@ -46,9 +46,10 @@ setMyEvents(myRes.data); // ✅ no filtering needed, remove the old filter line
 
 
 
-} catch (err) {
+} catch (e) {
 
-toast.error('Failed to load events');
+  toast.error('Failed to load events');
+  console.error(e);
 
 } finally {
 
