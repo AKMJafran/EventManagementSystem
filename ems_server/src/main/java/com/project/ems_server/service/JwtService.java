@@ -11,8 +11,7 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-   
-    private String SECRET_KEY="mysecretkeymysecretkeymysecretkeymy";
+    private String SECRET_KEY="verysecretvalue12345678901234567890";
 
    
     private long ACCESS_TOKEN_EXPIRY=900000;//15 minutes

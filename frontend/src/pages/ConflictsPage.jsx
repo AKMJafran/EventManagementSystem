@@ -11,8 +11,9 @@ export default function ConflictsPage() {
       try {
         const res = await axiosInstance.get('/events/admin/conflicts');
         setConflicts(res.data);
-      } catch (err) {
+      } catch (e) {
         toast.error('Failed to load conflicts');
+        console.error(e);
       } finally {
         setLoading(false);
       }

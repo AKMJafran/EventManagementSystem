@@ -35,8 +35,9 @@ export default function CreateEventPage() {
       try {
         const res = await axiosInstance.get('/categories');
         setCategories(res.data);
-      } catch (err) {
+      } catch (e) {
         toast.error('Failed to load categories');
+        console.error(e);
       }
     }
     fetchCategories();
@@ -51,8 +52,9 @@ export default function CreateEventPage() {
       try {
         const res = await axiosInstance.get(`/categories/${selectedCategory}/sub`);
         setSubCategories(res.data);
-      } catch (err) {
+      } catch (e) {
         toast.error('Failed to load sub-categories');
+        console.error(e);
       }
     }
     fetchSubCategories();
@@ -73,8 +75,9 @@ export default function CreateEventPage() {
       });
       toast.success('Event created successfully!');
       navigate('/my-events');
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to create event');
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to create event');
+      console.error(e);
     } finally {
       setLoading(false);
     }
