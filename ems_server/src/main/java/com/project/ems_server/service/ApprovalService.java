@@ -21,7 +21,7 @@ public class ApprovalService {
     private final List<EventObserver> observers; // Injected observers
 
     // Singleton instance (Spring manages this, but demonstrating pattern)
-    private static ApprovalService instance;
+    //private static ApprovalService instance;
 
     // Note: In Spring context, this is not needed as @Service makes it singleton.
     // This demonstrates the pattern conceptually.
