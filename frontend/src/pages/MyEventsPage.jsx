@@ -21,8 +21,9 @@ export default function MyEventsPage() {
           params: { userId: user.id },
         });
         setEvents(res.data);
-      } catch (err) {
+      } catch (e) {
         toast.error('Failed to load events');
+        console.error(e);
       } finally {
         setLoading(false);
       }

@@ -5,15 +5,13 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
-
 import javax.crypto.SecretKey;
 import java.util.Date;
 
 @Service
 public class JwtService {
 
-    
-    private String SECRET_KEY="amFmcmFuQEVNU1NwcmluZ0Jvb3QkSldUJVNlY3JldEtlWTIwMjU";
+    private String SECRET_KEY="verysecretvalue12345678901234567890";
 
    
     private long ACCESS_TOKEN_EXPIRY=900000;//15 minutes

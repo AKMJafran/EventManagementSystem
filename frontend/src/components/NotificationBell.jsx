@@ -19,15 +19,39 @@ export default function NotificationBell() {
       ]);
       setCount(countRes.data);
       setNotifications(listRes.data.slice(0, 5));
-    } catch (err) {
-      // Optionally toast error
+    } catch (e) {
+      toast.error('Failed to load notifications');
+      console.error(e);
     }
   };
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const [countRes, listRes] = await Promise.all([
+          axiosInstance.get('/notifications/count'),
+          axiosInstance.get('/notifications'),
+        ]);
+        if (cancelled) return;
+        setCount(countRes.data);
+        setNotifications(listRes.data.slice(0, 5));
+      } catch (e) {
+        if (!cancelled) {
+          toast.error('Failed to load notifications');
+          console.error(e);
+        }
+      }
+    };
+
+    const interval = setInterval(run, 30000);
+    setTimeout(run, 0);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Close dropdown on outside click
@@ -45,8 +69,9 @@ export default function NotificationBell() {
     try {
       await axiosInstance.patch(`/notifications/${id}/read`);
       fetchNotifications();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to mark as read');
+      console.error(e);
     }
   };
 
@@ -54,8 +79,9 @@ export default function NotificationBell() {
     try {
       await axiosInstance.patch('/notifications/read-all');
       fetchNotifications();
-    } catch (err) {
+    } catch (e) {
       toast.error('Failed to mark all as read');
+      console.error(e);
     }
   };
 
