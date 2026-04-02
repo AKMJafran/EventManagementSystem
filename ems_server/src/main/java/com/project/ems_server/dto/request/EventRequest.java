@@ -30,5 +30,5 @@ public class EventRequest {
     private LocalDateTime startTime;
     
     @NotNull(message = "End time is required")
-    private LocalDateTime endTime;
+    private boolean isUrgent;
 }

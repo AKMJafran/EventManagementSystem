@@ -3,9 +3,8 @@ package com.project.ems_server.service;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.entity.*;
-import com.project.ems_server.enums.EventStatus;
-import com.project.ems_server.enums.NotificationType;
-import com.project.ems_server.repository.*;
+import com.project.ems_server.factory.EventAbstractFactory;
+import com.project.ems_server.factory.EventFactoryInterface;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +24,7 @@ public class EventService {
     private final NotificationRepository notificationRepository;
     private final ConflictService conflictService;
     private final EmailService emailService;
+    private final EventAbstractFactory eventAbstractFactory;
 
     /**
      * Creates a new event with PENDING status and detects conflicts
@@ -38,18 +38,17 @@ public class EventService {
         // Detect conflicts
         List<Event> conflictingEvents = conflictService.detectConflict(eventRequest);
 
-        // Create event with PENDING status
-        Event event = Event.builder()
-                .title(eventRequest.getTitle())
-                .description(eventRequest.getDescription())
-                .userId(userId)
-                .categoryId(eventRequest.getCategoryId())
-                .venue(eventRequest.getVenue())
-                .startTime(eventRequest.getStartTime())
-                .endTime(eventRequest.getEndTime())
-                .status(EventStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        // Use Abstract Factory pattern to create event
+        EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.isUrgent()); // Assume isUrgent field
+        Event event = factory.createEvent(
+                eventRequest.getTitle(),
+                eventRequest.getDescription(),
+                userId,
+                eventRequest.getCategoryId(),
+                eventRequest.getVenue(),
+                eventRequest.getStartTime(),
+                eventRequest.getEndTime()
+        );
 
         Event savedEvent = eventRepository.save(event);
 

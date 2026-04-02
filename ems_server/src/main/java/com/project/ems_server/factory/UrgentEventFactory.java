@@ -7,22 +7,21 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 /**
- * Concrete Factory implementation for standard events.
- * Implements Abstract Factory pattern.
+ * Concrete Factory for urgent events that need immediate attention.
+ * Demonstrates Abstract Factory pattern with different event types.
  */
 @Component
-public class EventFactory implements EventFactoryInterface {
+public class UrgentEventFactory implements EventFactoryInterface {
 
     /**
-     * Creates an Event instance with default settings based on category.
-     * This shows loose coupling and centralized event creation.
+     * Creates an urgent event with high priority status.
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
                            LocalDateTime startTime, LocalDateTime endTime) {
         return Event.builder()
-                .title(title)
-                .description(description)
+                .title("[URGENT] " + title)
+                .description(description + " (Urgent Event - Priority Approval)")
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
@@ -34,14 +33,14 @@ public class EventFactory implements EventFactoryInterface {
     }
 
     /**
-     * Overloaded method for creating events with custom status (for admins).
+     * Creates urgent event with custom status.
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
                            LocalDateTime startTime, LocalDateTime endTime, EventStatus status) {
         return Event.builder()
-                .title(title)
-                .description(description)
+                .title("[URGENT] " + title)
+                .description(description + " (Urgent Event)")
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
