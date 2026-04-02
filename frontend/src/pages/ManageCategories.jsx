@@ -10,7 +10,25 @@ export default function ManageCategories() {
   const [subName, setSubName] = useState('');
   const [parentId, setParentId] = useState(null);
 
-  const fetchCategories = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await axiosInstance.get('/categories');
+        if (!cancelled) setCategories(res.data);
+      } catch (e) {
+        toast.error('Failed to load categories');
+        console.error(e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function reloadCategories() {
     try {
       const res = await axiosInstance.get('/categories');
       setCategories(res.data);
@@ -18,11 +36,7 @@ export default function ManageCategories() {
       toast.error('Failed to load categories');
       console.error(e);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  }
 
   async function addMainCategory() {
     try {
@@ -30,7 +44,7 @@ export default function ManageCategories() {
       toast.success('Main category added');
       setShowMainModal(false);
       setMainName('');
-      fetchCategories();
+      await reloadCategories();
     } catch (e) {
       toast.error('Failed to add main category');
       console.error(e);
@@ -43,7 +57,7 @@ export default function ManageCategories() {
       toast.success('Sub-category added');
       setShowSubModal(false);
       setSubName('');
-      fetchCategories();
+      await reloadCategories();
     } catch (e) {
       toast.error('Failed to add sub-category');
       console.error(e);
@@ -54,7 +68,7 @@ export default function ManageCategories() {
     try {
       await axiosInstance.delete(`/categories/${id}`);
       toast.success('Category deleted');
-      fetchCategories();
+      await reloadCategories();
     } catch (e) {
       toast.error('Failed to delete category');
       console.error(e);

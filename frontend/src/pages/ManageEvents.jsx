@@ -9,26 +9,41 @@ export default function ManageEvents() {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectId, setRejectId] = useState(null);
 
-  const fetchEvents = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const params = status !== 'ALL' ? { status } : {};
+        const res = await axiosInstance.get('/events', { params });
+        if (!cancelled) setEvents(res.data);
+      } catch (e) {
+        toast.error('Failed to load events');
+        console.error(e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  async function reloadEvents(nextStatus = status) {
     try {
-      const params = status !== 'ALL' ? { status } : {};
+      const params = nextStatus !== 'ALL' ? { status: nextStatus } : {};
       const res = await axiosInstance.get('/events', { params });
       setEvents(res.data);
     } catch (e) {
       toast.error('Failed to load events');
       console.error(e);
     }
-  }, [status]);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+  }
 
   async function approveEvent(id) {
     try {
       await axiosInstance.patch(`/events/${id}/approve`);
       toast.success('Event approved');
-      fetchEvents();
+      await reloadEvents();
     } catch (e) {
       toast.error('Failed to approve event');
       console.error(e);
@@ -42,7 +57,7 @@ export default function ManageEvents() {
       setShowRejectModal(false);
       setRejectReason('');
       setRejectId(null);
-      fetchEvents();
+      await reloadEvents();
     } catch (e) {
       toast.error('Failed to reject event');
       console.error(e);
