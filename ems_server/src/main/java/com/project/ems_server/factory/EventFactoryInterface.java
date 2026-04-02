@@ -1,5 +1,10 @@
 package com.project.ems_server.factory;
 
+import com.project.ems_server.entity.Event;
+import com.project.ems_server.enums.EventStatus;
+
+import java.time.LocalDateTime;
+
 /**
  * Abstract Factory pattern for event creation.
  * Defines the interface for creating different types of events.

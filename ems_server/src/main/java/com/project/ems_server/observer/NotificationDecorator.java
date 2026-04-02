@@ -1,5 +1,7 @@
 package com.project.ems_server.observer;
 
+import com.project.ems_server.entity.Event;
+
 /**
  * Decorator pattern for notification observers.
  * Adds logging functionality to existing observers.
