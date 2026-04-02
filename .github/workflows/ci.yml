@@ -26,6 +26,9 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Ensure Maven wrapper is executable
+        run: cd ems_server && chmod +x mvnw
+
       - name: Build backend with Maven
         run: cd ems_server && ./mvnw clean compile
 
