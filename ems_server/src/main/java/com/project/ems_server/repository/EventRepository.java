@@ -30,4 +30,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
            "AND e.startTime >= :now AND e.startTime <= :oneHourLater")
     List<Event> findUpcomingApprovedEvents(@Param("now") LocalDateTime now,
                                            @Param("oneHourLater") LocalDateTime oneHourLater);
+
+    List<Event> findByStartTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
 }

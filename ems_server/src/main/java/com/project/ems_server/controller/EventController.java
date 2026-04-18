@@ -2,6 +2,7 @@ package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.EventResponse;
+import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.EventConflict;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.repository.UserRepository;
@@ -14,6 +15,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
@@ -61,7 +64,43 @@ public class EventController {
         List<EventResponse> events = eventService.getEvents(eventStatus, categoryId);
         return ResponseEntity.ok(events);
     }
-    
+
+    /**
+     * Gets events for a date range.
+     */
+    @GetMapping("/calendar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<EventResponse>> getCalendarEvents(
+            @RequestParam String start,
+            @RequestParam String end) {
+        try {
+            LocalDate startDate = LocalDate.parse(start);
+            LocalDate endDate = LocalDate.parse(end);
+            if (endDate.isBefore(startDate)) {
+                return ResponseEntity.badRequest().build();
+            }
+            List<EventResponse> events = eventService.getCalendarEvents(startDate, endDate);
+            return ResponseEntity.ok(events);
+        } catch (DateTimeParseException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Gets monthly event report.
+     */
+    @GetMapping("/reports/monthly")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MonthlyReportResponse> getMonthlyReport(
+            @RequestParam int year,
+            @RequestParam int month) {
+        if (month < 1 || month > 12) {
+            return ResponseEntity.badRequest().build();
+        }
+        MonthlyReportResponse report = eventService.getMonthlyReport(year, month);
+        return ResponseEntity.ok(report);
+    }
+
     /**
  * Gets events created by the logged-in student
  * GET /events/user/my-events

@@ -1,7 +1,10 @@
 package com.project.ems_server.service;
 
 import com.project.ems_server.dto.request.EventRequest;
+import com.project.ems_server.dto.response.CategoryCountResponse;
 import com.project.ems_server.dto.response.EventResponse;
+import com.project.ems_server.dto.response.EventTypeCountResponse;
+import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.*;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.enums.EventType;
@@ -11,7 +14,10 @@ import com.project.ems_server.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -88,6 +94,72 @@ public class EventService {
                 .filter(event -> venue.equalsIgnoreCase(event.getVenue())) // Another filter
                 .map(this::mapToResponse) // Method reference
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Gets calendar events within the requested date range.
+     */
+    public List<EventResponse> getCalendarEvents(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+        return eventRepository.findByStartTimeBetween(startDateTime, endDateTime).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Builds a monthly report summary for the requested year and month.
+     */
+    public MonthlyReportResponse getMonthlyReport(int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("Month must be between 1 and 12");
+        }
+
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.with(TemporalAdjusters.lastDayOfMonth());
+        LocalDateTime startDateTime = from.atStartOfDay();
+        LocalDateTime endDateTime = to.atTime(23, 59, 59);
+
+        List<Event> events = eventRepository.findByStartTimeBetween(startDateTime, endDateTime);
+
+        long approvedCount = events.stream().filter(e -> e.getStatus() == EventStatus.APPROVED).count();
+        long pendingCount = events.stream().filter(e -> e.getStatus() == EventStatus.PENDING).count();
+        long rejectedCount = events.stream().filter(e -> e.getStatus() == EventStatus.REJECTED).count();
+        long urgentCount = events.stream().filter(e -> e.getEventType() == EventType.URGENT).count();
+
+        List<EventTypeCountResponse> eventsByType = events.stream()
+                .collect(Collectors.groupingBy(Event::getEventType, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> EventTypeCountResponse.builder()
+                        .eventType(entry.getKey() != null ? entry.getKey().name() : "UNKNOWN")
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<CategoryCountResponse> eventsByCategory = events.stream()
+                .collect(Collectors.groupingBy(event -> {
+                    return categoryRepository.findById(event.getCategoryId())
+                            .map(Category::getName)
+                            .orElse("Unknown");
+                }, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> CategoryCountResponse.builder()
+                        .categoryName(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        return MonthlyReportResponse.builder()
+                .year(year)
+                .month(month)
+                .totalEvents(events.size())
+                .approvedEvents(approvedCount)
+                .pendingEvents(pendingCount)
+                .rejectedEvents(rejectedCount)
+                .urgentEvents(urgentCount)
+                .eventsByType(eventsByType)
+                .eventsByCategory(eventsByCategory)
+                .build();
     }
 
     /**
