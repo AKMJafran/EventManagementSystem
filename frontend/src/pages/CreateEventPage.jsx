@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import StudentLayout from '../components/layout/StudentLayout';
 
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
@@ -89,7 +90,7 @@ export default function CreateEventPage() {
         endTime: data.endTime,
       });
       toast.success('Event created successfully!');
-      navigate('/my-events');
+      navigate('/student/my-events');
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to create event');
       console.error(e);
@@ -99,89 +100,204 @@ export default function CreateEventPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white p-8 rounded shadow-md w-full max-w-lg">
-        <h2 className="text-2xl font-bold mb-6 text-center">Create Event</h2>
-        <div className="mb-4">
-          <label className="block mb-1">Title</label>
-          <input {...register('title')} className="w-full px-3 py-2 border rounded" />
-          {errors.title && <p className="text-red-500 text-sm">{errors.title.message}</p>}
+    <StudentLayout user={user}>
+      <header className="mb-12">
+        <h1 className="text-4xl font-bold text-on-surface mb-2 serif-heading">Create New Event</h1>
+        <p className="text-on-surface-variant max-w-2xl">Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.</p>
+      </header>
+      
+      <div className="flex flex-col lg:flex-row gap-12">
+        <div className="flex-1 space-y-12">
+          <section className="bg-surface-container-lowest p-8 rounded-xl shadow-2xl shadow-primary/5">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+            
+              <div className="grid grid-cols-1 gap-8">
+                <div className="relative">
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Title</label>
+                  <input 
+                    {...register('title')} 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-lg font-bold placeholder:opacity-30 rounded-t-lg" 
+                    placeholder="e.g., Annual Symposium on Digital Ethics" 
+                    type="text"
+                  />
+                  {errors.title && <p className="text-error text-xs mt-1 font-bold">{errors.title.message}</p>}
+                </div>
+                
+                <div className="relative">
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Description</label>
+                  <textarea 
+                    {...register('description')}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 resize-none placeholder:opacity-30 rounded-t-lg" 
+                    placeholder="Describe the purpose, target audience, and key highlights..." 
+                    rows="4"
+                  />
+                  {errors.description && <p className="text-error text-xs mt-1 font-bold">{errors.description.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Category</label>
+                  <select 
+                    {...register('categoryId')}
+                    disabled={categoriesLoading}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                  >
+                    <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                  {errors.categoryId && <p className="text-error text-xs mt-1 font-bold">{errors.categoryId.message}</p>}
+                </div>
+                
+                {subCategories.length > 0 ? (
+                  <div>
+                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Sub-Category</label>
+                    <select 
+                      {...register('subCategoryId')}
+                      disabled={subCategoriesLoading}
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                    >
+                      <option value="">{subCategoriesLoading ? 'Loading...' : 'Select Sub-Category'}</option>
+                      {subCategories.map(sub => (
+                        <option key={sub.id} value={sub.id}>{sub.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
+                    <select 
+                      {...register('eventType')}
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                    >
+                      <option value="">Select Event Type</option>
+                      <option value="CULTURAL">Cultural</option>
+                      <option value="TECHNICAL">Technical</option>
+                      <option value="ACADEMIC">Academic</option>
+                      <option value="SPORTS">Sports</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
+                  </div>
+                )}
+              </div>
+
+              {subCategories.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
+                    <select 
+                      {...register('eventType')}
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                    >
+                      <option value="">Select Event Type</option>
+                      <option value="CULTURAL">Cultural</option>
+                      <option value="TECHNICAL">Technical</option>
+                      <option value="ACADEMIC">Academic</option>
+                      <option value="SPORTS">Sports</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
+                  </div>
+                  <div></div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Venue</label>
+                  <input 
+                    {...register('venue')}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    placeholder="Enter Venue Name"
+                  />
+                  {errors.venue && <p className="text-error text-xs mt-1 font-bold">{errors.venue.message}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Start Date & Time</label>
+                  <input 
+                    {...register('startTime')}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    type="datetime-local"
+                  />
+                  {errors.startTime && <p className="text-error text-xs mt-1 font-bold">{errors.startTime.message}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">End Date & Time</label>
+                  <input 
+                    {...register('endTime')}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    type="datetime-local"
+                  />
+                  {errors.endTime && <p className="text-error text-xs mt-1 font-bold">{errors.endTime.message}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-6 pt-6">
+                <button 
+                  type="button"
+                  onClick={() => navigate('/student')}
+                  className="px-8 py-4 text-on-surface-variant font-bold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isSubmitting || loading}
+                  className="px-10 py-4 academic-gradient text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
+                >
+                  {isSubmitting || loading ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </section>
         </div>
-        <div className="mb-4">
-          <label className="block mb-1">Description</label>
-          <textarea {...register('description')} className="w-full px-3 py-2 border rounded" />
-          {errors.description && <p className="text-red-500 text-sm">{errors.description.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Category</label>
-          <select
-            {...register('categoryId')}
-            defaultValue=""
-            className="w-full px-3 py-2 border rounded"
-            disabled={categoriesLoading}
-          >
-            <option value="">
-              {categoriesLoading ? 'Loading categories...' : 'Select category'}
-            </option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
-          </select>
-          {errors.categoryId && <p className="text-red-500 text-sm">{errors.categoryId.message}</p>}
-        </div>
-        {subCategories.length > 0 && (
-          <div className="mb-4">
-            <label className="block mb-1">Sub-Category</label>
-            <select
-              {...register('subCategoryId')}
-              defaultValue=""
-              className="w-full px-3 py-2 border rounded"
-              disabled={subCategoriesLoading}
-            >
-              <option value="">
-                {subCategoriesLoading ? 'Loading sub-categories...' : 'Select sub-category'}
-              </option>
-              {subCategories.map(sub => (
-                <option key={sub.id} value={sub.id}>{sub.name}</option>
-              ))}
-            </select>
+
+        <aside className="w-full lg:w-80 space-y-8">
+          <div className="bg-surface-container-low p-8 rounded-xl border-l-4 border-tertiary">
+            <h3 className="text-xl font-bold mb-4 text-primary serif-heading">Submission Guidelines</h3>
+            <ul className="space-y-6">
+              <li className="flex gap-4">
+                <span className="material-symbols-outlined text-tertiary shrink-0">info</span>
+                <p className="text-sm text-on-surface-variant leading-relaxed">Ensure all event venues are booked at least <strong className="text-on-surface">2 weeks</strong> in advance.</p>
+              </li>
+              <li className="flex gap-4">
+                <span className="material-symbols-outlined text-tertiary shrink-0">verified_user</span>
+                <p className="text-sm text-on-surface-variant leading-relaxed">Risk assessment forms must be attached for outdoor events.</p>
+              </li>
+              <li className="flex gap-4">
+                <span className="material-symbols-outlined text-tertiary shrink-0">group</span>
+                <p className="text-sm text-on-surface-variant leading-relaxed">Events exceeding <strong className="text-on-surface">200 attendees</strong> require security clearance.</p>
+              </li>
+            </ul>
           </div>
-        )}
-        <div className="mb-4">
-          <label className="block mb-1">Event Type</label>
-          <select {...register('eventType')} className="w-full px-3 py-2 border rounded">
-            <option value="">Select event type</option>
-            <option value="CULTURAL">Cultural</option>
-            <option value="TECHNICAL">Technical</option>
-            <option value="ACADEMIC">Academic</option>
-            <option value="SPORTS">Sports</option>
-            <option value="URGENT">Urgent</option>
-          </select>
-          {errors.eventType && <p className="text-red-500 text-sm">{errors.eventType.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Venue</label>
-          <input {...register('venue')} className="w-full px-3 py-2 border rounded" />
-          {errors.venue && <p className="text-red-500 text-sm">{errors.venue.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Start Time</label>
-          <input type="datetime-local" {...register('startTime')} className="w-full px-3 py-2 border rounded" />
-          {errors.startTime && <p className="text-red-500 text-sm">{errors.startTime.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">End Time</label>
-          <input type="datetime-local" {...register('endTime')} className="w-full px-3 py-2 border rounded" />
-          {errors.endTime && <p className="text-red-500 text-sm">{errors.endTime.message}</p>}
-        </div>
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-70"
-          disabled={isSubmitting || loading || categoriesLoading || categories.length === 0}
-        >
-          {isSubmitting || loading ? 'Creating...' : 'Create Event'}
-        </button>
-      </form>
-    </div>
+          
+          <div className="relative overflow-hidden group rounded-xl aspect-[4/5]">
+            <img 
+              alt="Academic Campus" 
+              className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCokpOP5O0X7kVdS3rFhFSjWwQZNGmfy4v2Y7WrNufEG2FBoLo0nffJONmtdImpO6PJw1nHX2DucAqVTvZzUOtY-0Yfe-B-T7a3cB_uTWnfqmCuG76NvijQ7II8cNpeRzSsN6nzhHrQvGffDLdRPLYaRR2-fA7GRHwNqrCR1bb3sG9_PwywyRbVB8RvbkrlZ898XAmHIlbuetffdkqiQKgLzo--WUoIsOU4Roe5-HXoWyc81R45uxV0F4iKLcWv5hY0MTiGqwGEawc"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
+              <h4 className="text-white text-lg font-bold mb-1 serif-heading">Tradition of Excellence</h4>
+              <p className="text-white/80 text-xs">Curating events that define our academic legacy.</p>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-primary-container/10 border border-primary-container/20 rounded-lg">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-primary text-sm mt-0.5">lightbulb</span>
+              <div className="text-xs text-on-surface-variant italic">
+                "Events with rich descriptions and clear categories are 40% more likely to be approved on the first review."
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </StudentLayout>
   );
 }

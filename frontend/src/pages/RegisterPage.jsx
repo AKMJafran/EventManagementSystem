@@ -2,9 +2,12 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 const schema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -37,36 +40,52 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
-        <div className="mb-4">
-          <label className="block mb-1">Name</label>
-          <input {...register('name')} className="w-full px-3 py-2 border rounded" />
-          {errors.name && <p className="text-red-500 text-sm">{errors.name.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Email</label>
-          <input {...register('email')} className="w-full px-3 py-2 border rounded" />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Password</label>
-          <input type="password" {...register('password')} className="w-full px-3 py-2 border rounded" />
-          {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Confirm Password</label>
-          <input type="password" {...register('confirmPassword')} className="w-full px-3 py-2 border rounded" />
-          {errors.confirmPassword && <p className="text-red-500 text-sm">{errors.confirmPassword.message}</p>}
-        </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700" disabled={isSubmitting}>
-          {isSubmitting ? 'Registering...' : 'Register'}
-        </button>
-        <div className="mt-4 text-center">
-          <a href="/login" className="text-blue-600 hover:underline">Already have an account? Login</a>
-        </div>
-      </form>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Register</CardTitle>
+          <CardDescription>Create a new account to get started</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Input
+              label="Name"
+              {...register('name')}
+              error={errors.name?.message}
+              placeholder="John Doe"
+            />
+            <Input
+              label="Email"
+              type="email"
+              {...register('email')}
+              error={errors.email?.message}
+              placeholder="john@example.com"
+            />
+            <Input
+              label="Password"
+              type="password"
+              {...register('password')}
+              error={errors.password?.message}
+              placeholder="••••••••"
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              {...register('confirmPassword')}
+              error={errors.confirmPassword?.message}
+              placeholder="••••••••"
+            />
+            <Button type="submit" className="w-full" isLoading={isSubmitting}>
+              Register
+            </Button>
+            <div className="mt-4 text-center text-sm">
+              <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+                Already have an account? Login
+              </Link>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

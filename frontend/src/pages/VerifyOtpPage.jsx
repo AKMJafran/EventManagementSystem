@@ -5,13 +5,16 @@ import { z } from 'zod';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 const schema = z.object({
   email: z.string().email(),
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
-function OtpInput({ onChange }) {
+function OtpInput({ onChange, valueStr = '' }) {
   const [inputs, setInputs] = useState(Array(6).fill(''));
 
   const handleInput = (e, idx) => {
@@ -22,22 +25,31 @@ function OtpInput({ onChange }) {
     setInputs(newInputs);
     onChange(newInputs.join(''));
     if (val && idx < 5) {
-      document.getElementById(`otp-${idx + 1}`).focus();
+      const nextInput = document.getElementById(`otp-${idx + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleKeyDown = (e, idx) => {
+    if (e.key === 'Backspace' && !inputs[idx] && idx > 0) {
+      const prevInput = document.getElementById(`otp-${idx - 1}`);
+      if (prevInput) prevInput.focus();
     }
   };
 
   return (
-    <div className="flex space-x-2 justify-center mb-4">
+    <div className="flex space-x-3 justify-center mb-4">
       {inputs.map((v, i) => (
-        <input
-          key={i}
-          id={`otp-${i}`}
-          type="text"
-          maxLength={1}
-          className="w-10 h-12 text-center border rounded text-xl"
-          value={v}
-          onChange={e => handleInput(e, i)}
-        />
+         <input
+           key={i}
+           id={`otp-${i}`}
+           type="text"
+           maxLength={1}
+           className="w-12 h-14 text-center border border-gray-300 rounded-md text-xl font-semibold focus:border-primary-500 focus:ring-2 focus:ring-primary-500 outline-none transition-colors"
+           value={v}
+           onChange={e => handleInput(e, i)}
+           onKeyDown={e => handleKeyDown(e, i)}
+         />
       ))}
     </div>
   );
@@ -69,7 +81,12 @@ export default function VerifyOtpPage() {
 
   const handleResend = async () => {
     try {
-      await axiosInstance.post(`/auth/resend-register-otp?email=${encodeURIComponent(getValues('email'))}`);
+      const emailValue = getValues('email');
+      if (!emailValue) {
+        toast.error("Please enter email");
+        return;
+      }
+      await axiosInstance.post(`/auth/resend-register-otp?email=${encodeURIComponent(emailValue)}`);
       toast.success('OTP resent to your email.');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to resend OTP');
@@ -77,28 +94,45 @@ export default function VerifyOtpPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Verify OTP</h2>
-        <div className="mb-4">
-          <label className="block mb-1">Email</label>
-          <input
-            {...register('email')}
-            className="w-full px-3 py-2 border rounded"
-            readOnly={Boolean(initialEmail)}
-          />
-          {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
-        </div>
-        <label className="block mb-1">Enter 6-digit OTP</label>
-        <OtpInput onChange={onOtpChange} />
-        {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp.message}</p>}
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 mb-2" disabled={isSubmitting}>
-          {isSubmitting ? 'Verifying...' : 'Verify'}
-        </button>
-        <button type="button" className="w-full bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300" onClick={handleResend}>
-          Resend OTP
-        </button>
-      </form>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Verify Your Account</CardTitle>
+          <CardDescription>We sent a 6-digit code to your email</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <Input
+              label="Email"
+              {...register('email')}
+              readOnly={Boolean(initialEmail)}
+              error={errors.email?.message}
+            />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                Enter 6-digit OTP
+              </label>
+              <OtpInput onChange={onOtpChange} />
+              {errors.otp && <p className="text-red-500 text-sm text-center">{errors.otp.message}</p>}
+            </div>
+
+            <div className="space-y-3">
+              <Button type="submit" className="w-full" isLoading={isSubmitting}>
+                Verify Account
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleResend}
+              >
+                Resend OTP
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
