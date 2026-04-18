@@ -16,11 +16,11 @@ public interface EventFactoryInterface {
      * Creates an event based on type.
      */
     Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                     LocalDateTime startTime, LocalDateTime endTime, EventType eventType);
+                     String imageData, LocalDateTime startTime, LocalDateTime endTime, EventType eventType);
 
     /**
      * Creates an event with custom status.
      */
     Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                     LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType);
+                     String imageData, LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType);
 }

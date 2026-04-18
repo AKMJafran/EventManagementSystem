@@ -17,6 +17,7 @@ const schema = z.object({
   venue: z.string().min(2, 'Venue required'),
   startTime: z.string(),
   endTime: z.string(),
+  imageData: z.string().optional(),
 });
 
 export default function CreateEventPage() {
@@ -24,6 +25,8 @@ export default function CreateEventPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
@@ -33,6 +36,23 @@ export default function CreateEventPage() {
       ...item,
       name: item.name || item.categoryName || item.label || `Category ${item.id}`,
     }));
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setSelectedImage(null);
+      setImagePreview(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result?.toString();
+      setSelectedImage(base64 || null);
+      setImagePreview(base64 || null);
+    };
+    reader.readAsDataURL(file);
   };
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
@@ -88,6 +108,7 @@ export default function CreateEventPage() {
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
+        imageData: selectedImage,
       });
       toast.success('Event created successfully!');
       navigate('/student/my-events');
@@ -132,6 +153,25 @@ export default function CreateEventPage() {
                     rows="4"
                   />
                   {errors.description && <p className="text-error text-xs mt-1 font-bold">{errors.description.message}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8">
+                <div>
+                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full bg-surface-container-high border-0 focus:ring-0 rounded-t-lg text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl"
+                  />
+                  {imagePreview && (
+                    <img
+                      src={imagePreview}
+                      alt="Event preview"
+                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -276,13 +316,13 @@ export default function CreateEventPage() {
             </ul>
           </div>
           
-          <div className="relative overflow-hidden group rounded-xl aspect-[4/5]">
+          <div className="relative overflow-hidden group rounded-xl aspect-4/5">
             <img 
               alt="Academic Campus" 
               className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCokpOP5O0X7kVdS3rFhFSjWwQZNGmfy4v2Y7WrNufEG2FBoLo0nffJONmtdImpO6PJw1nHX2DucAqVTvZzUOtY-0Yfe-B-T7a3cB_uTWnfqmCuG76NvijQ7II8cNpeRzSsN6nzhHrQvGffDLdRPLYaRR2-fA7GRHwNqrCR1bb3sG9_PwywyRbVB8RvbkrlZ898XAmHIlbuetffdkqiQKgLzo--WUoIsOU4Roe5-HXoWyc81R45uxV0F4iKLcWv5hY0MTiGqwGEawc"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
+            <div className="absolute inset-0 bg-linear-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
               <h4 className="text-white text-lg font-bold mb-1 serif-heading">Tradition of Excellence</h4>
               <p className="text-white/80 text-xs">Curating events that define our academic legacy.</p>
             </div>

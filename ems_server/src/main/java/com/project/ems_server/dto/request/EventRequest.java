@@ -35,4 +35,6 @@ public class EventRequest {
     
     @NotNull(message = "Event type is required")
     private EventType eventType;
+
+    private String imageData;
 }

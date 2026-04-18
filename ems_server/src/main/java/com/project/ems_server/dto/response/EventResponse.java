@@ -22,6 +22,8 @@ public class EventResponse {
     
     private String description;
     
+    private String imageData;
+    
     private String venue;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

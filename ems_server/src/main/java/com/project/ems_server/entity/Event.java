@@ -61,6 +61,9 @@ public class Event {
     
     @Column(columnDefinition = "TEXT")
     private String rejectReason;
+
+    @Column(columnDefinition = "TEXT")
+    private String imageData;
     
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

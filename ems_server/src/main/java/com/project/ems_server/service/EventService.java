@@ -54,6 +54,7 @@ public class EventService {
                 userId,
                 eventRequest.getCategoryId(),
                 eventRequest.getVenue(),
+                eventRequest.getImageData(),
                 eventRequest.getStartTime(),
                 eventRequest.getEndTime(),
                 eventRequest.getEventType()
@@ -254,6 +255,7 @@ public List<EventResponse> getEventsByUserId(Long userId) {
                 .id(event.getId())
                 .title(event.getTitle())
                 .description(event.getDescription())
+                .imageData(event.getImageData())
                 .venue(event.getVenue())
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())
