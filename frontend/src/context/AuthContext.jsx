@@ -3,6 +3,8 @@ import axiosInstance from '../api/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
 
 const useAuthStore = create((set) => ({
+
+
   user: null,
   accessToken: null,
   isAuthenticated: false,
@@ -18,6 +20,7 @@ const useAuthStore = create((set) => ({
         name: decodedToken.name,
         email: decodedToken.email,
         role: role,
+        profilePictureUrl: decodedToken.profilePictureUrl,
       };
 
       localStorage.setItem('accessToken', accessToken);
@@ -54,7 +57,8 @@ const useAuthStore = create((set) => ({
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       } else {
-        set({ user, accessToken, isAuthenticated: true });
+        // Also update user state from potentially refreshed token properties in localStorage
+        set({ user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name }, accessToken, isAuthenticated: true });
       }
     }
   },

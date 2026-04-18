@@ -24,12 +24,14 @@ public class JwtService {
     }
 
     /**
-     * Generates an access token (15 min expiry) with email and role as claims
+     * Generates an access token (15 min expiry) with email, role, name and profile picture as claims
      */
-    public String generateAccessToken(String email, String role) {
+    public String generateAccessToken(String email, String role, String name, String profilePictureUrl) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
+                .claim("name", name)
+                .claim("profilePictureUrl", profilePictureUrl)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)

@@ -22,7 +22,7 @@ public class EventResponse {
     
     private String description;
     
-    private String imageData;
+    private String imageUrl;
     
     private String venue;
     

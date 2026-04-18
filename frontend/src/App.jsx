@@ -14,6 +14,9 @@ import MyEventsPage from './pages/MyEventsPage';
 import AdminDashboard from './pages/AdminDashboard';
 import CalendarPage from './pages/CalendarPage';
 import MonthlyReportPage from './pages/MonthlyReportPage';
+import ManageStudents from './pages/ManageStudents';
+import ManageVenues from './pages/ManageVenues';
+import LandingPage from './pages/LandingPage';
 import ManageCategories from './pages/ManageCategories';
 import ManageEvents from './pages/ManageEvents';
 import ConflictsPage from './pages/ConflictsPage';
@@ -22,7 +25,7 @@ const Home = () => {
   if (isAuthenticated) {
     return user.role === 'ADMIN' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/student/dashboard" />;
   }
-  return <Navigate to="/login" />;
+  return <LandingPage />;
 };
 
 
@@ -46,7 +49,8 @@ function App() {
       <Route element={<ProtectedRoute requiredRole="STUDENT" />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/create-event" element={<CreateEventPage />} />
-        <Route path="/my-events" element={<MyEventsPage />} />
+        <Route path="/student/my-events" element={<MyEventsPage />} />
+        <Route path="/student/calendar" element={<CalendarPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
@@ -55,6 +59,8 @@ function App() {
         <Route path="/admin/reports/monthly" element={<MonthlyReportPage />} />
         <Route path="/manage-categories" element={<ManageCategories />} />
         <Route path="/manage-events" element={<ManageEvents />} />
+        <Route path="/manage-students" element={<ManageStudents />} />
+        <Route path="/manage-venues" element={<ManageVenues />} />
         <Route path="/create-event" element={<CreateEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
       </Route>

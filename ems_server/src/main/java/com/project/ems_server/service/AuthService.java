@@ -30,6 +30,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
+    private final FileServerService fileServerService;
 
     /**
      * Registers a new user with isVerified=false and sends OTP email
@@ -94,7 +95,8 @@ public class AuthService {
         }
 
         // Generate tokens
-        String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name());
+        String profileUrl = user.getProfilePictureId() != null ? fileServerService.requestFileLink(user.getProfilePictureId()) : null;
+        String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name(), user.getName(), profileUrl);
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         // Save refresh token to DB
@@ -137,7 +139,8 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name());
+        String profileUrl = user.getProfilePictureId() != null ? fileServerService.requestFileLink(user.getProfilePictureId()) : null;
+        String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name(), user.getName(), profileUrl);
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)

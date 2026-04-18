@@ -58,23 +58,7 @@ export default function StudentSidebar() {
             </Link>
           );
         })}
-
-        <a href="#" className="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 font-sans text-sm font-medium hover:translate-x-1 transition-transform duration-200">
-          <span className="material-symbols-outlined text-[20px]">school</span>
-          <span>Faculty Liaison</span>
-        </a>
-        <a href="#" className="flex items-center gap-3 px-4 py-3 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 font-sans text-sm font-medium hover:translate-x-1 transition-transform duration-200">
-          <span className="material-symbols-outlined text-[20px]">menu_book</span>
-          <span>Academic Guidelines</span>
-        </a>
       </nav>
-
-      <div className="mt-auto pt-6 px-4">
-        <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/10">
-          <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tighter mb-2">University News</p>
-          <p className="text-xs text-on-surface leading-relaxed">Annual research symposium registrations are now open for faculty members.</p>
-        </div>
-      </div>
     </aside>
   );
 }

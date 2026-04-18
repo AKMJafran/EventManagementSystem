@@ -33,6 +33,7 @@ public class EventService {
     private final ConflictService conflictService;
     private final ApprovalService approvalService;
     private final EventAbstractFactory eventAbstractFactory;
+    private final FileServerService fileServerService;
 
     /**
      * Creates a new event with PENDING status and blocks conflicting bookings.
@@ -54,7 +55,7 @@ public class EventService {
                 userId,
                 eventRequest.getCategoryId(),
                 eventRequest.getVenue(),
-                eventRequest.getImageData(),
+                eventRequest.getImageId(),
                 eventRequest.getStartTime(),
                 eventRequest.getEndTime(),
                 eventRequest.getEventType()
@@ -251,11 +252,17 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         User creator = userRepository.findById(event.getUserId()).orElse(null);
         Category category = categoryRepository.findById(event.getCategoryId()).orElse(null);
 
+        String imageUrl = null;
+        if (event.getImageId() != null && !event.getImageId().isEmpty()) {
+            imageUrl = fileServerService.requestFileLink(event.getImageId());
+        }
+
         return EventResponse.builder()
                 .id(event.getId())
+                .userId(event.getUserId())
                 .title(event.getTitle())
                 .description(event.getDescription())
-                .imageData(event.getImageData())
+                .imageUrl(imageUrl)
                 .venue(event.getVenue())
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())

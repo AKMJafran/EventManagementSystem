@@ -4,7 +4,7 @@ import StudentHeader from './StudentHeader';
 
 export default function StudentLayout({ children, user }) {
   return (
-    <div className="bg-background font-body text-on-surface antialiased min-h-screen text-on-surface">
+    <div className="bg-background font-body text-on-surface antialiased min-h-screen">
       <StudentSidebar />
       <StudentHeader user={user} />
       <main className="pl-72 pt-20 min-h-screen">

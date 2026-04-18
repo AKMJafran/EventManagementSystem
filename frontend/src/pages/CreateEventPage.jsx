@@ -17,7 +17,7 @@ const schema = z.object({
   venue: z.string().min(2, 'Venue required'),
   startTime: z.string(),
   endTime: z.string(),
-  imageData: z.string().optional(),
+  imageId: z.string().optional(),
 });
 
 export default function CreateEventPage() {
@@ -46,11 +46,10 @@ export default function CreateEventPage() {
       return;
     }
 
+    setSelectedImage(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = reader.result?.toString();
-      setSelectedImage(base64 || null);
-      setImagePreview(base64 || null);
+      setImagePreview(reader.result?.toString() || null);
     };
     reader.readAsDataURL(file);
   };
@@ -100,6 +99,25 @@ export default function CreateEventPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
+      let imageId = null;
+      
+      if (selectedImage) {
+        const formData = new FormData();
+        formData.append('file', selectedImage);
+        
+        try {
+          const uploadRes = await axiosInstance.post('/files/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+          imageId = uploadRes.data.fileId;
+        } catch (uploadError) {
+          toast.error("Failed to upload image. Event will be created without it.");
+          console.error(uploadError);
+        }
+      }
+
       await axiosInstance.post('/events', {
         title: data.title,
         description: data.description,
@@ -108,7 +126,7 @@ export default function CreateEventPage() {
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
-        imageData: selectedImage,
+        imageId: imageId,
       });
       toast.success('Event created successfully!');
       navigate('/student/my-events');

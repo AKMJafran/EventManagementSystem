@@ -19,14 +19,14 @@ public class UrgentEventFactory implements EventFactoryInterface {
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           String imageData, LocalDateTime startTime, LocalDateTime endTime, EventType eventType) {
+                           String imageId, LocalDateTime startTime, LocalDateTime endTime, EventType eventType) {
         return Event.builder()
                 .title("[URGENT] " + title)
                 .description(description + " (Urgent Event - Priority Approval)")
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
-                .imageData(imageData)
+                .imageId(imageId)
                 .startTime(startTime)
                 .endTime(endTime)
                 .eventType(eventType)
@@ -40,14 +40,14 @@ public class UrgentEventFactory implements EventFactoryInterface {
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           String imageData, LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType) {
+                           String imageId, LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType) {
         return Event.builder()
                 .title("[URGENT] " + title)
                 .description(description + " (Urgent Event)")
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
-                .imageData(imageData)
+                .imageId(imageId)
                 .startTime(startTime)
                 .endTime(endTime)
                 .eventType(eventType)

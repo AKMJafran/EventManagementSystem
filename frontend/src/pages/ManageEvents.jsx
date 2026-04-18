@@ -22,6 +22,7 @@ export default function ManageEvents() {
       try {
         const params = status !== 'ALL' ? { status } : {};
         const res = await axiosInstance.get('/events', { params });
+        if (!cancelled) {
           setEvents(res.data.content || res.data);
           setLastSynced(new Date());
         }
@@ -144,7 +145,7 @@ export default function ManageEvents() {
 
         {/* Filters Section */}
         <section className="max-w-7xl mx-auto mb-10 bg-white p-6 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-6">
-          <div className="flex-1 min-w-[300px]">
+          <div className="flex-1 min-w-75">
             <div className="relative">
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
               <input 

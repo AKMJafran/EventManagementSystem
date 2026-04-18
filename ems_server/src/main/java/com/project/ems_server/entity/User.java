@@ -40,6 +40,9 @@ public class User {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
+    @Column(name = "profile_picture_id", length = 255)
+    private String profilePictureId;
+    
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
