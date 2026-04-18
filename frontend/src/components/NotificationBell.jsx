@@ -17,7 +17,7 @@ export default function NotificationBell() {
         axiosInstance.get('/notifications/count'),
         axiosInstance.get('/notifications'),
       ]);
-      setCount(countRes.data);
+      setCount(countRes.data.unreadCount);
       setNotifications(listRes.data.slice(0, 5));
     } catch (e) {
       toast.error('Failed to load notifications');
@@ -35,7 +35,7 @@ export default function NotificationBell() {
           axiosInstance.get('/notifications'),
         ]);
         if (cancelled) return;
-        setCount(countRes.data);
+        setCount(countRes.data.unreadCount);
         setNotifications(listRes.data.slice(0, 5));
       } catch (e) {
         if (!cancelled) {

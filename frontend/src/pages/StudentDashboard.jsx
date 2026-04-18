@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import axiosInstance from '../api/axiosInstance';
+import NotificationBell from '../components/NotificationBell';
 
 import useAuthStore from '../context/AuthContext';
 
@@ -87,25 +88,8 @@ className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
 
 </div>
 
-{/* Notification bell placeholder */}
-
 <div className="flex justify-end mb-4">
-
-{/* NotificationBell component will be added in Step 21 */}
-
-<div className="relative">
-
-
-<div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
-
-<span role="img" aria-label="bell">🔔</span>
-
-</div>
-
-<span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full px-2">0</span>
-
-</div>
-
+  <NotificationBell />
 </div>
 
 {loading ? (

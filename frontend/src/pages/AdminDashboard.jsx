@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import NotificationBell from '../components/NotificationBell';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, conflicts: 0 });
@@ -29,7 +30,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <NotificationBell />
+      </div>
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-100 p-4 rounded shadow text-center">
           <div className="text-lg font-semibold">Total Events</div>

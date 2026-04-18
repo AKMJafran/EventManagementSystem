@@ -79,6 +79,7 @@ export default function ManageEvents() {
         <thead>
           <tr className="bg-gray-100">
             <th className="py-2 px-4">Title</th>
+            <th className="py-2 px-4">Type</th>
             <th className="py-2 px-4">Venue</th>
             <th className="py-2 px-4">Time</th>
             <th className="py-2 px-4">Status</th>
@@ -93,6 +94,7 @@ export default function ManageEvents() {
             events.map(event => (
               <tr key={event.id} className="border-b">
                 <td className="py-2 px-4">{event.title}</td>
+                <td className="py-2 px-4">{event.eventType || 'N/A'}</td>
                 <td className="py-2 px-4">{event.venue}</td>
                 <td className="py-2 px-4">{new Date(event.startTime).toLocaleString()} - {new Date(event.endTime).toLocaleString()}</td>
                 <td className="py-2 px-4">{event.status}</td>

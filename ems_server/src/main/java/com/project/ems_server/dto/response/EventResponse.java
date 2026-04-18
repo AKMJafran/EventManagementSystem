@@ -34,6 +34,8 @@ public class EventResponse {
     
     private String eventType;
     
+    private boolean hasConflict;
+    
     private String categoryName;
     
     private String createdByName;

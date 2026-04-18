@@ -187,6 +187,7 @@ public List<EventResponse> getEventsByUserId(Long userId) {
                 .endTime(event.getEndTime())
                 .status(event.getStatus().name())
                 .eventType(event.getEventType() != null ? event.getEventType().name() : null)
+                .hasConflict(eventConflictRepository.existsByEventIdOrConflictWith(event.getId(), event.getId()))
                 .categoryName(category != null ? category.getName() : "Unknown")
                 .createdByName(creator != null ? creator.getName() : "Unknown")
                 .rejectReason(event.getRejectReason())
