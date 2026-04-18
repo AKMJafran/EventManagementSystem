@@ -2,6 +2,7 @@ package com.project.ems_server.factory;
 
 import com.project.ems_server.entity.Event;
 import com.project.ems_server.enums.EventStatus;
+import com.project.ems_server.enums.EventType;
 
 import java.time.LocalDateTime;
 
@@ -15,11 +16,11 @@ public interface EventFactoryInterface {
      * Creates an event based on type.
      */
     Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                     LocalDateTime startTime, LocalDateTime endTime);
+                     LocalDateTime startTime, LocalDateTime endTime, EventType eventType);
 
     /**
      * Creates an event with custom status.
      */
     Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                     LocalDateTime startTime, LocalDateTime endTime, EventStatus status);
+                     LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType);
 }

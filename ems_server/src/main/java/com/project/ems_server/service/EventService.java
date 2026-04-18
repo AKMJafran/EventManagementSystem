@@ -4,7 +4,7 @@ import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.entity.*;
 import com.project.ems_server.enums.EventStatus;
-import com.project.ems_server.enums.NotificationType;
+import com.project.ems_server.enums.EventType;
 import com.project.ems_server.factory.EventAbstractFactory;
 import com.project.ems_server.factory.EventFactoryInterface;
 import com.project.ems_server.repository.*;
@@ -24,13 +24,12 @@ public class EventService {
     private final EventConflictRepository eventConflictRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
     private final ConflictService conflictService;
-    private final EmailService emailService;
+    private final ApprovalService approvalService;
     private final EventAbstractFactory eventAbstractFactory;
 
     /**
-     * Creates a new event with PENDING status and detects conflicts
+     * Creates a new event with PENDING status and blocks conflicting bookings.
      */
     public EventResponse createEvent(EventRequest eventRequest, Long userId) {
         // Verify category exists
@@ -38,11 +37,11 @@ public class EventService {
             throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
         }
 
-        // Detect conflicts
-        List<Event> conflictingEvents = conflictService.detectConflict(eventRequest);
+        // Block conflicting bookings before saving the event
+        conflictService.checkStrictConflict(eventRequest);
 
-        // Use Abstract Factory pattern to create event
-        EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.isUrgent()); // Assume isUrgent field
+        // Use Abstract Factory pattern to create event based on event type
+        EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.getEventType());
         Event event = factory.createEvent(
                 eventRequest.getTitle(),
                 eventRequest.getDescription(),
@@ -50,19 +49,11 @@ public class EventService {
                 eventRequest.getCategoryId(),
                 eventRequest.getVenue(),
                 eventRequest.getStartTime(),
-                eventRequest.getEndTime()
+                eventRequest.getEndTime(),
+                eventRequest.getEventType()
         );
 
         Event savedEvent = eventRepository.save(event);
-
-        // Save conflict records if conflicts exist
-        if (!conflictingEvents.isEmpty()) {
-            conflictService.saveConflictRecords(
-                    savedEvent.getId(),
-                    conflictingEvents.stream().map(Event::getId).collect(Collectors.toList())
-            );
-        }
-
         return mapToResponse(savedEvent);
     }
 
@@ -110,71 +101,23 @@ public class EventService {
     }
 
     /**
-     * Approves an event and notifies the student
+     * Approves an event and notifies observers.
      */
     public void approveEvent(Long eventId, Long adminId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        // Set status to APPROVED
-        event.setStatus(EventStatus.APPROVED);
-        eventRepository.save(event);
-
-        // Get student user
-        User student = userRepository.findById(event.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + event.getUserId()));
-
-        // Create in-app notification
-        String notificationMessage = String.format(
-                "✅ Your event '%s' has been approved!",
-                event.getTitle()
-        );
-        Notification notification = Notification.builder()
-                .userId(student.getId())
-                .message(notificationMessage)
-                .type(NotificationType.EVENT_APPROVED)
-                .isRead(false)
-                .createdAt(LocalDateTime.now())
-                .build();
-        notificationRepository.save(notification);
-
-        // Send email notification
-        emailService.sendEventApprovedEmail(student.getEmail(), event.getTitle());
+        approvalService.approveEvent(event);
     }
 
     /**
-     * Rejects an event and notifies the student
+     * Rejects an event and notifies observers.
      */
     public void rejectEvent(Long eventId, String reason, Long adminId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        // Set status to REJECTED and store reason
-        event.setStatus(EventStatus.REJECTED);
-        event.setRejectReason(reason);
-        eventRepository.save(event);
-
-        // Get student user
-        User student = userRepository.findById(event.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + event.getUserId()));
-
-        // Create in-app notification
-        String notificationMessage = String.format(
-                "❌ Your event '%s' has been rejected.\n\nReason: %s",
-                event.getTitle(),
-                reason
-        );
-        Notification notification = Notification.builder()
-                .userId(student.getId())
-                .message(notificationMessage)
-                .type(NotificationType.EVENT_REJECTED)
-                .isRead(false)
-                .createdAt(LocalDateTime.now())
-                .build();
-        notificationRepository.save(notification);
-
-        // Send email notification
-        emailService.sendEventRejectedEmail(student.getEmail(), event.getTitle(), reason);
+        approvalService.rejectEvent(event, reason);
     }
 
     /**
@@ -243,6 +186,7 @@ public List<EventResponse> getEventsByUserId(Long userId) {
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())
                 .status(event.getStatus().name())
+                .eventType(event.getEventType() != null ? event.getEventType().name() : null)
                 .categoryName(category != null ? category.getName() : "Unknown")
                 .createdByName(creator != null ? creator.getName() : "Unknown")
                 .rejectReason(event.getRejectReason())

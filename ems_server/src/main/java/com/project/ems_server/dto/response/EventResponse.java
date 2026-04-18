@@ -32,6 +32,8 @@ public class EventResponse {
     
     private String status;
     
+    private String eventType;
+    
     private String categoryName;
     
     private String createdByName;

@@ -12,6 +12,7 @@ const schema = z.object({
   description: z.string().min(5, 'Description required'),
   categoryId: z.string(),
   subCategoryId: z.string().optional(),
+  eventType: z.string().min(1, 'Event type required'),
   venue: z.string().min(2, 'Venue required'),
   startTime: z.string(),
   endTime: z.string(),
@@ -66,12 +67,11 @@ export default function CreateEventPage() {
       await axiosInstance.post('/events', {
         title: data.title,
         description: data.description,
-        categoryId: data.categoryId,
-        subCategoryId: data.subCategoryId || null,
+        categoryId: data.subCategoryId || data.categoryId,
+        eventType: data.eventType,
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
-        userId: user.id,
       });
       toast.success('Event created successfully!');
       navigate('/my-events');
@@ -118,6 +118,18 @@ export default function CreateEventPage() {
             </select>
           </div>
         )}
+        <div className="mb-4">
+          <label className="block mb-1">Event Type</label>
+          <select {...register('eventType')} className="w-full px-3 py-2 border rounded">
+            <option value="">Select event type</option>
+            <option value="CULTURAL">Cultural</option>
+            <option value="TECHNICAL">Technical</option>
+            <option value="ACADEMIC">Academic</option>
+            <option value="SPORTS">Sports</option>
+            <option value="URGENT">Urgent</option>
+          </select>
+          {errors.eventType && <p className="text-red-500 text-sm">{errors.eventType.message}</p>}
+        </div>
         <div className="mb-4">
           <label className="block mb-1">Venue</label>
           <input {...register('venue')} className="w-full px-3 py-2 border rounded" />

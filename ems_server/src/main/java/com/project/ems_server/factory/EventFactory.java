@@ -2,6 +2,7 @@ package com.project.ems_server.factory;
 
 import com.project.ems_server.entity.Event;
 import com.project.ems_server.enums.EventStatus;
+import com.project.ems_server.enums.EventType;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -19,7 +20,7 @@ public class EventFactory implements EventFactoryInterface {
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           LocalDateTime startTime, LocalDateTime endTime) {
+                           LocalDateTime startTime, LocalDateTime endTime, EventType eventType) {
         return Event.builder()
                 .title(title)
                 .description(description)
@@ -28,6 +29,7 @@ public class EventFactory implements EventFactoryInterface {
                 .venue(venue)
                 .startTime(startTime)
                 .endTime(endTime)
+                .eventType(eventType)
                 .status(EventStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -38,7 +40,7 @@ public class EventFactory implements EventFactoryInterface {
      */
     @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           LocalDateTime startTime, LocalDateTime endTime, EventStatus status) {
+                           LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType) {
         return Event.builder()
                 .title(title)
                 .description(description)
@@ -47,6 +49,7 @@ public class EventFactory implements EventFactoryInterface {
                 .venue(venue)
                 .startTime(startTime)
                 .endTime(endTime)
+                .eventType(eventType)
                 .status(status)
                 .createdAt(LocalDateTime.now())
                 .build();

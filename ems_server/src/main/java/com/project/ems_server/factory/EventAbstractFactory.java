@@ -1,5 +1,6 @@
 package com.project.ems_server.factory;
 
+import com.project.ems_server.enums.EventType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +18,12 @@ public class EventAbstractFactory {
     private UrgentEventFactory urgentFactory;
 
     /**
-     * Returns the appropriate factory based on urgency.
+     * Returns the appropriate factory based on event type.
      */
-    public EventFactoryInterface getFactory(boolean isUrgent) {
-        return isUrgent ? urgentFactory : standardFactory;
+    public EventFactoryInterface getFactory(EventType eventType) {
+        if (eventType == EventType.URGENT) {
+            return urgentFactory;
+        }
+        return standardFactory;
     }
 }

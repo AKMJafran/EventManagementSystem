@@ -17,9 +17,7 @@ export default function MyEventsPage() {
   useEffect(() => {
     async function fetchEvents() {
       try {
-        const res = await axiosInstance.get('/events', {
-          params: { userId: user.id },
-        });
+        const res = await axiosInstance.get('/events/user/my-events');
         setEvents(res.data);
       } catch (e) {
         toast.error('Failed to load events');
