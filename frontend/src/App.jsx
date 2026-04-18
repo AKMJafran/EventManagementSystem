@@ -12,6 +12,8 @@ import StudentDashboard from './pages/StudentDashboard';
 import CreateEventPage from './pages/CreateEventPage';
 import MyEventsPage from './pages/MyEventsPage';
 import AdminDashboard from './pages/AdminDashboard';
+import CalendarPage from './pages/CalendarPage';
+import MonthlyReportPage from './pages/MonthlyReportPage';
 import ManageCategories from './pages/ManageCategories';
 import ManageEvents from './pages/ManageEvents';
 import ConflictsPage from './pages/ConflictsPage';
@@ -49,6 +51,8 @@ function App() {
 
       <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/calendar" element={<CalendarPage />} />
+        <Route path="/admin/reports/monthly" element={<MonthlyReportPage />} />
         <Route path="/manage-categories" element={<ManageCategories />} />
         <Route path="/manage-events" element={<ManageEvents />} />
         <Route path="/create-event" element={<CreateEventPage />} />

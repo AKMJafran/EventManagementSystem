@@ -46,10 +46,10 @@ function OtpInput({ onChange }) {
 export default function VerifyOtpPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const email = location.state?.email || '';
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm({
+  const initialEmail = location.state?.email || '';
+  const { register, handleSubmit, getValues, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { email, otp: '' },
+    defaultValues: { email: initialEmail, otp: '' },
   });
 
   const onOtpChange = (otp) => setValue('otp', otp);
@@ -69,7 +69,7 @@ export default function VerifyOtpPage() {
 
   const handleResend = async () => {
     try {
-      await axiosInstance.post('/auth/send-reset-otp', { email });
+      await axiosInstance.post(`/auth/resend-register-otp?email=${encodeURIComponent(getValues('email'))}`);
       toast.success('OTP resent to your email.');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to resend OTP');
@@ -82,7 +82,11 @@ export default function VerifyOtpPage() {
         <h2 className="text-2xl font-bold mb-6 text-center">Verify OTP</h2>
         <div className="mb-4">
           <label className="block mb-1">Email</label>
-          <input {...register('email')} className="w-full px-3 py-2 border rounded" readOnly />
+          <input
+            {...register('email')}
+            className="w-full px-3 py-2 border rounded"
+            readOnly={Boolean(initialEmail)}
+          />
           {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
         </div>
         <label className="block mb-1">Enter 6-digit OTP</label>

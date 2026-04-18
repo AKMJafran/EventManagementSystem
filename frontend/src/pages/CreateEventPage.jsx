@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
   description: z.string().min(5, 'Description required'),
-  categoryId: z.string(),
+  categoryId: z.string().min(1, 'Category required'),
   subCategoryId: z.string().optional(),
   eventType: z.string().min(1, 'Event type required'),
   venue: z.string().min(2, 'Venue required'),
@@ -24,6 +24,15 @@ export default function CreateEventPage() {
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+
+  const normalizeCategories = (items) => {
+    return items.map((item) => ({
+      ...item,
+      name: item.name || item.categoryName || item.label || `Category ${item.id}`,
+    }));
+  };
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
@@ -35,10 +44,12 @@ export default function CreateEventPage() {
     async function fetchCategories() {
       try {
         const res = await axiosInstance.get('/categories');
-        setCategories(res.data);
+        setCategories(normalizeCategories(res.data));
       } catch (e) {
         toast.error('Failed to load categories');
         console.error(e);
+      } finally {
+        setCategoriesLoading(false);
       }
     }
     fetchCategories();
@@ -48,14 +59,18 @@ export default function CreateEventPage() {
     async function fetchSubCategories() {
       if (!selectedCategory) {
         setSubCategories([]);
+        setSubCategoriesLoading(false);
         return;
       }
+      setSubCategoriesLoading(true);
       try {
         const res = await axiosInstance.get(`/categories/${selectedCategory}/sub`);
-        setSubCategories(res.data);
+        setSubCategories(normalizeCategories(res.data));
       } catch (e) {
         toast.error('Failed to load sub-categories');
         console.error(e);
+      } finally {
+        setSubCategoriesLoading(false);
       }
     }
     fetchSubCategories();
@@ -99,8 +114,15 @@ export default function CreateEventPage() {
         </div>
         <div className="mb-4">
           <label className="block mb-1">Category</label>
-          <select {...register('categoryId')} className="w-full px-3 py-2 border rounded">
-            <option value="">Select category</option>
+          <select
+            {...register('categoryId')}
+            defaultValue=""
+            className="w-full px-3 py-2 border rounded"
+            disabled={categoriesLoading}
+          >
+            <option value="">
+              {categoriesLoading ? 'Loading categories...' : 'Select category'}
+            </option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
@@ -110,8 +132,15 @@ export default function CreateEventPage() {
         {subCategories.length > 0 && (
           <div className="mb-4">
             <label className="block mb-1">Sub-Category</label>
-            <select {...register('subCategoryId')} className="w-full px-3 py-2 border rounded">
-              <option value="">Select sub-category</option>
+            <select
+              {...register('subCategoryId')}
+              defaultValue=""
+              className="w-full px-3 py-2 border rounded"
+              disabled={subCategoriesLoading}
+            >
+              <option value="">
+                {subCategoriesLoading ? 'Loading sub-categories...' : 'Select sub-category'}
+              </option>
               {subCategories.map(sub => (
                 <option key={sub.id} value={sub.id}>{sub.name}</option>
               ))}
@@ -145,7 +174,11 @@ export default function CreateEventPage() {
           <input type="datetime-local" {...register('endTime')} className="w-full px-3 py-2 border rounded" />
           {errors.endTime && <p className="text-red-500 text-sm">{errors.endTime.message}</p>}
         </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700" disabled={isSubmitting || loading}>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-70"
+          disabled={isSubmitting || loading || categoriesLoading || categories.length === 0}
+        >
           {isSubmitting || loading ? 'Creating...' : 'Create Event'}
         </button>
       </form>

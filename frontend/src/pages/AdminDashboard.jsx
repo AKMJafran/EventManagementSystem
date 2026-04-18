@@ -65,9 +65,11 @@ export default function AdminDashboard() {
           </ul>
         )}
       </div>
-      <div className="flex space-x-4">
+      <div className="flex flex-wrap gap-4">
         <Link to="/manage-categories" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Manage Categories</Link>
         <Link to="/manage-events" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Manage Events</Link>
+        <Link to="/admin/calendar" className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">View Calendar</Link>
+        <Link to="/admin/reports/monthly" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Monthly Report</Link>
         <Link to="/conflicts" className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">View Conflicts</Link>
       </div>
     </div>
