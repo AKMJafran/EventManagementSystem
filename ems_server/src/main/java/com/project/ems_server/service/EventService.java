@@ -8,9 +8,12 @@ import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.*;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.enums.EventType;
+import com.project.ems_server.enums.NotificationType;
+import com.project.ems_server.enums.Role;
 import com.project.ems_server.factory.EventAbstractFactory;
 import com.project.ems_server.factory.EventFactoryInterface;
 import com.project.ems_server.repository.*;
+import com.project.ems_server.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +37,7 @@ public class EventService {
     private final ApprovalService approvalService;
     private final EventAbstractFactory eventAbstractFactory;
     private final FileServerService fileServerService;
+    private final NotificationService notificationService;
 
     /**
      * Creates a new event with PENDING status and blocks conflicting bookings.
@@ -62,7 +66,31 @@ public class EventService {
         );
 
         Event savedEvent = eventRepository.save(event);
+        notifyAdminsOfNewEventRequest(savedEvent);
         return mapToResponse(savedEvent);
+    }
+
+    /**
+     * Notifies all admin users when a new event request is created.
+     */
+    private void notifyAdminsOfNewEventRequest(Event event) {
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+        if (admins.isEmpty()) {
+            return;
+        }
+
+        String message = String.format(
+                "📢 New event request from %s: '%s' at %s (%s to %s). Review required.",
+                userRepository.findById(event.getUserId()).map(User::getName).orElse("A student"),
+                event.getTitle(),
+                event.getVenue(),
+                event.getStartTime(),
+                event.getEndTime()
+        );
+
+        for (User admin : admins) {
+            notificationService.createNotification(admin.getId(), message, NotificationType.GENERAL);
+        }
     }
 
     /**

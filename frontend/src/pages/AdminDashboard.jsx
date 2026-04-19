@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import NotificationBell from '../components/NotificationBell';
 import AdminLayout from '../components/layout/AdminLayout';
 
 export default function AdminDashboard() {
