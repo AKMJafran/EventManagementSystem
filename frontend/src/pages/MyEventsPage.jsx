@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import StudentLayout from '../components/layout/StudentLayout';
 
 export default function MyEventsPage() {
   const { user } = useAuthStore();
@@ -62,7 +63,7 @@ export default function MyEventsPage() {
     });
   };
 
-  return (
+  retStudentLayout user={user}urn (
     <>
       {/* Header Section */}
       <div className="mb-12">
@@ -170,7 +171,7 @@ export default function MyEventsPage() {
             );
           })}
         </div>
-      )}
+      StudentLayout)}
     </>
   );
 }
