@@ -30,9 +30,7 @@ export default function StudentHeader({ user }) {
       const formData = new FormData();
       formData.append('file', file);
       
-      const uploadRes = await axiosInstance.post('/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const uploadRes = await axiosInstance.post('/files/upload', formData);
       
       const fileId = uploadRes.data.fileId;
       
