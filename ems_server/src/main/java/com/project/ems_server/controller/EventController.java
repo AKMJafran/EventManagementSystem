@@ -9,6 +9,7 @@ import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,7 +17,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
@@ -69,21 +69,14 @@ public class EventController {
      * Gets events for a date range.
      */
     @GetMapping("/calendar")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<EventResponse>> getCalendarEvents(
-            @RequestParam String start,
-            @RequestParam String end) {
-        try {
-            LocalDate startDate = LocalDate.parse(start);
-            LocalDate endDate = LocalDate.parse(end);
-            if (endDate.isBefore(startDate)) {
-                return ResponseEntity.badRequest().build();
-            }
-            List<EventResponse> events = eventService.getCalendarEvents(startDate, endDate);
-            return ResponseEntity.ok(events);
-        } catch (DateTimeParseException e) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        if (end.isBefore(start)) {
             return ResponseEntity.badRequest().build();
         }
+        List<EventResponse> events = eventService.getCalendarEvents(start, end);
+        return ResponseEntity.ok(events);
     }
 
     /**
