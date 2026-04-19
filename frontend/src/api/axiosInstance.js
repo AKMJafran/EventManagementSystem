@@ -6,9 +6,6 @@ const API_BASE_URL = 'http://localhost:8081';
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Track whether a refresh is in progress to avoid multiple refresh requests
