@@ -17,6 +17,8 @@ public class EventResponse {
    
     private Long id;
     private Long userId;
+    private Long categoryId;
+    private String imageId;
     
     private String title;
     

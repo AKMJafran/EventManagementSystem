@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -46,6 +47,8 @@ export default function MyEventsPage() {
     }
   };
 
+  const navigate = useNavigate();
+
   const getStatusIcon = (status) => {
     switch(status) {
       case 'APPROVED': return 'event_available';
@@ -63,8 +66,8 @@ export default function MyEventsPage() {
     });
   };
 
-  retStudentLayout user={user}urn (
-    <>
+  return (
+    <StudentLayout user={user}>
       {/* Header Section */}
       <div className="mb-12">
         <h1 className="serif-authoritative text-4xl md:text-5xl font-bold text-on-background mb-4">My Events</h1>
@@ -126,10 +129,10 @@ export default function MyEventsPage() {
                       {event.status}
                     </span>
                     <h3 className="serif-authoritative text-2xl font-bold text-on-background leading-tight mb-2">{event.title}</h3>
-                    {event.category && (
+                    {event.categoryName && (
                       <p className="text-on-secondary-fixed-variant text-sm font-medium tracking-wide flex items-center gap-1 uppercase">
                         <span className="material-symbols-outlined text-sm">category</span>
-                        {event.category?.name || 'General'}
+                        {event.categoryName}
                       </p>
                     )}
                   </div>
@@ -161,9 +164,14 @@ export default function MyEventsPage() {
                       <div className="text-xs text-on-surface-variant italic">
                         {event.status === 'PENDING' && 'Awaiting Faculty Approval'}
                       </div>
-                      <button className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
-                        View Details <span className="material-symbols-outlined text-base">arrow_forward</span>
-                      </button>
+                      {event.status === 'PENDING' && (
+                        <button
+                          onClick={() => navigate(`/student/edit-event/${event.id}`)}
+                          className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
+                        >
+                          Edit Event <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -171,7 +179,7 @@ export default function MyEventsPage() {
             );
           })}
         </div>
-      StudentLayout)}
-    </>
+      )}
+    </StudentLayout>
   );
 }

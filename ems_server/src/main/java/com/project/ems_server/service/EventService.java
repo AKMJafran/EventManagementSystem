@@ -66,6 +66,48 @@ public class EventService {
     }
 
     /**
+     * Updates an existing pending event belonging to the requesting student.
+     */
+    public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        if (!event.getUserId().equals(userId)) {
+            throw new RuntimeException("You are not allowed to edit this event");
+        }
+
+        if (event.getStatus() != EventStatus.PENDING) {
+            throw new RuntimeException("Only pending events can be edited");
+        }
+
+        if (!categoryRepository.existsById(eventRequest.getCategoryId())) {
+            throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
+        }
+
+        boolean dateOrVenueChanged = !event.getVenue().equals(eventRequest.getVenue())
+                || !event.getStartTime().equals(eventRequest.getStartTime())
+                || !event.getEndTime().equals(eventRequest.getEndTime());
+
+        if (dateOrVenueChanged) {
+            conflictService.checkStrictConflict(eventRequest);
+        }
+
+        event.setTitle(eventRequest.getTitle());
+        event.setDescription(eventRequest.getDescription());
+        event.setCategoryId(eventRequest.getCategoryId());
+        event.setVenue(eventRequest.getVenue());
+        event.setStartTime(eventRequest.getStartTime());
+        event.setEndTime(eventRequest.getEndTime());
+        event.setEventType(eventRequest.getEventType());
+        event.setImageId(eventRequest.getImageId() != null ? eventRequest.getImageId() : event.getImageId());
+        event.setStatus(EventStatus.PENDING);
+        event.setRejectReason(null);
+
+        Event updatedEvent = eventRepository.save(event);
+        return mapToResponse(updatedEvent);
+    }
+
+    /**
      * Gets events filtered by status and/or category
      */
     public List<EventResponse> getEvents(EventStatus status, Long categoryId) {
@@ -260,6 +302,8 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         return EventResponse.builder()
                 .id(event.getId())
                 .userId(event.getUserId())
+                .categoryId(event.getCategoryId())
+                .imageId(event.getImageId())
                 .title(event.getTitle())
                 .description(event.getDescription())
                 .imageUrl(imageUrl)
