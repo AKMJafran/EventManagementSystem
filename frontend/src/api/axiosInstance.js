@@ -43,6 +43,16 @@ axiosInstance.interceptors.request.use(
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
       delete config.headers['content-type'];
+
+      if (config.headers.common) {
+        delete config.headers.common['Content-Type'];
+        delete config.headers.common['content-type'];
+      }
+
+      if (config.headers.post) {
+        delete config.headers.post['Content-Type'];
+        delete config.headers.post['content-type'];
+      }
     }
 
     return config;
