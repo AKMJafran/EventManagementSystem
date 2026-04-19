@@ -106,11 +106,7 @@ export default function CreateEventPage() {
         formData.append('file', selectedImage);
         
         try {
-          const uploadRes = await axiosInstance.post('/files/upload', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          });
+          const uploadRes = await axiosInstance.post('/files/upload', formData);
           imageId = uploadRes.data.fileId;
         } catch (uploadError) {
           toast.error("Failed to upload image. Event will be created without it.");
