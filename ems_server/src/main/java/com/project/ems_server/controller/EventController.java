@@ -44,6 +44,21 @@ public class EventController {
     }
 
     /**
+     * Updates an existing pending event (student only)
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<EventResponse> updateEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody EventRequest eventRequest,
+            Authentication authentication) {
+
+        Long userId = extractUserIdFromAuthentication(authentication);
+        EventResponse response = eventService.updateEvent(id, eventRequest, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Gets events with optional status and category filters
      * GET /events?status=APPROVED&categoryId=1
      */

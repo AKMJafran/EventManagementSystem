@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 import StudentLayout from '../components/layout/StudentLayout';
 
 export default function MyEventsPage() {
@@ -164,79 +164,69 @@ export default function MyEventsPage() {
                 key={event.id}
                 className="group bg-surface-container-lowest p-8 rounded-xl relative overflow-hidden transition-all duration-300 hover:shadow-[0_24px_48px_-12px_rgba(0,101,101,0.08)]"
               >
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${styles.bar}`}></div>
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${styles.bar}`} />
 
                 {/* Header */}
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase mb-4 ${styles.badge}`}
-                    >
+                    <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase mb-4 ${styles.badge}`}>
                       {event.status}
                     </span>
 
-                    <h3 className="serif-authoritative text-2xl font-bold text-on-background mb-2">
-                      {event.title}
-                    </h3>
+                    <h3 className="text-2xl font-bold mb-2">{event.title}</h3>
 
                     {event.category && (
                       <p className="text-sm uppercase flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">
-                          category
-                        </span>
+                        <span className="material-symbols-outlined text-sm">category</span>
                         {event.category?.name || 'General'}
                       </p>
                     )}
                   </div>
 
-                  <div className="bg-surface-container-high p-3 rounded-lg text-primary">
-                    <span className="material-symbols-outlined">
-                      {getStatusIcon(event.status)}
-                    </span>
-                  </div>
+                  <span className="material-symbols-outlined text-primary">
+                    {getStatusIcon(event.status)}
+                  </span>
                 </div>
 
                 {/* Details */}
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="material-symbols-outlined text-primary">
-                      calendar_month
-                    </span>
-                    {formatDate(event.startTime)} — {formatDate(event.endTime)}
+                <div className="space-y-3 mb-6 text-sm">
+                  <div>
+                    📅 {formatDate(event.startTime)} — {formatDate(event.endTime)}
                   </div>
-
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="material-symbols-outlined text-primary">
-                      location_on
-                    </span>
-                    {typeof event.venue === 'object'
+                  <div>
+                    📍 {typeof event.venue === 'object'
                       ? event.venue?.name || 'Unknown Venue'
                       : event.venue || 'Unknown Venue'}
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="pt-6 border-t border-surface-container-highest">
+                <div className="pt-4 border-t">
                   {event.status === 'REJECTED' && event.rejectReason ? (
-                    <div className="text-error text-sm italic">
+                    <p className="text-red-500 text-sm">
                       Reason: {event.rejectReason}
-                    </div>
+                    </p>
                   ) : (
                     <div className="flex justify-between items-center">
-                      <div className="text-xs italic text-on-surface-variant">
-                        {event.status === 'PENDING' &&
-                          'Awaiting Faculty Approval'}
-                      </div>
+                      <span className="text-xs italic">
+                        {event.status === 'PENDING' && 'Awaiting Approval'}
+                      </span>
 
-                      <button
-                        onClick={() => navigate(`/events/${event.id}`)}
-                        className="text-primary font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
-                      >
-                        View Details
-                        <span className="material-symbols-outlined text-base">
-                          arrow_forward
-                        </span>
-                      </button>
+                      {event.status === 'PENDING' ? (
+                        <button
+                          onClick={() => navigate(`/student/edit-event/${event.id}`)}
+                          className="text-blue-600 text-sm font-semibold"
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/events/${event.id}`)}
+                          className="text-blue-600 text-sm font-semibold"
+                        >
+                          View
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

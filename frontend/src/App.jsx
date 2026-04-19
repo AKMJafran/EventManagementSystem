@@ -49,6 +49,7 @@ function App() {
       <Route element={<ProtectedRoute requiredRole="STUDENT" />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/create-event" element={<CreateEventPage />} />
+        <Route path="/student/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
       </Route>

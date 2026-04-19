@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -23,11 +23,15 @@ const schema = z.object({
 export default function CreateEventPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [existingImageId, setExistingImageId] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [eventLoading, setEventLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
 
@@ -36,6 +40,17 @@ export default function CreateEventPage() {
       ...item,
       name: item.name || item.categoryName || item.label || `Category ${item.id}`,
     }));
+  };
+
+  const toDateTimeLocalValue = (dateString) => {
+    if (!dateString) return '';
+    const normalized = dateString.replace(' ', 'T');
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    const timezoneOffsetMs = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
   };
 
   const handleImageChange = (event) => {
@@ -54,7 +69,7 @@ export default function CreateEventPage() {
     reader.readAsDataURL(file);
   };
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
   });
 
@@ -74,6 +89,41 @@ export default function CreateEventPage() {
     }
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchEvent = async () => {
+      setEventLoading(true);
+      try {
+        const res = await axiosInstance.get(`/events/${id}`);
+        const event = res.data;
+
+        reset({
+          title: event.title || '',
+          description: event.description || '',
+          categoryId: event.categoryId?.toString() || '',
+          subCategoryId: '',
+          eventType: event.eventType || '',
+          venue: event.venue || '',
+          startTime: toDateTimeLocalValue(event.startTime),
+          endTime: toDateTimeLocalValue(event.endTime),
+          imageId: event.imageId || '',
+        });
+
+        setExistingImageId(event.imageId || null);
+        setSelectedImage(null);
+        setImagePreview(event.imageUrl || null);
+      } catch (e) {
+        toast.error('Failed to load event for editing');
+        console.error(e);
+      } finally {
+        setEventLoading(false);
+      }
+    };
+
+    fetchEvent();
+  }, [id, reset]);
 
   useEffect(() => {
     async function fetchSubCategories() {
@@ -99,7 +149,7 @@ export default function CreateEventPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      let imageId = null;
+      let imageId = existingImageId;
       
       if (selectedImage) {
         const formData = new FormData();
@@ -109,12 +159,12 @@ export default function CreateEventPage() {
           const uploadRes = await axiosInstance.post('/files/upload', formData);
           imageId = uploadRes.data.fileId;
         } catch (uploadError) {
-          toast.error("Failed to upload image. Event will be created without it.");
+          toast.error("Failed to upload image. Event will be saved without a new upload.");
           console.error(uploadError);
         }
       }
 
-      await axiosInstance.post('/events', {
+      const payload = {
         title: data.title,
         description: data.description,
         categoryId: data.subCategoryId || data.categoryId,
@@ -123,8 +173,15 @@ export default function CreateEventPage() {
         startTime: data.startTime,
         endTime: data.endTime,
         imageId: imageId,
-      });
-      toast.success('Event created successfully!');
+      };
+
+      if (isEditMode) {
+        await axiosInstance.put(`/events/${id}`, payload);
+        toast.success('Event updated successfully!');
+      } else {
+        await axiosInstance.post('/events', payload);
+        toast.success('Event created successfully!');
+      }
       navigate('/student/my-events');
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to create event');
@@ -137,8 +194,10 @@ export default function CreateEventPage() {
   return (
     <StudentLayout user={user}>
       <header className="mb-12">
-        <h1 className="text-4xl font-bold text-on-surface mb-2 serif-heading">Create New Event</h1>
-        <p className="text-on-surface-variant max-w-2xl">Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.</p>
+        <h1 className="text-4xl font-bold text-on-surface mb-2 serif-heading">{isEditMode ? 'Edit Pending Event' : 'Create New Event'}</h1>
+        <p className="text-on-surface-variant max-w-2xl">
+          {isEditMode ? 'Update the event details before faculty review.' : 'Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.'}
+        </p>
       </header>
       
       <div className="flex flex-col lg:flex-row gap-12">
@@ -304,7 +363,7 @@ export default function CreateEventPage() {
                   disabled={isSubmitting || loading}
                   className="px-10 py-4 academic-gradient text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
                 >
-                  {isSubmitting || loading ? 'Submitting...' : 'Submit Request'}
+                  {isSubmitting || loading ? 'Submitting...' : (isEditMode ? 'Update Request' : 'Submit Request')}
                 </button>
               </div>
             </form>
