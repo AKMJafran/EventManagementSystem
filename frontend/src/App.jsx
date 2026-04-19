@@ -30,11 +30,15 @@ const Home = () => {
 
 
 function App() {
-  const { loadFromStorage } = useAuthStore();
+  const { loadFromStorage, authLoaded } = useAuthStore();
 
   useEffect(() => {
     loadFromStorage();
   }, [loadFromStorage]);
+
+  if (!authLoaded) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <Routes>

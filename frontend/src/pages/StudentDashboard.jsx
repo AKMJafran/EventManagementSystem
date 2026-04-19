@@ -6,12 +6,16 @@ import { Link } from 'react-router-dom';
 import StudentLayout from '../components/layout/StudentLayout';
 
 export default function StudentDashboard() {
-  const { user } = useAuthStore();
+  const { user, isAuthenticated, authLoaded } = useAuthStore();
   const [approvedEvents, setApprovedEvents] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!authLoaded || !isAuthenticated) {
+      return;
+    }
+
     async function fetchData() {
       try {
         const approvedRes = await axiosInstance.get('/events', {
@@ -31,7 +35,7 @@ export default function StudentDashboard() {
       }
     }
     fetchData();
-  }, [user]);
+  }, [authLoaded, isAuthenticated, user]);
 
   if (loading) {
     return (

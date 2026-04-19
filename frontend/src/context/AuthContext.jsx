@@ -4,10 +4,10 @@ import { jwtDecode } from 'jwt-decode';
 
 const useAuthStore = create((set) => ({
 
-
   user: null,
   accessToken: null,
   isAuthenticated: false,
+  authLoaded: false,
   
   login: async (email, password) => {
     try {
@@ -27,7 +27,7 @@ const useAuthStore = create((set) => ({
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
 
-      set({ user, accessToken, isAuthenticated: true });
+      set({ user, accessToken, isAuthenticated: true, authLoaded: true });
       return { role };
     } catch (error) {
       console.error('Login failed:', error);
@@ -52,14 +52,21 @@ const useAuthStore = create((set) => ({
       const isTokenExpired = decodedToken.exp * 1000 < Date.now();
 
       if (isTokenExpired) {
-        set({ user: null, accessToken: null, isAuthenticated: false });
+        set({ user: null, accessToken: null, isAuthenticated: false, authLoaded: true });
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       } else {
         // Also update user state from potentially refreshed token properties in localStorage
-        set({ user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name }, accessToken, isAuthenticated: true });
+        set({
+          user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name },
+          accessToken,
+          isAuthenticated: true,
+          authLoaded: true,
+        });
       }
+    } else {
+      set({ user: null, accessToken: null, isAuthenticated: false, authLoaded: true });
     }
   },
 }));

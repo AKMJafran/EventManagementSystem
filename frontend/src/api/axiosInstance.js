@@ -144,6 +144,14 @@ axiosInstance.interceptors.response.use(
       });
     }
 
+    // Handle 403 Forbidden by clearing auth and redirecting to login
+    if (error.response?.status === 403 && !originalRequest?._retry) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+
     return Promise.reject(error);
   }
 );
