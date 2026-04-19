@@ -71,7 +71,6 @@ public class EventService {
     }
 
     /**
-<<<<<<< HEAD
      * Notifies all admin users when a new event request is created.
      */
     private void notifyAdminsOfNewEventRequest(Event event) {
@@ -92,7 +91,9 @@ public class EventService {
         for (User admin : admins) {
             notificationService.createNotification(admin.getId(), message, NotificationType.GENERAL);
         }
-=======
+    }
+
+    /**
      * Updates an existing pending event belonging to the requesting student.
      */
     public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
@@ -132,7 +133,6 @@ public class EventService {
 
         Event updatedEvent = eventRepository.save(event);
         return mapToResponse(updatedEvent);
->>>>>>> 729ae3670f27165eb18ebaa655512238ace0316b
     }
 
     /**
