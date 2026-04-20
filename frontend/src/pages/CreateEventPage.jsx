@@ -30,6 +30,7 @@ export default function CreateEventPage() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [existingImageId, setExistingImageId] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [imageError, setImageError] = useState('');
   const [loading, setLoading] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -58,9 +59,27 @@ export default function CreateEventPage() {
     if (!file) {
       setSelectedImage(null);
       setImagePreview(null);
+      setImageError('');
       return;
     }
 
+    if (!file.type.startsWith('image/')) {
+      setSelectedImage(null);
+      setImagePreview(null);
+      setImageError('Please select a valid image file.');
+      toast.error('Please select an image file.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedImage(null);
+      setImagePreview(null);
+      setImageError('Image size must be 5MB or less.');
+      toast.error('File size should not exceed 5MB.');
+      return;
+    }
+
+    setImageError('');
     setSelectedImage(file);
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -159,8 +178,14 @@ export default function CreateEventPage() {
           const uploadRes = await axiosInstance.post('/files/upload', formData);
           imageId = uploadRes.data.fileId;
         } catch (uploadError) {
-          toast.error("Failed to upload image. Event will be saved without a new upload.");
-          console.error(uploadError);
+          const status = uploadError?.response?.status;
+          const serverData = uploadError?.response?.data;
+          console.error('Image upload failed', { status, serverData, uploadError });
+          toast.error(
+            serverData?.error
+              ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
+              : 'Failed to upload image. Event will be saved without a new upload.'
+          );
         }
       }
 
@@ -238,6 +263,9 @@ export default function CreateEventPage() {
                     onChange={handleImageChange}
                     className="w-full bg-surface-container-high border-0 focus:ring-0 rounded-t-lg text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl"
                   />
+                  {imageError && (
+                    <p className="text-error text-xs mt-2 font-bold">{imageError}</p>
+                  )}
                   {imagePreview && (
                     <img
                       src={imagePreview}

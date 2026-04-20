@@ -37,64 +37,65 @@ public class FileServerService {
         this.restTemplate = new RestTemplate();
     }
 
-    private synchronized void authenticate() {
+    private synchronized void authenticate() throws IOException {
+        Map<String, String> payload = new HashMap<>();
+        payload.put("client_name", clientName);
+        payload.put("client_secret", clientSecret);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+
         try {
-            Map<String, String> payload = new HashMap<>();
-            payload.put("client_name", clientName);
-            payload.put("client_secret", clientSecret);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
-
             ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
-            
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 this.authToken = (String) response.getBody().get("token");
+                if (this.authToken == null || this.authToken.isBlank()) {
+                    throw new IOException("File server login did not return a valid token");
+                }
                 logger.info("Successfully authenticated with file server");
-            } else {
-                // If login fails, try signup then login
-                signupAndLogin();
+                return;
             }
+
+            logger.warn("Initial file server login failed with status {}", response.getStatusCode());
+            signupAndLogin(request);
         } catch (Exception e) {
-            logger.warn("Login failed, attempting signup: " + e.getMessage());
-            signupAndLogin();
+            logger.warn("Login failed, attempting signup: {}", e.getMessage());
+            signupAndLogin(request);
+        }
+
+        if (this.authToken == null || this.authToken.isBlank()) {
+            throw new IOException("Unable to authenticate with file server");
         }
     }
 
-    private void signupAndLogin() {
+    private void signupAndLogin(HttpEntity<Map<String, String>> request) throws IOException {
         try {
-            Map<String, String> payload = new HashMap<>();
-            payload.put("client_name", clientName);
-            payload.put("client_secret", clientSecret);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
-
-            // Attempt signup
             try {
                 restTemplate.postForEntity(fileServerUrl + "/signup", request, Map.class);
                 logger.info("Successfully registered client with file server");
             } catch (Exception ex) {
-                logger.warn("Signup failed (might already exist): " + ex.getMessage());
+                logger.warn("Signup failed (might already exist): {}", ex.getMessage());
             }
-            
-            // Login again
+
             ResponseEntity<Map> loginResponse = restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
             if (loginResponse.getStatusCode().is2xxSuccessful() && loginResponse.getBody() != null) {
                 this.authToken = (String) loginResponse.getBody().get("token");
+                if (this.authToken == null || this.authToken.isBlank()) {
+                    throw new IOException("File server login after signup did not return a valid token");
+                }
                 logger.info("Successfully authenticated after signup");
-            } else {
-                throw new RuntimeException("Failed to obtain auth token after signup");
+                return;
             }
+            throw new IOException("Failed to obtain auth token after signup, status: " + loginResponse.getStatusCode());
         } catch (Exception e) {
             logger.error("Failed to authenticate with file server", e);
+            throw new IOException("Failed to authenticate with file server", e);
         }
     }
 
-    private String getAuthToken() {
-        if (authToken == null) {
+    private String getAuthToken() throws IOException {
+        if (authToken == null || authToken.isBlank()) {
             authenticate();
         }
         return authToken;
@@ -109,7 +110,6 @@ public class FileServerService {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         
-        // Wrap file as Resource for RestTemplate to handle
         Resource fileAsResource = new ByteArrayResource(file.getBytes()) {
             @Override
             public String getFilename() {
@@ -122,16 +122,15 @@ public class FileServerService {
 
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/upload_file", requestEntity, Map.class);
-            
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody().get("file_id").toString();
             }
-            throw new RuntimeException("Upload failed with status: " + response.getStatusCode());
+            throw new IOException("Upload failed with status: " + response.getStatusCode());
         } catch (Exception e) {
-            // Token might be expired, try to authenticate once more
             if (e.getMessage() != null && e.getMessage().contains("401 Unauthorized")) {
+                logger.warn("Upload returned 401, retrying authentication");
                 authenticate();
-                return uploadFile(file); // Retry once
+                return uploadFile(file);
             }
             logger.error("Failed to upload file to file server", e);
             throw new IOException("Failed to upload file", e);
@@ -143,32 +142,35 @@ public class FileServerService {
             return null;
         }
 
-        String token = getAuthToken();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(token);
-
-        Map<String, String> payload = new HashMap<>();
-        payload.put("file_id", fileId);
-
-        HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(payload, headers);
-
         try {
+            String token = getAuthToken();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("file_id", fileId);
+
+            HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(payload, headers);
+
             ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/request_file", requestEntity, Map.class);
-            
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody().get("url").toString();
             }
-            throw new RuntimeException("Request link failed with status: " + response.getStatusCode());
+            logger.error("Request file link failed with status: {}", response.getStatusCode());
+            return null;
         } catch (Exception e) {
-            // Token might be expired, try to authenticate once more
             if (e.getMessage() != null && e.getMessage().contains("401 Unauthorized")) {
-                authenticate();
-                // Retry once
-                return requestFileLinkRetry(fileId, getAuthToken()); 
+                try {
+                    authenticate();
+                    return requestFileLinkRetry(fileId, getAuthToken());
+                } catch (IOException retryException) {
+                    logger.error("Failed to re-authenticate when requesting file link", retryException);
+                    return null;
+                }
             }
-            logger.error("Failed to request file link from file server for file_id: " + fileId, e);
+            logger.error("Failed to request file link from file server for file_id: {}", fileId, e);
             return null;
         }
     }

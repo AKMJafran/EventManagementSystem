@@ -38,17 +38,18 @@ axiosInstance.interceptors.request.use(
     }
 
     if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
-      delete config.headers['content-type'];
+      config.headers = config.headers || {};
+      config.headers['Content-Type'] = undefined;
+      config.headers['content-type'] = undefined;
 
       if (config.headers.common) {
-        delete config.headers.common['Content-Type'];
-        delete config.headers.common['content-type'];
+        config.headers.common['Content-Type'] = undefined;
+        config.headers.common['content-type'] = undefined;
       }
 
       if (config.headers.post) {
-        delete config.headers.post['Content-Type'];
-        delete config.headers.post['content-type'];
+        config.headers.post['Content-Type'] = undefined;
+        config.headers.post['content-type'] = undefined;
       }
     }
 
