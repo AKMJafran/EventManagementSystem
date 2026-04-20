@@ -30,7 +30,7 @@ export default function MyEventsPage() {
     }
 
     fetchEvents();
-  }, [user?.id]);
+  }, [user]);
 
   const searchLower = search.toLowerCase();
 

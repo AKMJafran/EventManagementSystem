@@ -32,7 +32,6 @@ export default function CreateEventPage() {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageError, setImageError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [eventLoading, setEventLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
 
@@ -113,7 +112,6 @@ export default function CreateEventPage() {
     if (!id) return;
 
     const fetchEvent = async () => {
-      setEventLoading(true);
       try {
         const res = await axiosInstance.get(`/events/${id}`);
         const event = res.data;
@@ -136,8 +134,6 @@ export default function CreateEventPage() {
       } catch (e) {
         toast.error('Failed to load event for editing');
         console.error(e);
-      } finally {
-        setEventLoading(false);
       }
     };
 

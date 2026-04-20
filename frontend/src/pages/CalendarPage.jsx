@@ -39,7 +39,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchEvents(start, end);
-  }, []);
+  }, [start, end]);
 
   const handleSearch = (e) => {
     e.preventDefault();

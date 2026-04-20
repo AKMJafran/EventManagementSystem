@@ -14,7 +14,7 @@ const schema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
-function OtpInput({ onChange, valueStr = '' }) {
+function OtpInput({ onChange }) {
   const [inputs, setInputs] = useState(Array(6).fill(''));
 
   const handleInput = (e, idx) => {
