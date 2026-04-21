@@ -72,7 +72,7 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
 
     // Check if error is 401 (Unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+   if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
       // Mark request to avoid infinite loop
       originalRequest._retry = true;
 
