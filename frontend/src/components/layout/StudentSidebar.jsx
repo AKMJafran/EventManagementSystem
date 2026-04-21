@@ -25,7 +25,7 @@ export default function StudentSidebar() {
         
         <Link 
           to="/create-event" 
-          className="w-full flex items-center justify-center gap-2 py-3 editorial-gradient text-white rounded-lg shadow-lg shadow-primary/20 hover:opacity-90 transition-all font-medium text-sm"
+         className="w-full flex items-center justify-center gap-2 py-3 academic-gradient text-white rounded-lg shadow-lg shadow-primary/20 hover:opacity-90 transition-all font-medium text-sm"
         >
           <span className="material-symbols-outlined text-sm">add_circle</span>
           <span>Create New Request</span>
