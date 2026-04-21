@@ -2,7 +2,8 @@ import React from "react";
 
 export const Select = React.forwardRef(
   ({ className, error, label, helperText, id, options = [], placeholder, wrapperClass, ...props }, ref) => {
-    const selectId = id || React.useId();
+    const generatedId = React.useId();
+    const selectId = id ?? generatedId;
 
     return (
       <div className={`space-y-1.5 ${wrapperClass || ""}`}>

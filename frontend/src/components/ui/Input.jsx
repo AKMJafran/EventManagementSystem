@@ -2,7 +2,8 @@ import React from "react";
 
 export const Input = React.forwardRef(
   ({ className, error, label, helperText, id, wrapperClass, ...props }, ref) => {
-    const inputId = id || React.useId();
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
 
     return (
       <div className={`space-y-1.5 ${wrapperClass || ""}`}>
