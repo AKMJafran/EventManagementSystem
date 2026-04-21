@@ -59,70 +59,97 @@ export default function ResetPasswordPage() {
       toast.error(err?.response?.data?.message || 'Failed to reset password');
     }
   };
+return (
+  <div className="flex items-center justify-center min-h-screen bg-surface-container-lowest p-4">
+    <Card className="w-full max-w-md bg-white shadow-md border border-outline-variant/20 rounded-2xl">
+      
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl font-bold text-primary">
+          Reset Password
+        </CardTitle>
+        <CardDescription className="text-on-surface-variant">
+          {step === 1 
+            ? "Enter your email and get OTP." 
+            : "Enter OTP and new password"}
+        </CardDescription>
+      </CardHeader>
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle>Reset Password</CardTitle>
-          <CardDescription>
-            {step === 1 
-              ? "Enter your email address and we'll send you a recovery OTP." 
-              : "Enter the OTP sent to your email along with your new password"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {step === 1 && (
-            <form onSubmit={handleEmailSubmit(onEmailSubmit)} className="space-y-4">
-              <Input
-                label="Email"
-                type="email"
-                {...registerEmail('email')}
-                error={emailErrors.email?.message}
-                placeholder="john@example.com"
-              />
-              <Button type="submit" className="w-full" isLoading={isEmailSubmitting}>
-                Send OTP
-              </Button>
-            </form>
-          )}
+      <CardContent>
+        {step === 1 && (
+          <form onSubmit={handleEmailSubmit(onEmailSubmit)} className="space-y-4">
+            
+            <Input
+              label="Email"
+              type="email"
+              {...registerEmail('email')}
+              error={emailErrors.email?.message}
+              placeholder="john@example.com"
+              className="focus:ring-2 focus:ring-primary/40"
+            />
 
-          {step === 2 && (
-            <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-4">
-              <Input
-                label="Email"
-                type="email"
-                value={email}
-                readOnly
-                disabled
-              />
-              <Input
-                label="OTP"
-                type="text"
-                {...registerReset('otp')}
-                error={resetErrors.otp?.message}
-                placeholder="Enter 6-digit code"
-              />
-              <Input
-                label="New Password"
-                type="password"
-                {...registerReset('newPassword')}
-                error={resetErrors.newPassword?.message}
-                placeholder="••••••••"
-              />
-              <Button type="submit" className="w-full" isLoading={isResetSubmitting}>
-                Reset Password
-              </Button>
-            </form>
-          )}
-          
-          <div className="mt-4 text-center text-sm">
-            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-              Back to Login
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <Button 
+              type="submit" 
+              className="w-full bg-primary text-white hover:bg-primary/90"
+              isLoading={isEmailSubmitting}
+            >
+              Send OTP
+            </Button>
+
+          </form>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-4">
+            
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              readOnly
+              disabled
+              className="bg-gray-100"
+            />
+
+            <Input
+              label="OTP"
+              type="text"
+              {...registerReset('otp')}
+              error={resetErrors.otp?.message}
+              placeholder="Enter 6-digit code"
+              className="focus:ring-2 focus:ring-tertiary/40"
+            />
+
+            <Input
+              label="New Password"
+              type="password"
+              {...registerReset('newPassword')}
+              error={resetErrors.newPassword?.message}
+              placeholder="••••••••"
+              className="focus:ring-2 focus:ring-secondary/40"
+            />
+
+            <Button 
+              type="submit" 
+              className="w-full bg-tertiary text-white hover:bg-tertiary/90"
+              isLoading={isResetSubmitting}
+            >
+              Reset Password
+            </Button>
+
+          </form>
+        )}
+        
+        <div className="mt-4 text-center text-sm">
+          <Link 
+            to="/login" 
+            className="font-medium text-primary hover:underline"
+          >
+            Back to Login
+          </Link>
+        </div>
+
+      </CardContent>
+    </Card>
+  </div>
+);
 }
