@@ -2,31 +2,35 @@ package com.project.ems_server.factory;
 
 import com.project.ems_server.entity.Event;
 import com.project.ems_server.enums.EventStatus;
+import com.project.ems_server.enums.EventType;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 /**
- * Factory pattern implementation for creating Event instances.
- * Demonstrates design pattern usage in advanced Java.
+ * Concrete Factory implementation for standard events.
+ * Implements Abstract Factory pattern.
  */
 @Component
-public class EventFactory {
+public class EventFactory implements EventFactoryInterface {
 
     /**
      * Creates an Event instance with default settings based on category.
      * This shows loose coupling and centralized event creation.
      */
+    @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           LocalDateTime startTime, LocalDateTime endTime) {
+                           String imageId, LocalDateTime startTime, LocalDateTime endTime, EventType eventType) {
         return Event.builder()
                 .title(title)
                 .description(description)
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
+                .imageId(imageId)
                 .startTime(startTime)
                 .endTime(endTime)
+                .eventType(eventType)
                 .status(EventStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -35,16 +39,19 @@ public class EventFactory {
     /**
      * Overloaded method for creating events with custom status (for admins).
      */
+    @Override
     public Event createEvent(String title, String description, Long userId, Long categoryId, String venue,
-                           LocalDateTime startTime, LocalDateTime endTime, EventStatus status) {
+                           String imageId, LocalDateTime startTime, LocalDateTime endTime, EventStatus status, EventType eventType) {
         return Event.builder()
                 .title(title)
                 .description(description)
                 .userId(userId)
                 .categoryId(categoryId)
                 .venue(venue)
+                .imageId(imageId)
                 .startTime(startTime)
                 .endTime(endTime)
+                .eventType(eventType)
                 .status(status)
                 .createdAt(LocalDateTime.now())
                 .build();

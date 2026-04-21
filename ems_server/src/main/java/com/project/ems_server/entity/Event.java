@@ -1,6 +1,7 @@
 package com.project.ems_server.entity;
 
 import com.project.ems_server.enums.EventStatus;
+import com.project.ems_server.enums.EventType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,11 +52,18 @@ public class Event {
     private LocalDateTime endTime;
     
     @Enumerated(EnumType.STRING)
+    @Column(name = "event_type", nullable = false)
+    private EventType eventType;
+    
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EventStatus status;
     
     @Column(columnDefinition = "TEXT")
     private String rejectReason;
+
+    @Column(name = "image_id", length = 255)
+    private String imageId;
     
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

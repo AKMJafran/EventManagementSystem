@@ -17,10 +17,14 @@ public class EventResponse {
    
     private Long id;
     private Long userId;
+    private Long categoryId;
+    private String imageId;
     
     private String title;
     
     private String description;
+    
+    private String imageUrl;
     
     private String venue;
     
@@ -31,6 +35,10 @@ public class EventResponse {
     private LocalDateTime endTime;
     
     private String status;
+    
+    private String eventType;
+    
+    private boolean hasConflict;
     
     private String categoryName;
     

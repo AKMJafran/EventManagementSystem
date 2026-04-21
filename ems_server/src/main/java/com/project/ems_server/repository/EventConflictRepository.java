@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface EventConflictRepository extends JpaRepository<EventConflict, Long> {
     List<EventConflict> findByEventId(Long eventId);
+    boolean existsByEventIdOrConflictWith(Long eventId, Long conflictWith);
 }

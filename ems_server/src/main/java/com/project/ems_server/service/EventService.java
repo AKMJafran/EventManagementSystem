@@ -1,15 +1,26 @@
 package com.project.ems_server.service;
 
 import com.project.ems_server.dto.request.EventRequest;
+import com.project.ems_server.dto.response.CategoryCountResponse;
 import com.project.ems_server.dto.response.EventResponse;
+import com.project.ems_server.dto.response.EventTypeCountResponse;
+import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.*;
 import com.project.ems_server.enums.EventStatus;
+import com.project.ems_server.enums.EventType;
 import com.project.ems_server.enums.NotificationType;
+import com.project.ems_server.enums.Role;
+import com.project.ems_server.factory.EventAbstractFactory;
+import com.project.ems_server.factory.EventFactoryInterface;
 import com.project.ems_server.repository.*;
+import com.project.ems_server.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,12 +33,14 @@ public class EventService {
     private final EventConflictRepository eventConflictRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
     private final ConflictService conflictService;
-    private final EmailService emailService;
+    private final ApprovalService approvalService;
+    private final EventAbstractFactory eventAbstractFactory;
+    private final FileServerService fileServerService;
+    private final NotificationService notificationService;
 
     /**
-     * Creates a new event with PENDING status and detects conflicts
+     * Creates a new event with PENDING status and blocks conflicting bookings.
      */
     public EventResponse createEvent(EventRequest eventRequest, Long userId) {
         // Verify category exists
@@ -35,33 +48,91 @@ public class EventService {
             throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
         }
 
-        // Detect conflicts
-        List<Event> conflictingEvents = conflictService.detectConflict(eventRequest);
+        // Block conflicting bookings before saving the event
+        conflictService.checkStrictConflict(eventRequest);
 
-        // Create event with PENDING status
-        Event event = Event.builder()
-                .title(eventRequest.getTitle())
-                .description(eventRequest.getDescription())
-                .userId(userId)
-                .categoryId(eventRequest.getCategoryId())
-                .venue(eventRequest.getVenue())
-                .startTime(eventRequest.getStartTime())
-                .endTime(eventRequest.getEndTime())
-                .status(EventStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        // Use Abstract Factory pattern to create event based on event type
+        EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.getEventType());
+        Event event = factory.createEvent(
+                eventRequest.getTitle(),
+                eventRequest.getDescription(),
+                userId,
+                eventRequest.getCategoryId(),
+                eventRequest.getVenue(),
+                eventRequest.getImageId(),
+                eventRequest.getStartTime(),
+                eventRequest.getEndTime(),
+                eventRequest.getEventType()
+        );
 
         Event savedEvent = eventRepository.save(event);
+        notifyAdminsOfNewEventRequest(savedEvent);
+        return mapToResponse(savedEvent);
+    }
 
-        // Save conflict records if conflicts exist
-        if (!conflictingEvents.isEmpty()) {
-            conflictService.saveConflictRecords(
-                    savedEvent.getId(),
-                    conflictingEvents.stream().map(Event::getId).collect(Collectors.toList())
-            );
+    /**
+     * Notifies all admin users when a new event request is created.
+     */
+    private void notifyAdminsOfNewEventRequest(Event event) {
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+        if (admins.isEmpty()) {
+            return;
         }
 
-        return mapToResponse(savedEvent);
+        String message = String.format(
+                "📢 New event request from %s: '%s' at %s (%s to %s). Review required.",
+                userRepository.findById(event.getUserId()).map(User::getName).orElse("A student"),
+                event.getTitle(),
+                event.getVenue(),
+                event.getStartTime(),
+                event.getEndTime()
+        );
+
+        for (User admin : admins) {
+            notificationService.createNotification(admin.getId(), message, NotificationType.GENERAL);
+        }
+    }
+
+    /**
+     * Updates an existing pending event belonging to the requesting student.
+     */
+    public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        if (!event.getUserId().equals(userId)) {
+            throw new RuntimeException("You are not allowed to edit this event");
+        }
+
+        if (event.getStatus() != EventStatus.PENDING) {
+            throw new RuntimeException("Only pending events can be edited");
+        }
+
+        if (!categoryRepository.existsById(eventRequest.getCategoryId())) {
+            throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
+        }
+
+        boolean dateOrVenueChanged = !event.getVenue().equals(eventRequest.getVenue())
+                || !event.getStartTime().equals(eventRequest.getStartTime())
+                || !event.getEndTime().equals(eventRequest.getEndTime());
+
+        if (dateOrVenueChanged) {
+            conflictService.checkStrictConflict(eventRequest);
+        }
+
+        event.setTitle(eventRequest.getTitle());
+        event.setDescription(eventRequest.getDescription());
+        event.setCategoryId(eventRequest.getCategoryId());
+        event.setVenue(eventRequest.getVenue());
+        event.setStartTime(eventRequest.getStartTime());
+        event.setEndTime(eventRequest.getEndTime());
+        event.setEventType(eventRequest.getEventType());
+        event.setImageId(eventRequest.getImageId() != null ? eventRequest.getImageId() : event.getImageId());
+        event.setStatus(EventStatus.PENDING);
+        event.setRejectReason(null);
+
+        Event updatedEvent = eventRepository.save(event);
+        return mapToResponse(updatedEvent);
     }
 
     /**
@@ -98,6 +169,72 @@ public class EventService {
     }
 
     /**
+     * Gets calendar events within the requested date range.
+     */
+    public List<EventResponse> getCalendarEvents(LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+        return eventRepository.findByStartTimeBetween(startDateTime, endDateTime).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Builds a monthly report summary for the requested year and month.
+     */
+    public MonthlyReportResponse getMonthlyReport(int year, int month) {
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("Month must be between 1 and 12");
+        }
+
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.with(TemporalAdjusters.lastDayOfMonth());
+        LocalDateTime startDateTime = from.atStartOfDay();
+        LocalDateTime endDateTime = to.atTime(23, 59, 59);
+
+        List<Event> events = eventRepository.findByStartTimeBetween(startDateTime, endDateTime);
+
+        long approvedCount = events.stream().filter(e -> e.getStatus() == EventStatus.APPROVED).count();
+        long pendingCount = events.stream().filter(e -> e.getStatus() == EventStatus.PENDING).count();
+        long rejectedCount = events.stream().filter(e -> e.getStatus() == EventStatus.REJECTED).count();
+        long urgentCount = events.stream().filter(e -> e.getEventType() == EventType.URGENT).count();
+
+        List<EventTypeCountResponse> eventsByType = events.stream()
+                .collect(Collectors.groupingBy(Event::getEventType, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> EventTypeCountResponse.builder()
+                        .eventType(entry.getKey() != null ? entry.getKey().name() : "UNKNOWN")
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<CategoryCountResponse> eventsByCategory = events.stream()
+                .collect(Collectors.groupingBy(event -> {
+                    return categoryRepository.findById(event.getCategoryId())
+                            .map(Category::getName)
+                            .orElse("Unknown");
+                }, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> CategoryCountResponse.builder()
+                        .categoryName(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        return MonthlyReportResponse.builder()
+                .year(year)
+                .month(month)
+                .totalEvents(events.size())
+                .approvedEvents(approvedCount)
+                .pendingEvents(pendingCount)
+                .rejectedEvents(rejectedCount)
+                .urgentEvents(urgentCount)
+                .eventsByType(eventsByType)
+                .eventsByCategory(eventsByCategory)
+                .build();
+    }
+
+    /**
      * Gets a single event by ID
      */
     public EventResponse getEventById(Long eventId) {
@@ -108,71 +245,23 @@ public class EventService {
     }
 
     /**
-     * Approves an event and notifies the student
+     * Approves an event and notifies observers.
      */
     public void approveEvent(Long eventId, Long adminId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        // Set status to APPROVED
-        event.setStatus(EventStatus.APPROVED);
-        eventRepository.save(event);
-
-        // Get student user
-        User student = userRepository.findById(event.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + event.getUserId()));
-
-        // Create in-app notification
-        String notificationMessage = String.format(
-                "✅ Your event '%s' has been approved!",
-                event.getTitle()
-        );
-        Notification notification = Notification.builder()
-                .userId(student.getId())
-                .message(notificationMessage)
-                .type(NotificationType.EVENT_APPROVED)
-                .isRead(false)
-                .createdAt(LocalDateTime.now())
-                .build();
-        notificationRepository.save(notification);
-
-        // Send email notification
-        emailService.sendEventApprovedEmail(student.getEmail(), event.getTitle());
+        approvalService.approveEvent(event);
     }
 
     /**
-     * Rejects an event and notifies the student
+     * Rejects an event and notifies observers.
      */
     public void rejectEvent(Long eventId, String reason, Long adminId) {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        // Set status to REJECTED and store reason
-        event.setStatus(EventStatus.REJECTED);
-        event.setRejectReason(reason);
-        eventRepository.save(event);
-
-        // Get student user
-        User student = userRepository.findById(event.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + event.getUserId()));
-
-        // Create in-app notification
-        String notificationMessage = String.format(
-                "❌ Your event '%s' has been rejected.\n\nReason: %s",
-                event.getTitle(),
-                reason
-        );
-        Notification notification = Notification.builder()
-                .userId(student.getId())
-                .message(notificationMessage)
-                .type(NotificationType.EVENT_REJECTED)
-                .isRead(false)
-                .createdAt(LocalDateTime.now())
-                .build();
-        notificationRepository.save(notification);
-
-        // Send email notification
-        emailService.sendEventRejectedEmail(student.getEmail(), event.getTitle(), reason);
+        approvalService.rejectEvent(event, reason);
     }
 
     /**
@@ -233,14 +322,25 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         User creator = userRepository.findById(event.getUserId()).orElse(null);
         Category category = categoryRepository.findById(event.getCategoryId()).orElse(null);
 
+        String imageUrl = null;
+        if (event.getImageId() != null && !event.getImageId().isEmpty()) {
+            imageUrl = fileServerService.requestFileLink(event.getImageId());
+        }
+
         return EventResponse.builder()
                 .id(event.getId())
+                .userId(event.getUserId())
+                .categoryId(event.getCategoryId())
+                .imageId(event.getImageId())
                 .title(event.getTitle())
                 .description(event.getDescription())
+                .imageUrl(imageUrl)
                 .venue(event.getVenue())
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())
                 .status(event.getStatus().name())
+                .eventType(event.getEventType() != null ? event.getEventType().name() : null)
+                .hasConflict(eventConflictRepository.existsByEventIdOrConflictWith(event.getId(), event.getId()))
                 .categoryName(category != null ? category.getName() : "Unknown")
                 .createdByName(creator != null ? creator.getName() : "Unknown")
                 .rejectReason(event.getRejectReason())

@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 const emailSchema = z.object({
   email: z.string().email('Invalid email'),
 });
 
-// ✅ Removed email from resetSchema
 const resetSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
   newPassword: z.string().min(6, 'Password must be at least 6 characters'),
@@ -47,7 +49,7 @@ export default function ResetPasswordPage() {
   const onResetSubmit = async (data) => {
     try {
       await axiosInstance.post('/auth/reset-password', {
-        email: email,        // ✅ from state, not from form
+        email: email,
         otp: data.otp,
         newPassword: data.newPassword,
       });
@@ -59,44 +61,68 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Reset Password</h2>
-        {step === 1 && (
-          <form onSubmit={handleEmailSubmit(onEmailSubmit)}>
-            <div className="mb-4">
-              <label className="block mb-1">Email</label>
-              <input {...registerEmail('email')} className="w-full px-3 py-2 border rounded" />
-              {emailErrors.email && <p className="text-red-500 text-sm">{emailErrors.email.message}</p>}
-            </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700" disabled={isEmailSubmitting}>
-              {isEmailSubmitting ? 'Sending OTP...' : 'Send OTP'}
-            </button>
-          </form>
-        )}
-        {step === 2 && (
-          <form onSubmit={handleResetSubmit(onResetSubmit)}>
-            <div className="mb-4">
-              <label className="block mb-1">Email</label>
-              {/* ✅ Plain input — just for display, not registered in RHF */}
-              <input className="w-full px-3 py-2 border rounded bg-gray-100" value={email} readOnly />
-            </div>
-            <div className="mb-4">
-              <label className="block mb-1">OTP</label>
-              <input {...registerReset('otp')} className="w-full px-3 py-2 border rounded" />
-              {resetErrors.otp && <p className="text-red-500 text-sm">{resetErrors.otp.message}</p>}
-            </div>
-            <div className="mb-4">
-              <label className="block mb-1">New Password</label>
-              <input type="password" {...registerReset('newPassword')} className="w-full px-3 py-2 border rounded" />
-              {resetErrors.newPassword && <p className="text-red-500 text-sm">{resetErrors.newPassword.message}</p>}
-            </div>
-            <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700" disabled={isResetSubmitting}>
-              {isResetSubmitting ? 'Resetting...' : 'Reset Password'}
-            </button>
-          </form>
-        )}
-      </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Reset Password</CardTitle>
+          <CardDescription>
+            {step === 1 
+              ? "Enter your email address and we'll send you a recovery OTP." 
+              : "Enter the OTP sent to your email along with your new password"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {step === 1 && (
+            <form onSubmit={handleEmailSubmit(onEmailSubmit)} className="space-y-4">
+              <Input
+                label="Email"
+                type="email"
+                {...registerEmail('email')}
+                error={emailErrors.email?.message}
+                placeholder="john@example.com"
+              />
+              <Button type="submit" className="w-full" isLoading={isEmailSubmitting}>
+                Send OTP
+              </Button>
+            </form>
+          )}
+
+          {step === 2 && (
+            <form onSubmit={handleResetSubmit(onResetSubmit)} className="space-y-4">
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                readOnly
+                disabled
+              />
+              <Input
+                label="OTP"
+                type="text"
+                {...registerReset('otp')}
+                error={resetErrors.otp?.message}
+                placeholder="Enter 6-digit code"
+              />
+              <Input
+                label="New Password"
+                type="password"
+                {...registerReset('newPassword')}
+                error={resetErrors.newPassword?.message}
+                placeholder="••••••••"
+              />
+              <Button type="submit" className="w-full" isLoading={isResetSubmitting}>
+                Reset Password
+              </Button>
+            </form>
+          )}
+          
+          <div className="mt-4 text-center text-sm">
+            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+              Back to Login
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

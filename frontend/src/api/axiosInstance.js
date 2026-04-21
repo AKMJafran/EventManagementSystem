@@ -1,14 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Track whether a refresh is in progress to avoid multiple refresh requests
@@ -38,6 +35,22 @@ axiosInstance.interceptors.request.use(
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (config.data instanceof FormData) {
+      config.headers = config.headers || {};
+      config.headers['Content-Type'] = undefined;
+      config.headers['content-type'] = undefined;
+
+      if (config.headers.common) {
+        config.headers.common['Content-Type'] = undefined;
+        config.headers.common['content-type'] = undefined;
+      }
+
+      if (config.headers.post) {
+        config.headers.post['Content-Type'] = undefined;
+        config.headers.post['content-type'] = undefined;
+      }
     }
 
     return config;
@@ -93,7 +106,11 @@ axiosInstance.interceptors.response.use(
 
       return new Promise((resolve, reject) => {
         axios
-          .post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken })
+          .post(`${API_BASE_URL}/auth/refresh-token`, null, {
+            headers: {
+              Authorization: `Bearer ${refreshToken}`,
+            },
+          })
           .then((response) => {
             const { accessToken, refreshToken: newRefreshToken } = response.data;
 
@@ -133,6 +150,14 @@ axiosInstance.interceptors.response.use(
             isRefreshing = false;
           });
       });
+    }
+
+    // Handle 403 Forbidden by clearing auth and redirecting to login
+    if (error.response?.status === 403 && !originalRequest?._retry) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
 
     return Promise.reject(error);

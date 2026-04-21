@@ -2,6 +2,7 @@ package com.project.ems_server.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -39,7 +40,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send OTP email: " + e.getMessage());
         }
     }
@@ -61,7 +62,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send password reset email: " + e.getMessage());
         }
     }
@@ -83,7 +84,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send event approved email: " + e.getMessage());
         }
     }
@@ -105,7 +106,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send event rejected email: " + e.getMessage());
         }
     }
@@ -127,7 +128,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send conflict alert email: " + e.getMessage());
         }
     }
@@ -149,7 +150,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             System.err.println("Failed to send event reminder email: " + e.getMessage());
         }
     }

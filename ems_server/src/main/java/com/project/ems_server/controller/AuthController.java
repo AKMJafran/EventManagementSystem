@@ -68,6 +68,15 @@ public class AuthController {
     }
 
     /**
+     * Resend registration OTP endpoint
+     */
+    @PostMapping("/resend-register-otp")
+    public ResponseEntity<String> resendRegisterOtp(@RequestParam String email) {
+        authService.resendRegisterOtp(email);
+        return ResponseEntity.ok("OTP resent to your email for account verification.");
+    }
+
+    /**
      * Reset password endpoint
      */
     @PostMapping("/reset-password")

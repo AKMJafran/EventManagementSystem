@@ -2,18 +2,21 @@ package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.EventResponse;
+import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.EventConflict;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +44,21 @@ public class EventController {
     }
 
     /**
+     * Updates an existing pending event (student only)
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<EventResponse> updateEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody EventRequest eventRequest,
+            Authentication authentication) {
+
+        Long userId = extractUserIdFromAuthentication(authentication);
+        EventResponse response = eventService.updateEvent(id, eventRequest, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Gets events with optional status and category filters
      * GET /events?status=APPROVED&categoryId=1
      */
@@ -61,7 +79,36 @@ public class EventController {
         List<EventResponse> events = eventService.getEvents(eventStatus, categoryId);
         return ResponseEntity.ok(events);
     }
-    
+
+    /**
+     * Gets events for a date range.
+     */
+    @GetMapping("/calendar")
+    public ResponseEntity<List<EventResponse>> getCalendarEvents(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        if (end.isBefore(start)) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<EventResponse> events = eventService.getCalendarEvents(start, end);
+        return ResponseEntity.ok(events);
+    }
+
+    /**
+     * Gets monthly event report.
+     */
+    @GetMapping("/reports/monthly")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MonthlyReportResponse> getMonthlyReport(
+            @RequestParam int year,
+            @RequestParam int month) {
+        if (month < 1 || month > 12) {
+            return ResponseEntity.badRequest().build();
+        }
+        MonthlyReportResponse report = eventService.getMonthlyReport(year, month);
+        return ResponseEntity.ok(report);
+    }
+
     /**
  * Gets events created by the logged-in student
  * GET /events/user/my-events

@@ -3,8 +3,10 @@ import { FaBell } from 'react-icons/fa';
 import { formatDistanceToNow } from 'date-fns';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
+import useAuthStore from '../context/AuthContext';
 
 export default function NotificationBell() {
+  const { isAuthenticated, authLoaded } = useAuthStore();
   const [count, setCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
@@ -12,12 +14,15 @@ export default function NotificationBell() {
 
   // Fetch unread count and latest notifications
   const fetchNotifications = async () => {
+    if (!authLoaded || !isAuthenticated) {
+      return;
+    }
     try {
       const [countRes, listRes] = await Promise.all([
         axiosInstance.get('/notifications/count'),
         axiosInstance.get('/notifications'),
       ]);
-      setCount(countRes.data);
+      setCount(countRes.data.unreadCount);
       setNotifications(listRes.data.slice(0, 5));
     } catch (e) {
       toast.error('Failed to load notifications');
@@ -26,6 +31,10 @@ export default function NotificationBell() {
   };
 
   useEffect(() => {
+    if (!authLoaded || !isAuthenticated) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     const run = async () => {
@@ -35,7 +44,7 @@ export default function NotificationBell() {
           axiosInstance.get('/notifications'),
         ]);
         if (cancelled) return;
-        setCount(countRes.data);
+        setCount(countRes.data.unreadCount);
         setNotifications(listRes.data.slice(0, 5));
       } catch (e) {
         if (!cancelled) {
@@ -52,7 +61,7 @@ export default function NotificationBell() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [authLoaded, isAuthenticated]);
 
   // Close dropdown on outside click
   useEffect(() => {
