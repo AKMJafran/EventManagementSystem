@@ -16,7 +16,7 @@ export default function AdminSidebar() {
   ];
 
   return (
-    <aside className="h-screen w-72 flex flex-col fixed left-0 top-0 bg-slate-50 dark:bg-slate-950 p-6 border-r-0 font-sans text-sm tracking-wide">
+    <aside className="h-screen w-72 flex flex-col fixed left-0 top-0 bg-zinc-300 dark:bg-zinc-800 p-6 border-r-0 font-sans text-sm tracking-wide">
       <div className="mb-10 flex items-center gap-4 px-2">
         <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
           <span className="material-symbols-outlined text-on-primary-container">school</span>
@@ -36,8 +36,8 @@ export default function AdminSidebar() {
               to={link.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg font-semibold transition-all duration-150 ${
                 isActive
-                  ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-800 dark:text-teal-100 active:translate-x-1'
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+                  ? 'bg-zinc-100 dark:bg-zinc-600/40 text-teal-800 dark:text-teal-100 active:translate-x-1'
+                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-400/40 dark:hover:bg-zinc-600/50'
               }`}
             >
               <span className="material-symbols-outlined">{link.icon}</span>
@@ -55,7 +55,7 @@ export default function AdminSidebar() {
           <span className="material-symbols-outlined text-sm">add</span>
           Create New Event
         </Link>
-        <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all rounded-lg">
+        <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-400/40 dark:hover:bg-zinc-600/50 transition-all rounded-lg">
           <span className="material-symbols-outlined text-lg">logout</span>
           <span className="font-sans text-xs tracking-wide">Sign Out</span>
         </button>
