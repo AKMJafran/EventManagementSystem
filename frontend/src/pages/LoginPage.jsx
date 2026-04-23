@@ -166,17 +166,7 @@ export default function LoginPage() {
                     Create Account
                   </Link>
                 </p>
-                <div className="flex items-center justify-center gap-6">
-                  <Link to="/verify-otp" className="flex items-center gap-1.5 text-xs font-medium text-outline hover:text-tertiary transition-colors">
-                    <span className="material-symbols-outlined text-sm">domain_verification</span>
-                    Verify OTP
-                  </Link>
-                  <span className="text-outline-variant text-xs">|</span>
-                  <a className="flex items-center gap-1.5 text-xs font-medium text-outline hover:text-primary transition-colors" href="#">
-                    <span className="material-symbols-outlined text-sm">help</span>
-                    Technical Support
-                  </a>
-                </div>
+              
               </div>
             </footer>
           </div>
