@@ -89,7 +89,7 @@ public class EventService {
         );
 
         for (User admin : admins) {
-            notificationService.createNotification(admin.getId(), message, NotificationType.GENERAL);
+            notificationService.createNotification(admin.getId(), "New Event Request", message, NotificationType.GENERAL);
         }
     }
 

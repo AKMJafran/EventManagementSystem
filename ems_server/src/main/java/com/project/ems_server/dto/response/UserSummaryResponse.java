@@ -12,26 +12,18 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificationResponse {
-    
+public class UserSummaryResponse {
+
     private Long id;
 
-    private Long userId;
+    private String name;
 
-    private String title;
-    
-    private String message;
-    
-    private String type;
-    
-    private Boolean isRead;
+    private String email;
 
-    private String recipientName;
+    private String role;
 
-    private String recipientEmail;
+    private Boolean isVerified;
 
-    private String recipientRole;
-    
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 }

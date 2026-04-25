@@ -12,6 +12,7 @@ export default function AdminSidebar() {
     { name: 'Manage Categories', path: '/manage-categories', icon: 'category' },
     { name: 'Manage Students', path: '/manage-students', icon: 'people' },
     { name: 'Manage Venues', path: '/manage-venues', icon: 'location_on' },
+    { name: 'Notifications', path: '/admin/notifications', icon: 'notifications' },
     { name: 'Reports', path: '/admin/reports/monthly', icon: 'analytics' },
   ];
 

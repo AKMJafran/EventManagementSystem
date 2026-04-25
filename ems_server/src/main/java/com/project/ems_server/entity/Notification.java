@@ -27,7 +27,10 @@ public class Notification {
     @ManyToOne
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
-    
+
+    @Column(length = 255)
+    private String title;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
     

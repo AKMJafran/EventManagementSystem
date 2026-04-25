@@ -21,16 +21,20 @@ public class InAppNotificationObserver implements EventObserver {
             case APPROVED:
                 notificationService.createNotification(
                         event.getUserId(),
-                        String.format("✅ Your event '%s' has been approved!", event.getTitle()),
+                        "Event Approved",
+                        String.format("Your event '%s' has been approved!", event.getTitle()),
                         NotificationType.EVENT_APPROVED
                 );
                 break;
             case REJECTED:
                 notificationService.createNotification(
                         event.getUserId(),
-                        String.format("❌ Your event '%s' has been rejected. Reason: %s",
+                        "Event Rejected",
+                        String.format(
+                                "Your event '%s' has been rejected. Reason: %s",
                                 event.getTitle(),
-                                event.getRejectReason() != null ? event.getRejectReason() : "No reason provided"),
+                                event.getRejectReason() != null ? event.getRejectReason() : "No reason provided"
+                        ),
                         NotificationType.EVENT_REJECTED
                 );
                 break;
