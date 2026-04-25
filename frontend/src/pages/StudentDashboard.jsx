@@ -4,6 +4,7 @@ import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import StudentLayout from '../components/layout/StudentLayout';
+import EventImage from '../components/EventImage';
 
 export default function StudentDashboard() {
   const { user, isAuthenticated, authLoaded } = useAuthStore();
@@ -93,13 +94,13 @@ export default function StudentDashboard() {
             {approvedEvents.length === 0 ? (
               <p className="text-gray-500">No approved events found.</p>
             ) : (
-              approvedEvents.map((event, idx) => (
+              approvedEvents.map((event) => (
                 <div key={event.id} className="group relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl transition-all duration-500 border border-transparent hover:border-primary-container/10">
                   <div className="h-48 overflow-hidden">
-                    <img 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                      alt="event cover" 
-                      src={idx % 2 === 0 ? "https://lh3.googleusercontent.com/aida-public/AB6AXuBHch0oh0KRKaRlDJ6hgwZiIS0ebL19vjp0oRcK8_eIrMtM0xJKoknARmKHHb_afzeVEr-gJEFZJUAdKJrtda__iaup2Pm3kWWSt67LWVb7xvMK_CLHYPZshgzjwQsM6qgZwa1QdC-8sKfdNYcmz8lSZi_97-xz6VsiireSCCHwgYLWEMaXWDRmVWsUEIwHChDRhbM8eAo0tkycz5IwjNvm8tySkNDO8tO9I4y4l9iDMjK_j24OoyDdnUfCNYV-Ro4PYARPIlPwLtoC" : "https://lh3.googleusercontent.com/aida-public/AB6AXuA8CDznZ29YXO_q5ey-pIR-I0EHdDI_l9KmP0vlmIGrqMbTebC9nOewVlbHjfSOXMs-htMvTzNz5h1jHL3ooAQi3XSCLcE9JAwhAMEYcZZWEaqC-gnDjySmNHXtf66Z9ex__44Ynw1_QMj5fsPqd5qI8P3aoE-TZsOdN0LANAxS2Y8pxb2G8wkLiWJayOPUsss3eJoDsMTkBacntc21kkWLz1XfM9NQpG8ciEqB-wjyi6R1sIesXFagQpDXF7EeuowkY88F-kr68XWS"}
+                    <EventImage
+                      src={event.imageUrl}
+                      alt={event.title || 'Event cover'}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                     <div className="absolute top-4 left-4">
                       <span className="bg-tertiary text-on-tertiary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
@@ -119,7 +120,7 @@ export default function StudentDashboard() {
                         <span className="material-symbols-outlined text-sm text-on-surface-variant">location_on</span>
                         <span className="text-xs text-on-surface-variant">{event.venue}</span>
                       </div>
-                      <Link to="/student/calendar" className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors inline-block">
+                      <Link to={`/events/${event.id}`} className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors inline-block">
                         <span className="material-symbols-outlined">arrow_forward</span>
                       </Link>
                     </div>
@@ -259,6 +260,4 @@ export default function StudentDashboard() {
     </StudentLayout>
   );
 }
-
-
 

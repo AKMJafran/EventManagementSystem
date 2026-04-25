@@ -3,6 +3,7 @@ import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import AdminLayout from '../components/layout/AdminLayout';
+import EventImage from '../components/EventImage';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, conflicts: 0 });
@@ -108,6 +109,13 @@ export default function AdminDashboard() {
               pendingApprovals.slice(0, 3).map(event => (
                 <div key={event.id} className="bg-surface-container-low p-6 rounded-xl flex items-center justify-between transition-transform hover:-translate-y-1">
                   <div className="flex items-center gap-6">
+                    <div className="h-20 w-24 overflow-hidden rounded-2xl bg-surface-container-high">
+                      <EventImage
+                        src={event.imageUrl}
+                        alt={event.title}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
                     <div className="w-1 bg-tertiary h-12 rounded-full"></div>
                     <div>
                       <h4 className="font-bold text-lg">{event.title}</h4>
@@ -227,4 +235,3 @@ export default function AdminDashboard() {
     </AdminLayout>
   );
 }
-

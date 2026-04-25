@@ -4,6 +4,7 @@ import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
+import EventImage from '../components/EventImage';
 
 export default function MyEventsPage() {
   const { user } = useAuthStore();
@@ -35,24 +36,24 @@ export default function MyEventsPage() {
   const searchLower = search.toLowerCase();
 
   const filteredEvents = events
-    .filter((e) => {
+    .filter((event) => {
       const now = Date.now();
-      const eventTime = new Date(e.startTime).getTime();
+      const eventTime = new Date(event.startTime).getTime();
 
       if (filter === 'Upcoming') return eventTime > now;
       if (filter === 'Past') return eventTime <= now;
       return true;
     })
-    .filter((e) => {
-      const title = e.title?.toLowerCase() || '';
+    .filter((event) => {
+      const title = event.title?.toLowerCase() || '';
       const venue =
-        typeof e.venue === 'string'
-          ? e.venue.toLowerCase()
-          : e.venue?.name?.toLowerCase() || '';
+        typeof event.venue === 'string'
+          ? event.venue.toLowerCase()
+          : event.venue?.name?.toLowerCase() || '';
 
       return title.includes(searchLower) || venue.includes(searchLower);
     })
-    .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    .sort((left, right) => new Date(right.startTime) - new Date(left.startTime));
 
   const getStatusStyles = (status) => {
     switch (status) {
@@ -103,7 +104,6 @@ export default function MyEventsPage() {
 
   return (
     <StudentLayout user={user}>
-      {/* Header */}
       <div className="mb-12">
         <h1 className="serif-authoritative text-4xl md:text-5xl font-bold text-on-background mb-4">
           My Events
@@ -113,7 +113,6 @@ export default function MyEventsPage() {
         </p>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center justify-between gap-6 mb-12">
         <div className="flex items-center space-x-6">
           {['All', 'Upcoming', 'Past'].map((type) => (
@@ -137,7 +136,7 @@ export default function MyEventsPage() {
           </span>
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             className="pl-10 pr-4 py-2 bg-surface-container-high border-none rounded-lg focus:ring-2 focus:ring-primary text-sm w-64"
             placeholder="Search events..."
             type="text"
@@ -145,7 +144,6 @@ export default function MyEventsPage() {
         </div>
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="flex justify-center py-10">
           <span className="material-symbols-outlined animate-spin text-primary text-3xl">
@@ -162,83 +160,88 @@ export default function MyEventsPage() {
             return (
               <div
                 key={event.id}
-                className="group bg-surface-container-lowest p-8 rounded-xl relative overflow-hidden transition-all duration-300 hover:shadow-[0_24px_48px_-12px_rgba(0,101,101,0.08)]"
+                className="group overflow-hidden rounded-xl bg-surface-container-lowest transition-all duration-300 hover:shadow-[0_24px_48px_-12px_rgba(0,101,101,0.08)]"
               >
-                <div className={`absolute left-0 top-0 bottom-0 w-1 ${styles.bar}`} />
-
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase mb-4 ${styles.badge}`}>
-                      {event.status}
-                    </span>
-                    {event.hasConflict && (
-                      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase text-on-error-container">
-                        <span className="material-symbols-outlined text-sm">warning</span>
-                        Conflict Detected
-                      </div>
-                    )}
-
-                    <h3 className="text-2xl font-bold mb-2">{event.title}</h3>
-
-                    {event.category && (
-                      <p className="text-sm uppercase flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">category</span>
-                        {event.category?.name || 'General'}
-                      </p>
-                    )}
-                  </div>
-
-                  <span className="material-symbols-outlined text-primary">
-                    {getStatusIcon(event.status)}
-                  </span>
+                <div className="relative h-52">
+                  <EventImage
+                    src={event.imageUrl}
+                    alt={event.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${styles.bar}`} />
                 </div>
 
-                {/* Details */}
-                <div className="space-y-3 mb-6 text-sm">
-                  <div>
-                    📅 {formatDate(event.startTime)} — {formatDate(event.endTime)}
-                  </div>
-                  <div>
-                    📍 {typeof event.venue === 'object'
-                      ? event.venue?.name || 'Unknown Venue'
-                      : event.venue || 'Unknown Venue'}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="pt-4 border-t">
-                  {event.status === 'REJECTED' && event.rejectReason ? (
-                    <p className="text-red-500 text-sm">
-                      Reason: {event.rejectReason}
-                    </p>
-                  ) : (
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="text-xs italic">
-                        {event.hasConflict
-                          ? 'Admin needs to resolve a scheduling conflict before approval.'
-                          : event.status === 'PENDING'
-                            ? 'Awaiting Approval'
-                            : ''}
+                <div className="relative p-8">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase mb-4 ${styles.badge}`}>
+                        {event.status}
                       </span>
+                      {event.hasConflict && (
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase text-on-error-container">
+                          <span className="material-symbols-outlined text-sm">warning</span>
+                          Conflict Detected
+                        </div>
+                      )}
 
-                      {event.status === 'PENDING' ? (
-                        <button
-                          onClick={() => navigate(`/student/edit-event/${event.id}`)}
-                          className="text-blue-600 text-sm font-semibold"
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => navigate(`/events/${event.id}`)}
-                          className="text-blue-600 text-sm font-semibold"
-                        >
-                          View
-                        </button>
+                      <h3 className="text-2xl font-bold mb-2">{event.title}</h3>
+
+                      {event.categoryName && (
+                        <p className="text-sm uppercase flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">category</span>
+                          {event.categoryName}
+                        </p>
                       )}
                     </div>
-                  )}
+
+                    <span className="material-symbols-outlined text-primary">
+                      {getStatusIcon(event.status)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 mb-6 text-sm">
+                    <div>Date: {formatDate(event.startTime)} - {formatDate(event.endTime)}</div>
+                    <div>
+                      Venue:{' '}
+                      {typeof event.venue === 'object'
+                        ? event.venue?.name || 'Unknown Venue'
+                        : event.venue || 'Unknown Venue'}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    {event.status === 'REJECTED' && event.rejectReason ? (
+                      <p className="text-red-500 text-sm">
+                        Reason: {event.rejectReason}
+                      </p>
+                    ) : (
+                      <div className="flex justify-between items-center gap-4">
+                        <span className="text-xs italic">
+                          {event.hasConflict
+                            ? 'Admin needs to resolve a scheduling conflict before approval.'
+                            : event.status === 'PENDING'
+                              ? 'Awaiting Approval'
+                              : ''}
+                        </span>
+
+                        {event.status === 'PENDING' ? (
+                          <button
+                            onClick={() => navigate(`/student/edit-event/${event.id}`)}
+                            className="text-blue-600 text-sm font-semibold"
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => navigate(`/events/${event.id}`)}
+                            className="text-blue-600 text-sm font-semibold"
+                          >
+                            View
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

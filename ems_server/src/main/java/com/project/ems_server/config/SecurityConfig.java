@@ -66,6 +66,7 @@ public class SecurityConfig {
     .authorizeHttpRequests(authz -> authz
         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
         .requestMatchers("/auth/**").permitAll()
+        .requestMatchers(HttpMethod.GET, "/files/content/**").permitAll()
         .anyRequest().authenticated()
     )
     

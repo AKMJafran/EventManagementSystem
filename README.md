@@ -80,7 +80,7 @@ Based on faculty activities (e.g., HackTrail, Technospirits), this system handle
 1. Navigate to `frontend/`: `cd frontend`
 2. Create `.env` file (if not present):
    ```
-   VITE_API_BASE_URL=http://localhost:8081/api
+   VITE_API_BASE_URL=http://localhost:8081
    ```
 3. Install dependencies: `npm install`
 4. Run the app: `npm run dev`

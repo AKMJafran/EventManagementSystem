@@ -65,6 +65,7 @@ public class EventService {
                 eventRequest.getEndTime(),
                 eventRequest.getEventType()
         );
+        applyEventImage(event, eventRequest, false);
 
         Event savedEvent = eventRepository.save(event);
         conflictService.refreshConflictRecords(savedEvent, true);
@@ -123,7 +124,7 @@ public class EventService {
         event.setStartTime(eventRequest.getStartTime());
         event.setEndTime(eventRequest.getEndTime());
         event.setEventType(eventRequest.getEventType());
-        event.setImageId(eventRequest.getImageId() != null ? eventRequest.getImageId() : event.getImageId());
+        applyEventImage(event, eventRequest, true);
         event.setStatus(EventStatus.PENDING);
         event.setRejectReason(null);
 
@@ -415,6 +416,41 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         }
     }
 
+    private void applyEventImage(Event event, EventRequest eventRequest, boolean preserveExistingWhenMissing) {
+        if (Boolean.TRUE.equals(eventRequest.getRemoveImage())) {
+            event.setImageId(null);
+            event.setImageOriginalFilename(null);
+            event.setImageContentType(null);
+            event.setImageUploadedAt(null);
+            event.setImageChecksum(null);
+            return;
+        }
+
+        boolean hasIncomingImage = eventRequest.getImageId() != null && !eventRequest.getImageId().isBlank();
+        if (!hasIncomingImage && preserveExistingWhenMissing) {
+            return;
+        }
+
+        String currentImageId = event.getImageId();
+        event.setImageId(hasIncomingImage ? eventRequest.getImageId() : null);
+        event.setImageOriginalFilename(resolveImageField(eventRequest.getImageOriginalFilename(), preserveExistingWhenMissing, currentImageId, eventRequest.getImageId(), event.getImageOriginalFilename()));
+        event.setImageContentType(resolveImageField(eventRequest.getImageContentType(), preserveExistingWhenMissing, currentImageId, eventRequest.getImageId(), event.getImageContentType()));
+        event.setImageUploadedAt(resolveImageField(eventRequest.getImageUploadedAt(), preserveExistingWhenMissing, currentImageId, eventRequest.getImageId(), event.getImageUploadedAt()));
+        event.setImageChecksum(resolveImageField(eventRequest.getImageChecksum(), preserveExistingWhenMissing, currentImageId, eventRequest.getImageId(), event.getImageChecksum()));
+    }
+
+    private <T> T resolveImageField(T incomingValue, boolean preserveExistingWhenMissing, String currentImageId, String requestedImageId, T existingValue) {
+        if (incomingValue != null) {
+            return incomingValue;
+        }
+
+        if (preserveExistingWhenMissing && currentImageId != null && currentImageId.equals(requestedImageId)) {
+            return existingValue;
+        }
+
+        return null;
+    }
+
     /**
      * Maps Event entity to EventResponse
      */
@@ -422,16 +458,17 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         User creator = userRepository.findById(event.getUserId()).orElse(null);
         Category category = categoryRepository.findById(event.getCategoryId()).orElse(null);
 
-        String imageUrl = null;
-        if (event.getImageId() != null && !event.getImageId().isEmpty()) {
-            imageUrl = fileServerService.requestFileLink(event.getImageId());
-        }
+        String imageUrl = fileServerService.buildFileAccessUrl(event.getImageId());
 
         return EventResponse.builder()
                 .id(event.getId())
                 .userId(event.getUserId())
                 .categoryId(event.getCategoryId())
                 .imageId(event.getImageId())
+                .imageOriginalFilename(event.getImageOriginalFilename())
+                .imageContentType(event.getImageContentType())
+                .imageUploadedAt(event.getImageUploadedAt())
+                .imageChecksum(event.getImageChecksum())
                 .title(event.getTitle())
                 .description(event.getDescription())
                 .imageUrl(imageUrl)

@@ -21,6 +21,7 @@ import ManageCategories from './pages/ManageCategories';
 import ManageEvents from './pages/ManageEvents';
 import ConflictsPage from './pages/ConflictsPage';
 import NotificationManagerPage from './pages/NotificationManagerPage';
+import EventDetailsPage from './pages/EventDetailsPage';
 const Home = () => {
   const { isAuthenticated, user } = useAuthStore.getState();
   if (isAuthenticated) {
@@ -70,6 +71,10 @@ function App() {
         <Route path="/create-event" element={<CreateEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
         <Route path="/admin/notifications" element={<NotificationManagerPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/events/:id" element={<EventDetailsPage />} />
       </Route>
 
       {/* Default Route */}

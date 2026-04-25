@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,9 @@ import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
+
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
 
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
@@ -25,12 +28,20 @@ export default function CreateEventPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const fileInputRef = useRef(null);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [existingImageId, setExistingImageId] = useState(null);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [selectedImageSignature, setSelectedImageSignature] = useState('');
+  const [lastUploadedSignature, setLastUploadedSignature] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
   const [imageError, setImageError] = useState('');
+  const [imageFeedback, setImageFeedback] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadState, setUploadState] = useState('idle');
+  const [removeImage, setRemoveImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
@@ -53,38 +64,84 @@ export default function CreateEventPage() {
     return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
   };
 
+  const buildFileSignature = (file) => {
+    if (!file) return '';
+    return [file.name, file.size, file.lastModified].join(':');
+  };
+
+  const clearImageSelection = () => {
+    setSelectedImage(null);
+    setSelectedImageSignature('');
+    setLastUploadedSignature('');
+    setUploadedImage(null);
+    setExistingImageId(null);
+    setImagePreview(null);
+    setImageError('');
+    setImageFeedback('Image removed from this event.');
+    setUploadProgress(0);
+    setUploadState('idle');
+    setRemoveImage(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const getImageValidationError = (file) => {
+    const extension = file?.name?.split('.').pop()?.toLowerCase();
+    const allowedExtensions = ['jpg', 'jpeg', 'png'];
+
+    if (!file) {
+      return 'Please select an image file.';
+    }
+
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || !allowedExtensions.includes(extension)) {
+      return 'Only JPG, JPEG, and PNG images are allowed.';
+    }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      return 'Image size must be 5MB or less.';
+    }
+
+    return '';
+  };
+
   const handleImageChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('');
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    const validationError = getImageValidationError(file);
+    if (validationError) {
       setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Please select a valid image file.');
-      toast.error('Please select an image file.');
+      setSelectedImageSignature('');
+      setImageError(validationError);
+      setImageFeedback('');
+      setUploadProgress(0);
+      setUploadState('idle');
+      toast.error(validationError);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Image size must be 5MB or less.');
-      toast.error('File size should not exceed 5MB.');
+    const nextSignature = buildFileSignature(file);
+    if (nextSignature === selectedImageSignature && imagePreview) {
+      setImageFeedback('That image is already selected.');
       return;
     }
 
     setImageError('');
+    setImageFeedback('Image selected. It will upload when you submit the event.');
     setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result?.toString() || null);
-    };
-    reader.readAsDataURL(file);
+    setSelectedImageSignature(nextSignature);
+    setLastUploadedSignature('');
+    setUploadedImage(null);
+    setUploadProgress(0);
+    setUploadState('idle');
+    setRemoveImage(false);
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
@@ -92,6 +149,14 @@ export default function CreateEventPage() {
   });
 
   const selectedCategory = watch('categoryId');
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview?.startsWith?.('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -128,9 +193,28 @@ export default function CreateEventPage() {
           imageId: event.imageId || '',
         });
 
+        const existingImage = event.imageId
+          ? {
+              fileId: event.imageId,
+              originalFilename: event.imageOriginalFilename || '',
+              contentType: event.imageContentType || '',
+              uploadedAt: event.imageUploadedAt || null,
+              checksum: event.imageChecksum || '',
+              imageUrl: event.imageUrl || null,
+            }
+          : null;
+
         setExistingImageId(event.imageId || null);
+        setUploadedImage(existingImage);
+        setSelectedImageSignature('');
+        setLastUploadedSignature('');
         setSelectedImage(null);
         setImagePreview(event.imageUrl || null);
+        setImageError('');
+        setImageFeedback(event.imageId ? 'Existing image loaded. You can keep, replace, or remove it.' : '');
+        setUploadProgress(0);
+        setUploadState('idle');
+        setRemoveImage(false);
       } catch (e) {
         toast.error('Failed to load event for editing');
         console.error(e);
@@ -164,24 +248,54 @@ export default function CreateEventPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      let imageId = existingImageId;
-      
+      let finalImage = uploadedImage;
+
       if (selectedImage) {
-        const formData = new FormData();
-        formData.append('file', selectedImage);
-        
-        try {
-          const uploadRes = await axiosInstance.post('/files/upload', formData);
-          imageId = uploadRes.data.fileId;
-        } catch (uploadError) {
-          const status = uploadError?.response?.status;
-          const serverData = uploadError?.response?.data;
-          console.error('Image upload failed', { status, serverData, uploadError });
-          toast.error(
-            serverData?.error
-              ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
-              : 'Failed to upload image. Event will be saved without a new upload.'
-          );
+        if (!uploadedImage || lastUploadedSignature !== selectedImageSignature) {
+          const formData = new FormData();
+          formData.append('file', selectedImage);
+
+          try {
+            setUploadState('uploading');
+            setUploadProgress(0);
+            setImageError('');
+            setImageFeedback('Uploading image to the file server...');
+
+            const uploadRes = await axiosInstance.post('/files/upload', formData, {
+              onUploadProgress: (progressEvent) => {
+                if (!progressEvent.total) return;
+                const nextProgress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+                setUploadProgress(nextProgress);
+              },
+            });
+
+            finalImage = uploadRes.data;
+            setUploadedImage(uploadRes.data);
+            setExistingImageId(uploadRes.data.fileId);
+            setLastUploadedSignature(selectedImageSignature);
+            setRemoveImage(false);
+            setUploadState('success');
+            setUploadProgress(100);
+            setImageFeedback(
+              uploadRes.data.reusedExisting
+                ? 'This image already exists in the system, so the previous upload was reused.'
+                : 'Image uploaded successfully.'
+            );
+          } catch (uploadError) {
+            const serverData = uploadError?.response?.data;
+            const errorMessage =
+              serverData?.error
+                ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
+                : 'Failed to upload image. Please try again.';
+
+            setUploadState('error');
+            setUploadProgress(0);
+            setImageError(errorMessage);
+            setImageFeedback('');
+            console.error('Image upload failed', uploadError);
+            toast.error(errorMessage);
+            throw uploadError;
+          }
         }
       }
 
@@ -193,7 +307,12 @@ export default function CreateEventPage() {
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
-        imageId: imageId,
+        imageId: removeImage ? null : finalImage?.fileId || existingImageId || null,
+        imageOriginalFilename: removeImage ? null : finalImage?.originalFilename || null,
+        imageContentType: removeImage ? null : finalImage?.contentType || null,
+        imageUploadedAt: removeImage ? null : finalImage?.uploadedAt || null,
+        imageChecksum: removeImage ? null : finalImage?.checksum || null,
+        removeImage,
       };
 
       if (isEditMode) {
@@ -211,7 +330,7 @@ export default function CreateEventPage() {
             : 'Event created successfully!'
         );
       }
-      navigate('/student/my-events');
+      navigate(user?.role === 'ADMIN' ? '/manage-events' : '/student/my-events');
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to create event');
       console.error(e);
@@ -262,20 +381,66 @@ export default function CreateEventPage() {
                 <div>
                   <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Image</label>
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/jpg"
                     onChange={handleImageChange}
                     className="w-full bg-surface-container-high border-0 focus:ring-0 rounded-t-lg text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl"
                   />
+                  <p className="mt-2 text-xs text-on-surface-variant">
+                    Supported formats: JPG, JPEG, PNG. Maximum size: 5MB.
+                  </p>
                   {imageError && (
                     <p className="text-error text-xs mt-2 font-bold">{imageError}</p>
                   )}
+                  {imageFeedback && !imageError && (
+                    <p className={`text-xs mt-2 font-bold ${uploadState === 'success' ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                      {imageFeedback}
+                    </p>
+                  )}
+                  {uploadState === 'uploading' && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between text-xs font-bold text-on-surface-variant">
+                        <span>Upload Progress</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-container-high">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Event preview"
-                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10"
-                    />
+                    <div className="mt-4 space-y-4">
+                      <img
+                        src={imagePreview}
+                        alt="Event preview"
+                        className="h-48 w-full rounded-2xl object-cover border border-primary/10"
+                      />
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-xl bg-surface-container-high px-4 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-highest"
+                        >
+                          Replace Image
+                        </button>
+                        <button
+                          type="button"
+                          onClick={clearImageSelection}
+                          className="rounded-xl border border-error/30 px-4 py-2 text-xs font-bold text-error transition-colors hover:bg-error/5"
+                        >
+                          Remove Image
+                        </button>
+                        {uploadedImage?.originalFilename && (
+                          <span className="text-xs font-medium text-on-surface-variant">
+                            {uploadedImage.originalFilename}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -385,7 +550,7 @@ export default function CreateEventPage() {
               <div className="flex items-center justify-end gap-6 pt-6">
                 <button 
                   type="button"
-                  onClick={() => navigate('/student')}
+                  onClick={() => navigate(user?.role === 'ADMIN' ? '/manage-events' : '/student/dashboard')}
                   className="px-8 py-4 text-on-surface-variant font-bold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
                 >
                   Cancel

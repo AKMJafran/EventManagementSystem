@@ -37,4 +37,9 @@ public class EventRequest {
     private EventType eventType;
 
     private String imageId;
+    private String imageOriginalFilename;
+    private String imageContentType;
+    private LocalDateTime imageUploadedAt;
+    private String imageChecksum;
+    private Boolean removeImage;
 }

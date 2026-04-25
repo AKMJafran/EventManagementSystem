@@ -3,6 +3,7 @@ import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/layout/AdminLayout';
+import EventImage from '../components/EventImage';
 
 export default function ManageEvents() {
   const [events, setEvents] = useState([]);
@@ -247,6 +248,13 @@ export default function ManageEvents() {
                   <tr key={event.id} className="group hover:bg-surface-container-lowest transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-start gap-4">
+                        <div className="h-16 w-20 overflow-hidden rounded-xl bg-surface-container-high">
+                          <EventImage
+                            src={event.imageUrl}
+                            alt={event.title}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
                         <div className={`w-1 self-stretch rounded-full ${event.hasConflict ? 'bg-error' : (event.status === 'PENDING' ? 'bg-tertiary' : (event.status === 'APPROVED' ? 'bg-secondary' : 'bg-on-surface-variant/20'))}`}></div>
                         <div>
                           <h4 className="font-serif text-base font-bold text-teal-900 flex items-center gap-2 group-hover:text-primary transition-colors">
@@ -296,7 +304,11 @@ export default function ManageEvents() {
                         >
                           <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>cancel</span>
                         </button>
-                        <button className="p-2 rounded-lg text-outline hover:bg-surface-container-high transition-colors">
+                        <button
+                          onClick={() => navigate(`/events/${event.id}`)}
+                          className="p-2 rounded-lg text-outline hover:bg-surface-container-high transition-colors"
+                          title="View details"
+                        >
                           <span className="material-symbols-outlined">more_vert</span>
                         </button>
                       </div>

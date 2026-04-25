@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
@@ -51,4 +52,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                            @Param("oneHourLater") LocalDateTime oneHourLater);
 
     List<Event> findByStartTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
+
+    Optional<Event> findTopByImageChecksumAndImageIdIsNotNull(String imageChecksum);
 }

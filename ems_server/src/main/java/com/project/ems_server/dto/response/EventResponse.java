@@ -19,6 +19,10 @@ public class EventResponse {
     private Long userId;
     private Long categoryId;
     private String imageId;
+    private String imageOriginalFilename;
+    private String imageContentType;
+    private LocalDateTime imageUploadedAt;
+    private String imageChecksum;
     
     private String title;
     

@@ -95,7 +95,7 @@ public class AuthService {
         }
 
         // Generate tokens
-        String profileUrl = user.getProfilePictureId() != null ? fileServerService.requestFileLink(user.getProfilePictureId()) : null;
+        String profileUrl = user.getProfilePictureId() != null ? fileServerService.buildFileAccessUrl(user.getProfilePictureId()) : null;
         String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name(), user.getName(), profileUrl);
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
@@ -139,7 +139,7 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String profileUrl = user.getProfilePictureId() != null ? fileServerService.requestFileLink(user.getProfilePictureId()) : null;
+        String profileUrl = user.getProfilePictureId() != null ? fileServerService.buildFileAccessUrl(user.getProfilePictureId()) : null;
         String newAccessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name(), user.getName(), profileUrl);
 
         return AuthResponse.builder()
