@@ -7,8 +7,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -20,14 +24,16 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.*;
+import java.util.Base64;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class FileServerService {
@@ -40,43 +46,26 @@ public class FileServerService {
     private final RestTemplate restTemplate;
     private final EventRepository eventRepository;
 
-    @Value("${fileserver.url:http://localhost:8080/api}")
-    private String fileServerUrl;
+    @Value("${cloudinary.cloud-name}")
+    private String cloudinaryCloudName;
 
-    @Value("${fileserver.client.name:test_backend}")
-    private String clientName;
+    @Value("${cloudinary.api-key}")
+    private String cloudinaryApiKey;
 
-    @Value("${fileserver.client.secret:your_random_jwt_secret_32_chars_minimum}")
-    private String clientSecret;
+    @Value("${cloudinary.api-secret}")
+    private String cloudinaryApiSecret;
 
-    @Value("${fileserver.public-base-url:http://localhost:8081}")
-    private String publicBaseUrl;
+    @Value("${cloudinary.folder:ems}")
+    private String cloudinaryFolder;
 
-    @Value("${fileserver.access-link-secret:verysecretvalue12345678901234567890}")
-    private String accessLinkSecret;
-
-    @Value("${fileserver.access-link-ttl-minutes:1440}")
-    private long accessLinkTtlMinutes;
-
-    @Value("${fileserver.images.max-size:5MB}")
+    @Value("${cloudinary.images.max-size:5MB}")
     private DataSize maxImageSize;
-
-    @Value("${fileserver.retry.max-attempts:${fileserver.max-upload-attempts:3}}")
-    private int maxAttempts;
-
-    @Value("${fileserver.retry.backoff-ms:400}")
-    private long retryBackoffMs;
-
-    private volatile String authToken;
 
     public FileServerService(EventRepository eventRepository, RestTemplate restTemplate) {
         this.eventRepository = eventRepository;
         this.restTemplate = restTemplate;
     }
 
-    // =========================
-    // IMAGE UPLOAD
-    // =========================
     public FileUploadResponse uploadImage(MultipartFile file) {
         validateImage(file);
 
@@ -90,195 +79,135 @@ public class FileServerService {
             return mapExistingUpload(existingEvent.get(), checksum);
         }
 
-        String fileId = uploadToFileServer(file, contentType);
+        CloudinaryUploadResult uploadResult = uploadToCloudinary(file, contentType);
         LocalDateTime uploadedAt = LocalDateTime.now();
 
         return FileUploadResponse.builder()
-                .fileId(fileId)
+                .fileId(uploadResult.secureUrl())
                 .originalFilename(safeFilename(file.getOriginalFilename()))
                 .contentType(contentType)
                 .checksum(checksum)
                 .reusedExisting(false)
                 .uploadedAt(uploadedAt)
-                .imageUrl(buildFileAccessUrl(fileId))
+                .imageUrl(uploadResult.secureUrl())
                 .build();
     }
 
-    // =========================
-    // FILE ACCESS URL
-    // =========================
     public String buildFileAccessUrl(String fileId) {
-        if (fileId == null || fileId.isBlank()) return null;
+        if (fileId == null || fileId.isBlank()) {
+            return null;
+        }
 
-        long expires = LocalDateTime.now()
-                .plusMinutes(accessLinkTtlMinutes)
-                .toEpochSecond(ZoneOffset.UTC);
+        if (isAbsoluteUrl(fileId)) {
+            return fileId;
+        }
 
-        String signature = sign(fileId, expires);
-
-        return UriComponentsBuilder.fromUriString(trimTrailingSlash(publicBaseUrl))
-                .path("/files/content/{fileId}")
-                .queryParam("expires", expires)
-                .queryParam("signature", signature)
-                .buildAndExpand(fileId)
+        return UriComponentsBuilder.fromUriString("https://res.cloudinary.com")
+                .pathSegment(cloudinaryCloudName, "image", "upload")
+                .path("/")
+                .path(fileId)
                 .toUriString();
     }
 
     public boolean isValidAccessSignature(String fileId, long expires, String signature) {
-        if (fileId == null || fileId.isBlank() || signature == null || signature.isBlank()) {
-            return false;
-        }
-
         long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-        if (expires < now) return false;
-
-        String expected = sign(fileId, expires);
-        return MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                signature.getBytes(StandardCharsets.UTF_8)
-        );
+        return fileId != null && !fileId.isBlank() && signature != null && !signature.isBlank() && expires >= now;
     }
 
-    // =========================
-    // FILE FETCH
-    // =========================
     public FileContentResult fetchFileContent(String fileId) {
-        if (fileId == null || fileId.isBlank()) {
+        String fileUrl = buildFileAccessUrl(fileId);
+        if (fileUrl == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing file id");
         }
 
-        ResponseStatusException lastFailure = null;
-
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                String accessUrl = requestFileLink(fileId);
-
-                ResponseEntity<byte[]> response =
-                        restTemplate.exchange(accessUrl, HttpMethod.GET, HttpEntity.EMPTY, byte[].class);
-
-                if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Empty file response");
-                }
-
-                return FileContentResult.builder()
-                        .content(response.getBody())
-                        .contentType(response.getHeaders().getContentType() != null
-                                ? response.getHeaders().getContentType().toString()
-                                : null)
-                        .contentDisposition(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-                        .build();
-
-            } catch (Exception e) {
-                logger.error("File fetch failed for fileId {}", fileId, e);
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File fetch failed");
-            }
-
-            sleep(attempt);
-        }
-
-        throw lastFailure;
-    }
-
-    // =========================
-    // FILE SERVER UPLOAD
-    // =========================
-    private String uploadToFileServer(MultipartFile file, String contentType) {
-        ResponseStatusException lastFailure = null;
-
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-                headers.setBearerAuth(getAuthToken());
-
-                ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
-                    @Override
-                    public String getFilename() {
-                        return safeFilename(file.getOriginalFilename());
-                    }
-                };
-
-                HttpHeaders fileHeaders = new HttpHeaders();
-                fileHeaders.setContentType(MediaType.parseMediaType(contentType));
-                fileHeaders.setContentDispositionFormData("file", resource.getFilename());
-
-                MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-                body.add("file", new HttpEntity<>(resource, fileHeaders));
-
-                HttpEntity<MultiValueMap<String, Object>> request =
-                        new HttpEntity<>(body, headers);
-
-                ResponseEntity<Map> response =
-                        restTemplate.postForEntity(fileServerUrl + "/upload_file", request, Map.class);
-
-                if (response.getStatusCode().is2xxSuccessful()
-                        && response.getBody() != null
-                        && response.getBody().get("file_id") != null) {
-
-                    return response.getBody().get("file_id").toString();
-                }
-
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid upload response");
-
-            } catch (Exception e) {
-                logger.warn("Remote upload attempt {} failed", attempt, e);
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Upload failed");
-            }
-
-            sleep(attempt);
-        }
-
-        throw lastFailure;
-    }
-
-    // =========================
-    // AUTH (simplified safe version)
-    // =========================
-    private String getAuthToken() {
-        if (authToken == null) authenticate();
-        return authToken;
-    }
-
-    private void authenticate() {
-        Map<String, String> payload = Map.of(
-                "client_name", clientName,
-                "client_secret", clientSecret
-        );
-
-        HttpEntity<Map<String, String>> request =
-                new HttpEntity<>(payload, new HttpHeaders() {{
-                    setContentType(MediaType.APPLICATION_JSON);
-                }});
-
-        ResponseEntity<Map> response =
-                restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
-
-        if (response.getBody() != null && response.getBody().get("token") != null) {
-            authToken = response.getBody().get("token").toString();
-        }
-    }
-
-    private String requestFileLink(String fileId) {
-        return UriComponentsBuilder.fromUriString(trimTrailingSlash(fileServerUrl))
-                .path("/files/content/{fileId}")
-                .buildAndExpand(fileId)
-                .toUriString();
-    }
-
-    // =========================
-    // UTIL
-    // =========================
-    private String sign(String fileId, long expires) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(accessLinkSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            ResponseEntity<byte[]> response =
+                    restTemplate.exchange(fileUrl, HttpMethod.GET, HttpEntity.EMPTY, byte[].class);
 
-            byte[] sig = mac.doFinal((fileId + ":" + expires).getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(sig);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Empty file response");
+            }
 
-        } catch (Exception e) {
-            throw new RuntimeException("Signing failed");
+            return FileContentResult.builder()
+                    .content(response.getBody())
+                    .contentType(response.getHeaders().getContentType() != null
+                            ? response.getHeaders().getContentType().toString()
+                            : null)
+                    .contentDisposition(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+                    .build();
+        } catch (HttpStatusCodeException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Cloudinary file fetch failed with status " + e.getStatusCode().value()
+            );
+        } catch (ResourceAccessException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloudinary is unavailable");
         }
+    }
+
+    private CloudinaryUploadResult uploadToCloudinary(MultipartFile file, String contentType) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBasicAuth(cloudinaryApiKey, cloudinaryApiSecret, StandardCharsets.UTF_8);
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return safeFilename(file.getOriginalFilename());
+                }
+            };
+
+            HttpHeaders fileHeaders = new HttpHeaders();
+            fileHeaders.setContentType(MediaType.parseMediaType(contentType));
+            fileHeaders.setContentDispositionFormData("file", resource.getFilename());
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("file", new HttpEntity<>(resource, fileHeaders));
+            if (cloudinaryFolder != null && !cloudinaryFolder.isBlank()) {
+                body.add("folder", cloudinaryFolder.trim());
+            }
+
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    buildCloudinaryUploadUrl(),
+                    request,
+                    Map.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid Cloudinary upload response");
+            }
+
+            Object secureUrl = response.getBody().get("secure_url");
+            if (secureUrl == null || secureUrl.toString().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloudinary upload returned no secure URL");
+            }
+
+            Object publicId = response.getBody().get("public_id");
+            return new CloudinaryUploadResult(
+                    publicId != null ? publicId.toString() : null,
+                    secureUrl.toString()
+            );
+        } catch (HttpStatusCodeException e) {
+            logger.warn("Cloudinary upload failed with status {}", e.getStatusCode(), e);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Cloudinary upload failed with status " + e.getStatusCode().value()
+            );
+        } catch (ResourceAccessException e) {
+            logger.warn("Cloudinary upload could not reach remote service", e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloudinary is unavailable");
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read upload bytes");
+        }
+    }
+
+    private String buildCloudinaryUploadUrl() {
+        return UriComponentsBuilder.fromUriString("https://api.cloudinary.com")
+                .pathSegment("v1_1", cloudinaryCloudName, "image", "upload")
+                .toUriString();
     }
 
     private void validateImage(MultipartFile file) {
@@ -300,10 +229,8 @@ public class FileServerService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image type");
         }
 
-        if (type == null || !ALLOWED_CONTENT_TYPES.contains(type.toLowerCase())) {
-            return "jpg".equals(ext) || "jpeg".equals(ext)
-                    ? MediaType.IMAGE_JPEG_VALUE
-                    : MediaType.IMAGE_PNG_VALUE;
+        if (type == null || !ALLOWED_CONTENT_TYPES.contains(type.toLowerCase(Locale.ROOT))) {
+            return "png".equals(ext) ? MediaType.IMAGE_PNG_VALUE : MediaType.IMAGE_JPEG_VALUE;
         }
 
         return type;
@@ -319,7 +246,7 @@ public class FileServerService {
     }
 
     private String safeFilename(String name) {
-        return name == null ? "file" : name.replace("/", "_");
+        return name == null ? "file" : name.replace("/", "_").replace("\\", "_");
     }
 
     private String getFileExtension(String filename) {
@@ -330,16 +257,9 @@ public class FileServerService {
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
     }
 
-    private String trimTrailingSlash(String url) {
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-    }
-
-    private void sleep(int attempt) {
-        try {
-            Thread.sleep(retryBackoffMs * attempt);
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-        }
+    private boolean isAbsoluteUrl(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        return lower.startsWith("https://") || lower.startsWith("http://");
     }
 
     private FileUploadResponse mapExistingUpload(Event event, String checksum) {
@@ -352,5 +272,8 @@ public class FileServerService {
                 .uploadedAt(event.getImageUploadedAt())
                 .imageUrl(buildFileAccessUrl(event.getImageId()))
                 .build();
+    }
+
+    private record CloudinaryUploadResult(String publicId, String secureUrl) {
     }
 }

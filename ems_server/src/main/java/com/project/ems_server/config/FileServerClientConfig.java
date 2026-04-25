@@ -13,8 +13,8 @@ public class FileServerClientConfig {
     @Bean
     @Primary
     public RestTemplate restTemplate(
-            @Value("${fileserver.connect-timeout-ms:5000}") long connectTimeoutMs,
-            @Value("${fileserver.read-timeout-ms:15000}") long readTimeoutMs
+            @Value("${cloudinary.connect-timeout-ms:5000}") long connectTimeoutMs,
+            @Value("${cloudinary.read-timeout-ms:15000}") long readTimeoutMs
     ) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) connectTimeoutMs);

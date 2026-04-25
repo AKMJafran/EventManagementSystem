@@ -1,68 +1,82 @@
 # Faculty Event Management System
 
-Faculty Event Management System is a full-stack app for managing student and faculty events. The repository contains:
+This repository contains:
 
 - `frontend/`: React + Vite client
-- `ems_server/`: Spring Boot API
-- an external file server integration used for image upload and file access
+- `ems_server/`: Spring Boot backend
 
-## Current Local Setup
-
-These are the ports and services the project is currently wired for:
+## Current Setup
 
 - Frontend: `http://localhost:5173`
-- Spring Boot backend: `http://localhost:8081`
-- File server API: `http://localhost:8080/api`
+- Backend: `http://localhost:8081`
+- Database: MySQL
+- Image storage: Cloudinary
 
-Event and profile images are stored through the file server only. If the file server is down or misconfigured, image upload will fail.
+The app no longer uses the old external file server on `localhost:8080`.
+
+## Image Upload Architecture
+
+Image upload still goes through the backend route:
+
+- `POST /files/upload`
+
+Flow:
+
+1. frontend sends the selected image to the Spring backend
+2. backend validates file type and size
+3. backend uploads the image directly to Cloudinary
+4. backend stores the returned Cloudinary URL as the image ID
+5. event and profile image URLs are built from that stored value
 
 ## Prerequisites
 
-- Java 17
+- Java 17+
 - Node.js 18+
 - MySQL
-- A running file server compatible with:
-  - `POST /api/login`
-  - `POST /api/upload_file`
-  - `GET /api/files/content/{fileId}`
+- Cloudinary account
 
 ## Backend Configuration
 
-The backend reads configuration from `ems_server/src/main/resources/application.properties`.
+Local backend config lives in:
 
-That file is gitignored by [`ems_server/.gitignore`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/.gitignore:28), so each machine should keep its own local copy.
+- `ems_server/src/main/resources/application.properties`
 
-You can start from [`application-template.properties`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1) and fill in real values.
+That file is gitignored. Use [application-template.properties](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1) as the template.
 
-Minimum required properties:
+Required properties:
 
 ```properties
 server.port=8081
 
-spring.datasource.url=jdbc:mysql://localhost:3306/EMS_Database
+spring.datasource.url=jdbc:mysql://localhost:3306/ems_database?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=your_mysql_username
 spring.datasource.password=your_mysql_password
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
 
 jwt.secret=your_jwt_secret
 
-fileserver.url=http://localhost:8080/api
-fileserver.client.name=test_backend
-fileserver.client.secret=your_file_server_client_secret
-fileserver.public-base-url=http://localhost:8081
-
 spring.servlet.multipart.max-file-size=10MB
 spring.servlet.multipart.max-request-size=10MB
+
+cloudinary.cloud-name=your_cloudinary_cloud_name
+cloudinary.api-key=your_cloudinary_api_key
+cloudinary.api-secret=your_cloudinary_api_secret
+cloudinary.folder=ems
+cloudinary.connect-timeout-ms=5000
+cloudinary.read-timeout-ms=15000
+cloudinary.images.max-size=5MB
 ```
 
-Optional but present in the current local setup:
+Optional but currently used locally:
 
-- SMTP mail settings for notification email
-- file server timeout and retry settings
-- file access signing secret
+- SMTP settings for email notifications
 
 ## Frontend Configuration
-
-The frontend uses `VITE_API_BASE_URL` and defaults to `http://localhost:8081`.
 
 Create `frontend/.env` if needed:
 
@@ -70,17 +84,13 @@ Create `frontend/.env` if needed:
 VITE_API_BASE_URL=http://localhost:8081
 ```
 
-## Running the Project
+## Run The Project
 
 ### 1. Start MySQL
 
-Make sure the target database exists and the credentials in `application.properties` are correct.
+Make sure the `ems_database` database exists and the configured credentials are correct.
 
-### 2. Start the file server
-
-The backend depends on the external file server for all image uploads. It must be reachable at the configured `fileserver.url`.
-
-### 3. Start the Spring Boot backend
+### 2. Start the backend
 
 From `ems_server/`:
 
@@ -88,13 +98,13 @@ From `ems_server/`:
 ./mvnw.cmd spring-boot:run
 ```
 
-If Maven is installed globally, this also works:
+If Maven is installed globally:
 
 ```powershell
 mvn spring-boot:run
 ```
 
-### 4. Start the frontend
+### 3. Start the frontend
 
 From `frontend/`:
 
@@ -103,26 +113,25 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:5173`.
+Open:
 
-## Image Upload Notes
+- `http://localhost:5173`
 
-- Frontend uploads images to `POST /files/upload` on the Spring backend.
-- The Spring backend forwards the upload to the external file server.
-- The backend also generates signed URLs for `GET /files/content/{fileId}`.
-- If you get a `502` during upload, check the file server first:
-  - is it running
-  - is `fileserver.url` correct
-  - do `fileserver.client.name` and `fileserver.client.secret` match the file server
+## Important Notes
 
-## Useful Paths
+- After backend code changes, restart the Spring Boot server before testing again.
+- Existing records that were saved during the earlier local-fallback phase may still contain old values like `local-...png`.
+- Those old records should no longer crash event pages, but that specific old image may not render correctly until it is uploaded again through the Cloudinary-based uploader.
 
-- [`frontend/src/pages/CreateEventPage.jsx`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/CreateEventPage.jsx:1)
-- [`frontend/src/pages/ManageEvents.jsx`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/ManageEvents.jsx:1)
-- [`frontend/src/api/axiosInstance.js`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/api/axiosInstance.js:1)
-- [`ems_server/src/main/java/com/project/ems_server/service/FileServerService.java`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/service/FileServerService.java:1)
-- [`ems_server/src/main/java/com/project/ems_server/controller/FileController.java`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/controller/FileController.java:1)
+## Relevant Files
+
+- [CreateEventPage.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/CreateEventPage.jsx:1)
+- [ManageEvents.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/ManageEvents.jsx:1)
+- [StudentHeader.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/components/layout/StudentHeader.jsx:1)
+- [FileController.java](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/controller/FileController.java:1)
+- [FileServerService.java](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/service/FileServerService.java:1)
+- [application-template.properties](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1)
 
 ## Current Status
 
-The backend is now set to use the file server only for image storage. The local fallback was removed, but the multipart upload fix remains in place.
+The uploader is now designed around Cloudinary instead of the previous file-server integration.
