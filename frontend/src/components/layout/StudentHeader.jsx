@@ -1,10 +1,12 @@
 import React, { useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
 import toast from 'react-hot-toast';
 import NotificationBell from '../NotificationBell';
 
 export default function StudentHeader({ user }) {
   const fileInputRef = useRef(null);
+  const location = useLocation();
 
   const handleProfileClick = () => {
     fileInputRef.current?.click();
@@ -53,7 +55,7 @@ export default function StudentHeader({ user }) {
         </div>
         
         <div className="flex items-center gap-6">
-          <NotificationBell />
+          <NotificationBell enableStudentUiFixes key={location.pathname} />
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 pl-4 border-l border-outline-variant/20">
               <div className="text-right">
