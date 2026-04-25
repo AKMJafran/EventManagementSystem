@@ -13,6 +13,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequest {
+
+    @NotBlank(message = "Student number is required")
+    private String studentNumber;
     
     @NotBlank(message = "Name is required")
     private String name;
