@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
+
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -30,31 +31,33 @@ export default function CreateEventPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const { id } = useParams();
+
   const isEditMode = Boolean(id);
+
   const fileInputRef = useRef(null);
 
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
+
   const [selectedImage, setSelectedImage] = useState(null);
   const [existingImageId, setExistingImageId] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
+
   const [selectedImageSignature, setSelectedImageSignature] = useState('');
   const [lastUploadedSignature, setLastUploadedSignature] = useState('');
+
   const [imagePreview, setImagePreview] = useState(null);
   const [imageError, setImageError] = useState('');
   const [imageFeedback, setImageFeedback] = useState('');
+
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadState, setUploadState] = useState('idle');
+
   const [removeImage, setRemoveImage] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
-
-  const normalizeCategories = (items) =>
-    items.map((item) => ({
-      ...item,
-      name: item.name || item.categoryName || item.label || `Category ${item.id}`,
-    }));
 
   const EVENT_TYPE_OPTIONS = [
     { value: 'CULTURAL', label: 'Cultural' },
@@ -64,13 +67,25 @@ export default function CreateEventPage() {
     { value: 'URGENT', label: 'Urgent' },
   ];
 
+  const normalizeCategories = (items) =>
+    items.map((item) => ({
+      ...item,
+      name: item.name || item.categoryName || item.label || `Category ${item.id}`,
+    }));
+
   const toDateTimeLocalValue = (dateString) => {
     if (!dateString) return '';
+
     const normalized = dateString.replace(' ', 'T');
     const date = new Date(normalized);
+
     if (Number.isNaN(date.getTime())) return '';
+
     const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+
+    return new Date(date.getTime() - offset)
+      .toISOString()
+      .slice(0, 16);
   };
 
   const buildFileSignature = (file) =>
@@ -88,20 +103,22 @@ export default function CreateEventPage() {
     setUploadProgress(0);
     setUploadState('idle');
     setRemoveImage(true);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const getImageValidationError = (file) => {
     const extension = file?.name?.split('.').pop()?.toLowerCase();
-    const allowedExtensions = ['jpg', 'jpeg', 'png'];
 
     if (!file) return 'Please select an image file.';
 
     if (
       !ACCEPTED_IMAGE_TYPES.includes(file.type) ||
-      !allowedExtensions.includes(extension)
+      !['jpg', 'jpeg', 'png'].includes(extension)
     ) {
-      return 'Only JPG, JPEG, and PNG images are allowed.';
+      return 'Only JPG, JPEG and PNG allowed.';
     }
 
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
@@ -111,16 +128,23 @@ export default function CreateEventPage() {
     return '';
   };
 
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+
     if (!file) return;
 
     const error = getImageValidationError(file);
+
     if (error) {
       setSelectedImage(null);
       setImageError(error);
+
       toast.error(error);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       return;
     }
 
@@ -128,11 +152,15 @@ export default function CreateEventPage() {
 
     setSelectedImage(file);
     setSelectedImageSignature(signature);
+
     setImageError('');
-    setImageFeedback('Image selected. It will upload on submit.');
+    setImageFeedback('Image selected. Upload happens on submit.');
+
     setUploadProgress(0);
     setUploadState('idle');
+
     setRemoveImage(false);
+
     setImagePreview(URL.createObjectURL(file));
   };
 
@@ -141,7 +169,10 @@ export default function CreateEventPage() {
     handleSubmit,
     watch,
     reset,
-    formState: { errors, isSubmitting },
+    formState: {
+      errors,
+      isSubmitting
+    }
   } = useForm({
     resolver: zodResolver(schema),
   });
@@ -149,7 +180,7 @@ export default function CreateEventPage() {
   const selectedCategory = watch('categoryId');
 
   useEffect(() => {
-    async function fetchCategories() {
+    const fetchCategories = async () => {
       try {
         const res = await axiosInstance.get('/categories');
         setCategories(normalizeCategories(res.data));
@@ -158,7 +189,8 @@ export default function CreateEventPage() {
       } finally {
         setCategoriesLoading(false);
       }
-    }
+    };
+
     fetchCategories();
   }, []);
 
@@ -183,6 +215,7 @@ export default function CreateEventPage() {
         });
 
         setExistingImageId(event.imageId || null);
+
         setUploadedImage(
           event.imageId
             ? {
@@ -197,45 +230,59 @@ export default function CreateEventPage() {
         );
 
         setImagePreview(event.imageUrl || null);
+
       } catch {
         toast.error('Failed to load event');
       }
     };
 
     fetchEvent();
+
   }, [id, reset]);
 
   useEffect(() => {
-    async function fetchSubCategories() {
-      if (!selectedCategory) return setSubCategories([]);
+    const fetchSubCategories = async () => {
+      if (!selectedCategory) {
+        setSubCategories([]);
+        return;
+      }
 
       try {
         setSubCategoriesLoading(true);
+
         const res = await axiosInstance.get(
           `/categories/${selectedCategory}/sub`
         );
-        setSubCategories(normalizeCategories(res.data));
+
+        setSubCategories(
+          normalizeCategories(res.data)
+        );
+
       } catch {
-        toast.error('Failed to load sub-categories');
+        toast.error('Failed loading subcategories');
       } finally {
         setSubCategoriesLoading(false);
       }
-    }
+    };
 
     fetchSubCategories();
+
   }, [selectedCategory]);
 
   const onSubmit = async (data) => {
     setLoading(true);
 
     try {
+
       let finalImage = uploadedImage;
 
       if (selectedImage) {
+
         if (
           !uploadedImage ||
           lastUploadedSignature !== selectedImageSignature
         ) {
+
           const formData = new FormData();
           formData.append('file', selectedImage);
 
@@ -247,6 +294,7 @@ export default function CreateEventPage() {
             {
               onUploadProgress: (e) => {
                 if (!e.total) return;
+
                 setUploadProgress(
                   Math.round((e.loaded / e.total) * 100)
                 );
@@ -255,8 +303,10 @@ export default function CreateEventPage() {
           );
 
           finalImage = uploadRes.data;
+
           setUploadedImage(uploadRes.data);
           setLastUploadedSignature(selectedImageSignature);
+
           setUploadState('success');
         }
       }
@@ -269,19 +319,27 @@ export default function CreateEventPage() {
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
+
         imageId: removeImage
           ? null
           : finalImage?.fileId || existingImageId,
+
         imageOriginalFilename: removeImage
           ? null
           : finalImage?.originalFilename,
+
         imageContentType: removeImage
           ? null
           : finalImage?.contentType,
+
         imageUploadedAt: removeImage
           ? null
           : finalImage?.uploadedAt,
-        imageChecksum: removeImage ? null : finalImage?.checksum,
+
+        imageChecksum: removeImage
+          ? null
+          : finalImage?.checksum,
+
         removeImage,
       };
 
@@ -298,51 +356,59 @@ export default function CreateEventPage() {
           ? '/manage-events'
           : '/student/my-events'
       );
+
     } catch (e) {
+
       toast.error(
-        e?.response?.data?.message || 'Failed to submit event'
+        e?.response?.data?.message ||
+        'Failed to submit event'
       );
+
     } finally {
       setLoading(false);
     }
   };
 
-  const categoryOptions = categories.map((category) => ({
-    value: category.id?.toString() || '',
-    label: category.name || `Category ${category.id}`,
+  const categoryOptions = categories.map((cat) => ({
+    value: cat.id?.toString() || '',
+    label: cat.name,
   }));
 
-  const subCategoryOptions = subCategories.map((subCategory) => ({
-    value: subCategory.id?.toString() || '',
-    label: subCategory.name || `Subcategory ${subCategory.id}`,
+  const subCategoryOptions = subCategories.map((sub) => ({
+    value: sub.id?.toString() || '',
+    label: sub.name,
   }));
 
   return (
     <StudentLayout user={user}>
       <div className="mx-auto max-w-6xl px-4 py-10">
+
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-on-background">
+          <h1 className="text-4xl font-bold">
             {isEditMode ? 'Edit Event' : 'Create Event'}
           </h1>
-          <p className="mt-2 text-sm text-on-surface-variant max-w-2xl">
+
+          <p className="mt-2 text-sm text-gray-500">
             {isEditMode
-              ? 'Update your event details and submit changes for review.'
-              : 'Fill in the event details to submit a new event request.'}
+              ? 'Update your event details.'
+              : 'Submit a new event request.'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-8"
+        >
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Input
               label="Event Title"
-              placeholder="Enter event title"
               error={errors.title?.message}
               {...register('title')}
             />
 
             <Select
               label="Event Type"
-              placeholder="Select event type"
               options={EVENT_TYPE_OPTIONS}
               error={errors.eventType?.message}
               {...register('eventType')}
@@ -352,16 +418,14 @@ export default function CreateEventPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Select
               label="Category"
-              placeholder={categoriesLoading ? 'Loading categories...' : 'Select category'}
               options={categoryOptions}
-              error={errors.categoryId?.message}
               disabled={categoriesLoading}
+              error={errors.categoryId?.message}
               {...register('categoryId')}
             />
 
             <Select
               label="Subcategory"
-              placeholder={subCategoryOptions.length ? 'Select subcategory' : 'Choose category first'}
               options={subCategoryOptions}
               disabled={!selectedCategory || subCategoriesLoading}
               {...register('subCategoryId')}
@@ -369,91 +433,105 @@ export default function CreateEventPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
+
             <Input
               label="Venue"
-              placeholder="Enter venue or room"
               error={errors.venue?.message}
               {...register('venue')}
             />
 
             <div className="grid gap-6 sm:grid-cols-2">
               <Input
-                label="Start Date & Time"
+                label="Start Time"
                 type="datetime-local"
-                error={errors.startTime?.message}
                 {...register('startTime')}
               />
+
               <Input
-                label="End Date & Time"
+                label="End Time"
                 type="datetime-local"
-                error={errors.endTime?.message}
                 {...register('endTime')}
               />
             </div>
+
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+          <div>
+            <label className="block mb-2 font-medium">
+              Description
+            </label>
+
             <textarea
-              className="min-h-[160px] w-full rounded-md border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Describe the event, agenda, and objective"
               {...register('description')}
+              className="w-full rounded border p-3 min-h-[160px]"
             />
-            {errors.description?.message && (
-              <p className="text-sm text-red-500">{errors.description.message}</p>
+
+            {errors.description && (
+              <p className="text-red-500 text-sm mt-2">
+                {errors.description.message}
+              </p>
             )}
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-700">Event image</p>
-                <p className="text-sm text-gray-500">Upload a JPG or PNG file (max 5MB). Optional.</p>
-              </div>
+            <div className="flex justify-between">
+              <span className="font-medium">
+                Event Image
+              </span>
+
               <button
                 type="button"
-                className="text-sm text-blue-600 hover:text-blue-700"
                 onClick={clearImageSelection}
+                className="text-blue-600"
               >
-                Remove image
+                Remove Image
               </button>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png"
-                onChange={handleImageChange}
-                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-full file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-white file:hover:bg-primary-700"
-              />
-              {imageError && <p className="text-sm text-red-500">{imageError}</p>}
-            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleImageChange}
+            />
 
-            {imageFeedback && <p className="text-sm text-green-600">{imageFeedback}</p>}
+            {imageError && (
+              <p className="text-red-500">
+                {imageError}
+              </p>
+            )}
+
+            {imageFeedback && (
+              <p className="text-green-600">
+                {imageFeedback}
+              </p>
+            )}
+
+            {uploadState === 'uploading' && (
+              <p>Uploading {uploadProgress}%</p>
+            )}
 
             {imagePreview && (
-              <div className="rounded-xl border border-gray-200 bg-surface-container-lowest p-3">
-                <img
-                  src={imagePreview}
-                  alt="Selected preview"
-                  className="max-h-80 w-full rounded-lg object-contain"
-                />
-              </div>
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="rounded-xl max-h-80"
+              />
             )}
+
           </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-            <div className="text-sm text-on-surface-variant">
-              {isEditMode
-                ? 'Edit mode: existing event data is loaded automatically.'
-                : 'Create mode: all fields are required except the image.'}
-            </div>
-            <Button type="submit" isLoading={loading} className="w-full sm:w-auto">
-              {isEditMode ? 'Update Event' : 'Create Event'}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            isLoading={loading || isSubmitting}
+          >
+            {isEditMode
+              ? 'Update Event'
+              : 'Create Event'}
+          </Button>
+
         </form>
+
       </div>
     </StudentLayout>
   );
