@@ -8,6 +8,8 @@ export default function ManageEvents() {
   const [events, setEvents] = useState([]);
   const [status, setStatus] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectId, setRejectId] = useState(null);
@@ -20,7 +22,16 @@ export default function ManageEvents() {
 
     (async () => {
       try {
-        const params = status !== 'ALL' ? { status } : {};
+        if (startDate && endDate && endDate < startDate) {
+          toast.error('End date must be on or after start date');
+          return;
+        }
+
+        const params = {};
+        if (status !== 'ALL') params.status = status;
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+
         const res = await axiosInstance.get('/events', { params });
         if (!cancelled) {
           setEvents(res.data.content || res.data);
@@ -35,11 +46,20 @@ export default function ManageEvents() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, startDate, endDate]);
 
   async function reloadEvents(nextStatus = status) {
     try {
-      const params = nextStatus !== 'ALL' ? { status: nextStatus } : {};
+      if (startDate && endDate && endDate < startDate) {
+        toast.error('End date must be on or after start date');
+        return;
+      }
+
+      const params = {};
+      if (nextStatus !== 'ALL') params.status = nextStatus;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+
       const res = await axiosInstance.get('/events', { params });
       setEvents(res.data.content || res.data);
       setLastSynced(new Date());
@@ -77,6 +97,16 @@ export default function ManageEvents() {
   const formatTime = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDate = (isoString) => {
+    const d = new Date(isoString);
+    return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: '2-digit' });
+  };
+
+  const clearDateFilters = () => {
+    setStartDate('');
+    setEndDate('');
   };
 
   const getStatusDisplay = (evtStatus) => {
@@ -169,6 +199,30 @@ export default function ManageEvents() {
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-xs text-teal-900"
+              aria-label="Filter from date"
+            />
+            <span className="text-xs font-bold text-on-surface-variant">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-xs text-teal-900"
+              aria-label="Filter to date"
+            />
+            <button
+              type="button"
+              onClick={clearDateFilters}
+              className="px-3 py-2 rounded-lg text-xs font-bold text-teal-700 hover:bg-teal-50 transition-colors"
+            >
+              Clear Dates
+            </button>
+          </div>
         </section>
 
         {/* Table Section */}
@@ -179,7 +233,7 @@ export default function ManageEvents() {
                 <tr className="bg-surface-container-low/50">
                   <th className="px-8 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900">Event Details</th>
                   <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900">Type</th>
-                  <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900">Venue & Time</th>
+                  <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900">Venue, Date & Time</th>
                   <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900">Status</th>
                   <th className="px-8 py-5 text-[11px] font-bold uppercase tracking-widest text-teal-900 text-right">Actions</th>
                 </tr>
@@ -212,6 +266,9 @@ export default function ManageEvents() {
                       <div className="flex flex-col gap-1">
                         <span className="flex items-center gap-2 text-teal-900 font-medium">
                           <span className="material-symbols-outlined text-sm">location_on</span> {event.venue}
+                        </span>
+                        <span className="flex items-center gap-2 text-on-surface-variant text-xs">
+                          <span className="material-symbols-outlined text-sm">calendar_month</span> {formatDate(event.startTime)}
                         </span>
                         <span className="flex items-center gap-2 text-on-surface-variant text-xs">
                           <span className="material-symbols-outlined text-sm">schedule</span> {formatTime(event.startTime)} — {formatTime(event.endTime)}
