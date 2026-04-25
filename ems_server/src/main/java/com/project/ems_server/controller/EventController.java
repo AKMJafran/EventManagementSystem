@@ -3,9 +3,10 @@ package com.project.ems_server.controller;
 import com.project.ems_server.dto.request.ConflictResolutionRequest;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.AnalyticsReportResponse;
+import com.project.ems_server.dto.response.EventConflictAnalysisResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
-import com.project.ems_server.entity.EventConflict;
+import com.project.ems_server.dto.response.StudentCalendarFeedResponse;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
@@ -102,6 +103,20 @@ public class EventController {
         return ResponseEntity.ok(events);
     }
 
+    @GetMapping("/student/calendar-feed")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<StudentCalendarFeedResponse> getStudentCalendarFeed(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            Authentication authentication) {
+        if (end.isBefore(start)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = extractUserIdFromAuthentication(authentication);
+        return ResponseEntity.ok(eventService.getStudentCalendarFeed(userId, start, end));
+    }
+
     /**
      * Gets monthly event report.
      */
@@ -167,6 +182,12 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
         return ResponseEntity.ok(event);
     }
 
+    @GetMapping("/{id}/approval-check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EventConflictAnalysisResponse> getApprovalCheck(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getApprovalCheck(id));
+    }
+
     /**
      * Approves an event (admin only)
      * PATCH /events/{id}/approve
@@ -209,8 +230,8 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
      */
     @GetMapping("/admin/conflicts")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<EventConflict>> getConflicts() {
-        List<EventConflict> conflicts = eventService.getConflicts();
+    public ResponseEntity<List<EventConflictAnalysisResponse>> getConflicts() {
+        List<EventConflictAnalysisResponse> conflicts = eventService.getConflicts();
         return ResponseEntity.ok(conflicts);
     }
 

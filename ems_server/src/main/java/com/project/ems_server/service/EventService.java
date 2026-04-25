@@ -4,14 +4,19 @@ import com.project.ems_server.dto.request.ConflictResolutionRequest;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.BreakdownItemResponse;
+import com.project.ems_server.dto.response.CalendarAlertResponse;
 import com.project.ems_server.dto.response.CategoryCountResponse;
+import com.project.ems_server.dto.response.EventConflictAnalysisResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.EventTypeCountResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.dto.response.OrganizerActivityResponse;
+import com.project.ems_server.dto.response.ReminderResponse;
 import com.project.ems_server.dto.response.ReportEventDetailResponse;
+import com.project.ems_server.dto.response.StudentCalendarFeedResponse;
 import com.project.ems_server.dto.response.TrendPointResponse;
 import com.project.ems_server.entity.*;
+import com.project.ems_server.enums.ConflictSeverity;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.enums.EventType;
 import com.project.ems_server.enums.NotificationType;
@@ -25,6 +30,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
@@ -207,8 +213,8 @@ public class EventService {
      */
     public List<EventResponse> getCalendarEvents(LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
-        return eventRepository.findByStartTimeBetween(startDateTime, endDateTime).stream()
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+        return eventRepository.findByStatusInAndTimeRangeOverlap(List.of(EventStatus.APPROVED, EventStatus.PENDING), startDateTime, endDateTime).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -527,6 +533,13 @@ public class EventService {
         return mapToResponse(event);
     }
 
+    public EventConflictAnalysisResponse getApprovalCheck(Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        return conflictService.analyzeEvent(event);
+    }
+
     /**
      * Approves an event and notifies observers.
      */
@@ -552,22 +565,11 @@ public class EventService {
     /**
      * Gets all conflicts
      */
-    public List<EventConflict> getConflicts() {
-        List<EventConflict> activeConflicts = new ArrayList<>();
-
-        for (EventConflict conflict : eventConflictRepository.findAll()) {
-            Event primary = conflict.getEvent();
-            Event secondary = conflict.getConflictingEvent();
-
-            if (!conflictService.eventsConflict(primary, secondary)) {
-                eventConflictRepository.delete(conflict);
-                continue;
-            }
-
-            activeConflicts.add(conflict);
-        }
-
-        return activeConflicts;
+    public List<EventConflictAnalysisResponse> getConflicts() {
+        return eventRepository.findByStatus(EventStatus.PENDING).stream()
+                .map(conflictService::analyzeEvent)
+                .filter(analysis -> !ConflictSeverity.NO_CONFLICT.name().equals(analysis.getConflictStatus()))
+                .collect(Collectors.toList());
     }
 
     public EventResponse resolveConflict(Long eventId, ConflictResolutionRequest request, Long adminId) {
@@ -604,23 +606,28 @@ public class EventService {
                 .imageId(event.getImageId())
                 .build();
 
-        List<Event> remainingConflicts = conflictService.detectConflict(probeRequest, event.getId()).stream()
-                .filter(conflictingEvent -> !conflictingEvent.getId().equals(event.getId()))
-                .toList();
+        EventConflictAnalysisResponse analysis = conflictService.analyzeRequest(
+                probeRequest,
+                event.getId(),
+                event.getUserId(),
+                event.getStatus()
+        );
 
-        if (!remainingConflicts.isEmpty()) {
-            String conflictTitles = remainingConflicts.stream()
-                    .map(Event::getTitle)
+        if (ConflictSeverity.HARD_CONFLICT.name().equals(analysis.getConflictStatus())) {
+            String conflictTitles = analysis.getConflicts().stream()
+                    .map(conflict -> conflict.getConflictingEventTitle())
                     .collect(Collectors.joining(", "));
-            throw new RuntimeException("Conflict still exists with: " + conflictTitles);
+            throw new RuntimeException("Hard conflict still exists with: " + conflictTitles);
         }
 
         event.setVenue(newVenue);
         event.setStartTime(newStartTime);
         event.setEndTime(newEndTime);
+        event.setStatus(EventStatus.PENDING);
 
         Event savedEvent = eventRepository.save(event);
         conflictService.refreshConflictRecords(savedEvent, false);
+        notifyStudentOfAlternativeSchedule(savedEvent, request.getAdminMessage());
         return mapToResponse(savedEvent);
     }
 
@@ -663,9 +670,42 @@ public class EventService {
 public List<EventResponse> getEventsByUserId(Long userId) {
     return eventRepository.findByUserId(userId)
             .stream()
-            .map(this::mapToResponse)
+            .map(event -> mapToResponse(event, userId, false, "MY_REQUEST"))
             .collect(Collectors.toList());
 }
+
+    public StudentCalendarFeedResponse getStudentCalendarFeed(Long userId, LocalDate startDate, LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+
+        Map<Long, EventResponse> calendarEvents = new HashMap<>();
+
+        eventRepository.findByStatusInAndTimeRangeOverlap(List.of(EventStatus.APPROVED), startDateTime, endDateTime)
+                .forEach(event -> calendarEvents.put(event.getId(), mapToResponse(event, userId, isAttending(event.getId(), userId), "APPROVED_EVENT")));
+
+        eventRepository.findByUserId(userId).stream()
+                .filter(event -> event.getStartTime().isBefore(endDateTime) && event.getEndTime().isAfter(startDateTime))
+                .forEach(event -> calendarEvents.put(event.getId(), mapToResponse(event, userId, isAttending(event.getId(), userId), "MY_REQUEST")));
+
+        for (EventAttendee attendee : eventAttendeeRepository.findByUserId(userId)) {
+            eventRepository.findById(attendee.getEventId())
+                    .filter(event -> event.getStartTime().isBefore(endDateTime) && event.getEndTime().isAfter(startDateTime))
+                    .ifPresent(event -> calendarEvents.put(event.getId(), mapToResponse(event, userId, true, "REGISTERED_EVENT")));
+        }
+
+        List<Event> involvementEvents = new ArrayList<>(eventRepository.findByUserId(userId));
+        for (EventAttendee attendee : eventAttendeeRepository.findByUserId(userId)) {
+            eventRepository.findById(attendee.getEventId()).ifPresent(involvementEvents::add);
+        }
+
+        return StudentCalendarFeedResponse.builder()
+                .events(calendarEvents.values().stream()
+                        .sorted(Comparator.comparing(EventResponse::getStartTime))
+                        .toList())
+                .reminders(buildReminders(involvementEvents))
+                .overlapAlerts(buildOverlapAlerts(involvementEvents))
+                .build();
+    }
 
     private void validateEventWindow(LocalDateTime startTime, LocalDateTime endTime) {
         if (startTime == null || endTime == null) {
@@ -675,6 +715,104 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         if (!endTime.isAfter(startTime)) {
             throw new RuntimeException("End time must be after start time");
         }
+    }
+
+    private List<ReminderResponse> buildReminders(List<Event> events) {
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, Event> uniqueEvents = events.stream()
+                .collect(Collectors.toMap(Event::getId, event -> event, (first, second) -> first));
+
+        return uniqueEvents.values().stream()
+                .filter(event -> event.getStatus() == EventStatus.APPROVED || event.getStatus() == EventStatus.PENDING)
+                .filter(event -> event.getStartTime().isAfter(now.minusHours(1)))
+                .filter(event -> event.getStartTime().isBefore(now.plusDays(7)))
+                .sorted(Comparator.comparing(Event::getStartTime))
+                .map(event -> ReminderResponse.builder()
+                        .eventId(event.getId())
+                        .eventTitle(event.getTitle())
+                        .status(event.getStatus().name())
+                        .venue(event.getVenue())
+                        .reminderType(event.getStatus() == EventStatus.PENDING ? "PENDING_REVIEW" : "UPCOMING_EVENT")
+                        .message(buildReminderMessage(event, now))
+                        .hoursUntilStart(ChronoUnit.HOURS.between(now, event.getStartTime()))
+                        .startTime(event.getStartTime())
+                        .build())
+                .toList();
+    }
+
+    private String buildReminderMessage(Event event, LocalDateTime now) {
+        if (event.getStatus() == EventStatus.PENDING) {
+            return "Your request is still pending review. Check for conflicts or admin feedback before the event date.";
+        }
+
+        long hoursUntilStart = ChronoUnit.HOURS.between(now, event.getStartTime());
+        if (hoursUntilStart <= 24) {
+            return "Starts within the next day. Review venue and preparation details.";
+        }
+        return "Upcoming approved event on your calendar.";
+    }
+
+    private List<CalendarAlertResponse> buildOverlapAlerts(List<Event> events) {
+        Map<Long, Event> uniqueEvents = events.stream()
+                .collect(Collectors.toMap(Event::getId, event -> event, (first, second) -> first));
+
+        List<Event> relevantEvents = uniqueEvents.values().stream()
+                .filter(event -> event.getStatus() == EventStatus.APPROVED || event.getStatus() == EventStatus.PENDING)
+                .sorted(Comparator.comparing(Event::getStartTime))
+                .collect(Collectors.toList());
+
+        List<CalendarAlertResponse> alerts = new ArrayList<>();
+        Set<String> seenPairs = new HashSet<>();
+
+        for (int index = 0; index < relevantEvents.size(); index++) {
+            for (int inner = index + 1; inner < relevantEvents.size(); inner++) {
+                Event first = relevantEvents.get(index);
+                Event second = relevantEvents.get(inner);
+                if (!first.getStartTime().isBefore(second.getEndTime()) || !first.getEndTime().isAfter(second.getStartTime())) {
+                    continue;
+                }
+
+                String pairKey = first.getId() + ":" + second.getId();
+                if (!seenPairs.add(pairKey)) {
+                    continue;
+                }
+
+                alerts.add(CalendarAlertResponse.builder()
+                        .primaryEventId(first.getId())
+                        .relatedEventId(second.getId())
+                        .severity(ConflictSeverity.HARD_CONFLICT.name())
+                        .summary(String.format("'%s' overlaps with '%s' on your calendar.", first.getTitle(), second.getTitle()))
+                        .primaryEventTitle(first.getTitle())
+                        .relatedEventTitle(second.getTitle())
+                        .startTime(first.getStartTime().isAfter(second.getStartTime()) ? first.getStartTime() : second.getStartTime())
+                        .endTime(first.getEndTime().isBefore(second.getEndTime()) ? first.getEndTime() : second.getEndTime())
+                        .build());
+                }
+        }
+
+        return alerts;
+    }
+
+    private boolean isAttending(Long eventId, Long userId) {
+        return eventAttendeeRepository.findByEventIdAndUserId(eventId, userId).isPresent();
+    }
+
+    private void notifyStudentOfAlternativeSchedule(Event event, String adminMessage) {
+        String message = String.format(
+                "Admin proposed an alternative schedule for '%s'. New venue: %s. New time: %s to %s.%s",
+                event.getTitle(),
+                event.getVenue(),
+                event.getStartTime(),
+                event.getEndTime(),
+                adminMessage != null && !adminMessage.isBlank() ? " Note: " + adminMessage.trim() : ""
+        );
+
+        notificationService.createNotification(
+                event.getUserId(),
+                "Alternative Schedule Proposed",
+                message,
+                NotificationType.GENERAL
+        );
     }
 
     private void applyEventImage(Event event, EventRequest eventRequest, boolean preserveExistingWhenMissing) {
@@ -716,8 +854,13 @@ public List<EventResponse> getEventsByUserId(Long userId) {
      * Maps Event entity to EventResponse
      */
     private EventResponse mapToResponse(Event event) {
+        return mapToResponse(event, null, false, null);
+    }
+
+    private EventResponse mapToResponse(Event event, Long currentUserId, boolean attending, String calendarLabel) {
         User creator = userRepository.findById(event.getUserId()).orElse(null);
         Category category = categoryRepository.findById(event.getCategoryId()).orElse(null);
+        EventConflictAnalysisResponse analysis = conflictService.analyzeEvent(event);
 
         String imageUrl = fileServerService.buildFileAccessUrl(event.getImageId());
 
@@ -738,10 +881,15 @@ public List<EventResponse> getEventsByUserId(Long userId) {
                 .endTime(event.getEndTime())
                 .status(event.getStatus().name())
                 .eventType(event.getEventType() != null ? event.getEventType().name() : null)
-                .hasConflict(eventConflictRepository.existsByEventIdOrConflictWith(event.getId(), event.getId()))
+                .hasConflict(!ConflictSeverity.NO_CONFLICT.name().equals(analysis.getConflictStatus()))
                 .categoryName(category != null ? category.getName() : "Unknown")
                 .createdByName(creator != null ? creator.getName() : "Unknown")
                 .rejectReason(event.getRejectReason())
+                .conflictStatus(analysis.getConflictStatus())
+                .conflictDetails(analysis.getConflicts())
+                .calendarLabel(calendarLabel)
+                .ownedByCurrentUser(currentUserId != null && currentUserId.equals(event.getUserId()))
+                .attending(attending)
                 .build();
     }
 }
