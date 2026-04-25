@@ -33,7 +33,7 @@ const Home = () => {
 
 
 function App() {
-  const { loadFromStorage, authLoaded } = useAuthStore();
+  const { loadFromStorage, authLoaded, user } = useAuthStore();
 
   useEffect(() => {
     loadFromStorage();
@@ -55,7 +55,7 @@ function App() {
       {/* Protected Routes */}
       <Route element={<ProtectedRoute requiredRole="STUDENT" />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/create-event" element={<CreateEventPage />} />
+        <Route path="/student/create-event" element={<CreateEventPage />} />
         <Route path="/student/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
@@ -70,12 +70,17 @@ function App() {
         <Route path="/manage-events" element={<ManageEvents />} />
         <Route path="/manage-students" element={<ManageStudents />} />
         <Route path="/manage-venues" element={<ManageVenues />} />
-        <Route path="/create-event" element={<CreateEventPage />} />
+        <Route path="/admin/create-event" element={<CreateEventPage />} />
+        <Route path="/admin/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
         <Route path="/admin/notifications" element={<NotificationManagerPage />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>
+        <Route
+          path="/create-event"
+          element={<Navigate to={user?.role === 'ADMIN' ? '/admin/create-event' : '/student/create-event'} replace />}
+        />
         <Route path="/events/:id" element={<EventDetailsPage />} />
       </Route>
 

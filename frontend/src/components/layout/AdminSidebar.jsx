@@ -51,7 +51,7 @@ export default function AdminSidebar() {
 
       <div className="mt-auto space-y-2 pt-6">
         <Link
-          to="/create-event"
+          to="/admin/create-event"
           className="w-full btn-gradient text-on-primary py-3 px-4 rounded-lg font-semibold mb-6 shadow-xl shadow-primary/20 flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
         >
           <span className="material-symbols-outlined text-sm">add</span>
