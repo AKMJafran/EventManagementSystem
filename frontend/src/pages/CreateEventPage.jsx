@@ -8,6 +8,14 @@ import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
 
+const EVENT_TYPE_OPTIONS = [
+  { value: 'CULTURAL', label: 'Cultural' },
+  { value: 'TECHNICAL', label: 'Technical' },
+  { value: 'ACADEMIC', label: 'Academic' },
+  { value: 'SPORTS', label: 'Sports' },
+  { value: 'URGENT', label: 'Urgent' },
+];
+
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
   description: z.string().min(5, 'Description required'),
@@ -34,6 +42,7 @@ export default function CreateEventPage() {
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState(null);
 
   const normalizeCategories = (items) => {
     return items.map((item) => ({
@@ -87,11 +96,56 @@ export default function CreateEventPage() {
     reader.readAsDataURL(file);
   };
 
-  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
   });
 
   const selectedCategory = watch('categoryId');
+
+  const loadSubCategories = async (parentId) => {
+    if (!parentId) {
+      return [];
+    }
+
+    const res = await axiosInstance.get(`/categories/${parentId}/sub`);
+    return normalizeCategories(res.data);
+  };
+
+  const resolveCategorySelection = async (categoryId, parentCategories) => {
+    const normalizedCategoryId = categoryId?.toString();
+    if (!normalizedCategoryId) {
+      return { categoryId: '', subCategoryId: '', subCategories: [] };
+    }
+
+    const matchingParent = parentCategories.find(
+      (category) => category.id?.toString() === normalizedCategoryId
+    );
+
+    if (matchingParent) {
+      return {
+        categoryId: normalizedCategoryId,
+        subCategoryId: '',
+        subCategories: await loadSubCategories(normalizedCategoryId),
+      };
+    }
+
+    for (const parentCategory of parentCategories) {
+      const nestedSubCategories = await loadSubCategories(parentCategory.id);
+      const matchingSubCategory = nestedSubCategories.find(
+        (subCategory) => subCategory.id?.toString() === normalizedCategoryId
+      );
+
+      if (matchingSubCategory) {
+        return {
+          categoryId: parentCategory.id?.toString() || '',
+          subCategoryId: normalizedCategoryId,
+          subCategories: nestedSubCategories,
+        };
+      }
+    }
+
+    return { categoryId: normalizedCategoryId, subCategoryId: '', subCategories: [] };
+  };
 
   useEffect(() => {
     async function fetchCategories() {
@@ -114,23 +168,7 @@ export default function CreateEventPage() {
     const fetchEvent = async () => {
       try {
         const res = await axiosInstance.get(`/events/${id}`);
-        const event = res.data;
-
-        reset({
-          title: event.title || '',
-          description: event.description || '',
-          categoryId: event.categoryId?.toString() || '',
-          subCategoryId: '',
-          eventType: event.eventType || '',
-          venue: event.venue || '',
-          startTime: toDateTimeLocalValue(event.startTime),
-          endTime: toDateTimeLocalValue(event.endTime),
-          imageId: event.imageId || '',
-        });
-
-        setExistingImageId(event.imageId || null);
-        setSelectedImage(null);
-        setImagePreview(event.imageUrl || null);
+        setEventToEdit(res.data);
       } catch (e) {
         toast.error('Failed to load event for editing');
         console.error(e);
@@ -138,28 +176,97 @@ export default function CreateEventPage() {
     };
 
     fetchEvent();
-  }, [id, reset]);
+  }, [id]);
 
   useEffect(() => {
+    if (!isEditMode || !eventToEdit || categoriesLoading) return;
+
+    let cancelled = false;
+
+    async function initializeEditForm() {
+      try {
+        const selection = await resolveCategorySelection(eventToEdit.categoryId, categories);
+
+        if (cancelled) return;
+
+        setSubCategories(selection.subCategories);
+        reset({
+          title: eventToEdit.title || '',
+          description: eventToEdit.description || '',
+          categoryId: selection.categoryId,
+          subCategoryId: selection.subCategoryId,
+          eventType: eventToEdit.eventType || '',
+          venue: eventToEdit.venue || '',
+          startTime: toDateTimeLocalValue(eventToEdit.startTime),
+          endTime: toDateTimeLocalValue(eventToEdit.endTime),
+          imageId: eventToEdit.imageId || '',
+        });
+
+        setExistingImageId(eventToEdit.imageId || null);
+        setSelectedImage(null);
+        setImagePreview(eventToEdit.imageUrl || null);
+      } catch (e) {
+        if (!cancelled) {
+          toast.error('Failed to resolve event categories');
+          console.error(e);
+        }
+      }
+    }
+
+    initializeEditForm();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, eventToEdit, categoriesLoading, categories, reset]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function fetchSubCategories() {
       if (!selectedCategory) {
         setSubCategories([]);
         setSubCategoriesLoading(false);
+        setValue('subCategoryId', '');
         return;
       }
+
       setSubCategoriesLoading(true);
+
       try {
-        const res = await axiosInstance.get(`/categories/${selectedCategory}/sub`);
-        setSubCategories(normalizeCategories(res.data));
+        const normalizedSubCategories = await loadSubCategories(selectedCategory);
+        if (cancelled) return;
+
+        setSubCategories(normalizedSubCategories);
+
+        const selectedSubCategory = getValues('subCategoryId');
+        const hasSelectedSubCategory = normalizedSubCategories.some(
+          (subCategory) => subCategory.id?.toString() === selectedSubCategory
+        );
+
+        if (!hasSelectedSubCategory) {
+          setValue('subCategoryId', '');
+        }
       } catch (e) {
-        toast.error('Failed to load sub-categories');
-        console.error(e);
+        if (!cancelled) {
+          setSubCategories([]);
+          setValue('subCategoryId', '');
+          toast.error('Failed to load sub-categories');
+          console.error(e);
+        }
       } finally {
-        setSubCategoriesLoading(false);
+        if (!cancelled) {
+          setSubCategoriesLoading(false);
+        }
       }
     }
+
     fetchSubCategories();
-  }, [selectedCategory]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory, getValues, setValue]);
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -292,60 +399,46 @@ export default function CreateEventPage() {
                   </select>
                   {errors.categoryId && <p className="text-error text-xs mt-1 font-bold">{errors.categoryId.message}</p>}
                 </div>
-                
-                {subCategories.length > 0 ? (
-                  <div>
-                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Sub-Category</label>
-                    <select 
-                      {...register('subCategoryId')}
-                      disabled={subCategoriesLoading}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
-                    >
-                      <option value="">{subCategoriesLoading ? 'Loading...' : 'Select Sub-Category'}</option>
-                      {subCategories.map(sub => (
-                        <option key={sub.id} value={sub.id}>{sub.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
-                    <select 
-                      {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
-                    >
-                      <option value="">Select Event Type</option>
-                      <option value="CULTURAL">Cultural</option>
-                      <option value="TECHNICAL">Technical</option>
-                      <option value="ACADEMIC">Academic</option>
-                      <option value="SPORTS">Sports</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
-                  </div>
-                )}
+
+                <div>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Sub-Category</label>
+                  <select 
+                    {...register('subCategoryId')}
+                    disabled={!selectedCategory || subCategoriesLoading || subCategories.length === 0}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 disabled:opacity-60"
+                  >
+                    <option value="">
+                      {!selectedCategory
+                        ? 'Select Category First'
+                        : subCategoriesLoading
+                          ? 'Loading...'
+                          : subCategories.length > 0
+                            ? 'Select Sub-Category'
+                            : 'No Sub-Categories Available'}
+                    </option>
+                    {subCategories.map(sub => (
+                      <option key={sub.id} value={sub.id}>{sub.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {subCategories.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
-                    <select 
-                      {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
-                    >
-                      <option value="">Select Event Type</option>
-                      <option value="CULTURAL">Cultural</option>
-                      <option value="TECHNICAL">Technical</option>
-                      <option value="ACADEMIC">Academic</option>
-                      <option value="SPORTS">Sports</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
-                  </div>
-                  <div></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
+                  <select 
+                    {...register('eventType')}
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
+                  >
+                    <option value="">Select Event Type</option>
+                    {EVENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
                 </div>
-              )}
+                <div></div>
+              </div>
 
               {/* Section 3: Logistics */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">

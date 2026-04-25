@@ -11,13 +11,30 @@ export default function ManageCategories() {
   const [subName, setSubName] = useState('');
   const [parentId, setParentId] = useState(null);
 
+  async function fetchCategoriesWithChildren() {
+    const parentResponse = await axiosInstance.get('/categories');
+    const parentCategories = parentResponse.data || [];
+
+    const categoriesWithChildren = await Promise.all(
+      parentCategories.map(async (category) => {
+        const subCategoryResponse = await axiosInstance.get(`/categories/${category.id}/sub`);
+        return {
+          ...category,
+          subCategories: subCategoryResponse.data || [],
+        };
+      })
+    );
+
+    return categoriesWithChildren;
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const res = await axiosInstance.get('/categories');
-        if (!cancelled) setCategories(res.data);
+        const categoriesWithChildren = await fetchCategoriesWithChildren();
+        if (!cancelled) setCategories(categoriesWithChildren);
       } catch (e) {
         if (!cancelled) {
           toast.error('Failed to load categories');
@@ -33,8 +50,8 @@ export default function ManageCategories() {
 
   async function reloadCategories() {
     try {
-      const res = await axiosInstance.get('/categories');
-      setCategories(res.data);
+      const categoriesWithChildren = await fetchCategoriesWithChildren();
+      setCategories(categoriesWithChildren);
     } catch (e) {
       toast.error('Failed to load categories');
       console.error(e);
@@ -90,9 +107,6 @@ export default function ManageCategories() {
     }
     if (formattedName.includes('academic')) {
       return { border: 'bg-primary-container', badgeBg: 'bg-primary-fixed', badgeText: 'text-on-primary-fixed-variant', badgeLabel: 'Core', isUrgent: false };
-    }
-    if (formattedName.includes('urgent')) {
-      return { border: 'bg-tertiary-fixed border-none shadow-xl shadow-tertiary/10', bgColor: 'bg-tertiary-fixed', textColor: 'text-on-tertiary-fixed', isUrgent: true };
     }
     if (formattedName.includes('sports')) {
       return { border: 'bg-secondary', isUrgent: false };
