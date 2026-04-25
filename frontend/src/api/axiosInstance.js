@@ -1,20 +1,24 @@
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 const DEFAULT_TIMEOUT_MS = 10000;
 const FILE_UPLOAD_TIMEOUT_MS = 30000;
 
-// Create axios instance with base configuration
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: DEFAULT_TIMEOUT_MS,
 });
 
-// Track whether a refresh is in progress to avoid multiple refresh requests
 let isRefreshing = false;
 let failedQueue = [];
 
-// Helper function to process queued requests after token refresh
+const clearStoredAuth = () => {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+};
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
@@ -27,10 +31,6 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-/**
- * REQUEST INTERCEPTOR
- * Adds Authorization header with Bearer token to every request
- */
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -60,28 +60,17 @@ axiosInstance.interceptors.request.use(
 
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-/**
- * RESPONSE INTERCEPTOR
- * Handles 401 responses by refreshing token and retrying request
- */
 axiosInstance.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
     const originalRequest = error.config;
 
-    // Check if error is 401 (Unauthorized)
-   if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
-      // Mark request to avoid infinite loop
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
       originalRequest._retry = true;
 
-      // If already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -90,21 +79,15 @@ axiosInstance.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return axiosInstance(originalRequest);
           })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .catch((err) => Promise.reject(err));
       }
 
-      // Start refresh process
       isRefreshing = true;
 
       const refreshToken = localStorage.getItem('refreshToken');
 
       if (!refreshToken) {
-        // No refresh token available - clear storage and redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        clearStoredAuth();
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -117,38 +100,37 @@ axiosInstance.interceptors.response.use(
             },
           })
           .then((response) => {
-            const { accessToken, refreshToken: newRefreshToken } = response.data;
+            const { accessToken, refreshToken: newRefreshToken, role, email, mustChangePassword } = response.data;
+            const decodedToken = jwtDecode(accessToken);
 
-            // Update tokens in localStorage
             localStorage.setItem('accessToken', accessToken);
             if (newRefreshToken) {
               localStorage.setItem('refreshToken', newRefreshToken);
             }
 
-            // Update authorization header
+            const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+            if (storedUser) {
+              localStorage.setItem(
+                'user',
+                JSON.stringify({
+                  ...storedUser,
+                  name: decodedToken.name,
+                  email: email || decodedToken.sub,
+                  role: role || storedUser.role,
+                  profilePictureUrl: decodedToken.profilePictureUrl,
+                  mustChangePassword: Boolean(mustChangePassword),
+                })
+              );
+            }
+
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-
-            // Process queued requests with new token
             processQueue(null, accessToken);
-
-            // Retry original request
             resolve(axiosInstance(originalRequest));
           })
           .catch((refreshError) => {
-            // Token refresh failed
-            console.error('Token refresh failed:', refreshError);
-
-            // Clear all stored data
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
-
-            // Process queued requests with error
+            clearStoredAuth();
             processQueue(refreshError, null);
-
-            // Redirect to login
             window.location.href = '/login';
-
             reject(refreshError);
           })
           .finally(() => {
@@ -157,11 +139,8 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    // Handle 403 Forbidden by clearing auth and redirecting to login
     if (error.response?.status === 403 && !originalRequest?._retry) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      clearStoredAuth();
       window.location.href = '/login';
     }
 

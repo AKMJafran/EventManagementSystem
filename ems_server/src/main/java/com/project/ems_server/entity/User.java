@@ -36,6 +36,12 @@ public class User {
     
     @Column(nullable = false)
     private Boolean isVerified;
+
+    @Column(name = "is_first_login", nullable = false)
+    private Boolean isFirstLogin;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive;
     
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -47,6 +53,12 @@ public class User {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (isFirstLogin == null) {
+            isFirstLogin = false;
+        }
+        if (isActive == null) {
+            isActive = true;
         }
     }
 }

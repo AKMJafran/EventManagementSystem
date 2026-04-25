@@ -9,15 +9,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuthResponse {
-    
-    private String accessToken;
-    
-    private String refreshToken;
-    
-    private String role;
-    
-    private String email;
+public class BulkStudentImportFailureResponse {
 
-    private Boolean mustChangePassword;
+    private Integer rowNumber;
+
+    private String studentNumber;
+
+    private String officialEmail;
+
+    private String reason;
 }

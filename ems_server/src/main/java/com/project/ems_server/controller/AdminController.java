@@ -1,81 +1,60 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.request.AdminStudentCreateRequest;
 import com.project.ems_server.dto.request.StudentProfileBulkItemRequest;
-import com.project.ems_server.entity.StudentProfile;
-import com.project.ems_server.repository.StudentProfileRepository;
+import com.project.ems_server.dto.response.AdminStudentResponse;
+import com.project.ems_server.dto.response.BulkStudentImportResponse;
+import com.project.ems_server.service.AdminStudentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
 public class AdminController {
 
-    private static final Set<String> ALLOWED_DEPARTMENTS = Set.of("ICT", "ET", "BST");
+    private final AdminStudentService adminStudentService;
 
-    private final StudentProfileRepository studentProfileRepository;
+    @PostMapping("/students")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminStudentResponse> createStudent(@Valid @RequestBody AdminStudentCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminStudentService.createStudent(request));
+    }
 
     @PostMapping("/students/bulk")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> bulkImportStudents(@Valid @RequestBody List<@Valid StudentProfileBulkItemRequest> students) {
-        if (students == null || students.isEmpty()) {
-            throw new RuntimeException("Invalid request: student list cannot be empty.");
-        }
+    public ResponseEntity<BulkStudentImportResponse> bulkImportStudents(@RequestBody List<StudentProfileBulkItemRequest> students) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminStudentService.bulkImportStudents(students));
+    }
 
-        Set<String> payloadStudentNumbers = new HashSet<>();
-        Set<String> payloadOfficialEmails = new HashSet<>();
-        List<StudentProfile> profiles = new ArrayList<>();
+    @GetMapping("/students")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<AdminStudentResponse>> getAllStudents() {
+        return ResponseEntity.ok(adminStudentService.getAllStudents());
+    }
 
-        for (StudentProfileBulkItemRequest student : students) {
-            String normalizedStudentNumber = student.getStudentNumber().trim();
-            String normalizedEmail = student.getOfficialEmail().trim().toLowerCase(Locale.ROOT);
-            String normalizedDepartment = student.getDepartment().trim().toUpperCase(Locale.ROOT);
+    @GetMapping("/students/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminStudentResponse> getStudent(@PathVariable Long id) {
+        return ResponseEntity.ok(adminStudentService.getStudent(id));
+    }
 
-            if (!ALLOWED_DEPARTMENTS.contains(normalizedDepartment)) {
-                throw new RuntimeException("Invalid department '" + student.getDepartment() + "'. Allowed values are ICT, ET, BST.");
-            }
-
-            if (!payloadStudentNumbers.add(normalizedStudentNumber)) {
-                throw new RuntimeException("Invalid request: duplicate student number in payload: " + normalizedStudentNumber);
-            }
-
-            if (!payloadOfficialEmails.add(normalizedEmail)) {
-                throw new RuntimeException("Invalid request: duplicate official email in payload: " + normalizedEmail);
-            }
-
-            if (studentProfileRepository.existsByStudentNumber(normalizedStudentNumber)) {
-                throw new RuntimeException("Invalid request: student number already exists: " + normalizedStudentNumber);
-            }
-
-            if (studentProfileRepository.existsByOfficialEmail(normalizedEmail)) {
-                throw new RuntimeException("Invalid request: official email already exists: " + normalizedEmail);
-            }
-
-            profiles.add(StudentProfile.builder()
-                    .studentNumber(normalizedStudentNumber)
-                    .officialEmail(normalizedEmail)
-                    .fullName(student.getFullName().trim())
-                    .department(normalizedDepartment)
-                    .batchYear(student.getBatchYear())
-                    .isRegistered(false)
-                    .build());
-        }
-
-        studentProfileRepository.saveAll(profiles);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body("Successfully imported " + profiles.size() + " student profiles.");
+    @DeleteMapping("/students/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deactivateStudent(@PathVariable Long id) {
+        adminStudentService.deactivateStudent(id);
+        return ResponseEntity.noContent().build();
     }
 }

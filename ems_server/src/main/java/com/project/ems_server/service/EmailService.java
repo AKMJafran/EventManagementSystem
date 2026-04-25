@@ -67,6 +67,25 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendStudentWelcomeEmail(String email, String fullName, String temporaryPassword) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setFrom(fromEmail);
+            helper.setTo(email);
+            helper.setSubject(appName + " - Student Account Created");
+
+            String htmlContent = buildStudentWelcomeEmail(fullName, email, temporaryPassword);
+            helper.setText(htmlContent, true);
+
+            javaMailSender.send(message);
+        } catch (MessagingException | MailException e) {
+            System.err.println("Failed to send student welcome email: " + e.getMessage());
+        }
+    }
+
     /**
      * Sends event approved notification email to student
      */
@@ -181,6 +200,38 @@ public class EmailService {
                 "<p>This OTP is valid for 10 minutes. Please do not share it with anyone.</p>" +
                 "<div class='footer'>" +
                 "<p>If you didn't request this, please ignore this email.</p>" +
+                "</div>" +
+                "</div>" +
+                "</body>" +
+                "</html>";
+    }
+
+    private String buildStudentWelcomeEmail(String fullName, String email, String temporaryPassword) {
+        return "<!DOCTYPE html>" +
+                "<html>" +
+                "<head>" +
+                "<style>" +
+                "body { font-family: Arial, sans-serif; background-color: #f4f4f4; }" +
+                ".container { max-width: 600px; margin: 50px auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }" +
+                ".header { text-align: center; color: #333; }" +
+                ".credential-box { background-color: #eef6ff; border-left: 4px solid #007bff; padding: 16px; margin: 20px 0; }" +
+                ".footer { text-align: center; color: #999; font-size: 12px; margin-top: 20px; }" +
+                "</style>" +
+                "</head>" +
+                "<body>" +
+                "<div class='container'>" +
+                "<div class='header'>" +
+                "<h2>Welcome to " + appName + "</h2>" +
+                "</div>" +
+                "<p>Hello " + fullName + ",</p>" +
+                "<p>Your student account has been created by the Faculty administration.</p>" +
+                "<div class='credential-box'>" +
+                "<p><strong>Email:</strong> " + email + "</p>" +
+                "<p><strong>Temporary Password:</strong> " + temporaryPassword + "</p>" +
+                "</div>" +
+                "<p>Please sign in and change your password immediately.</p>" +
+                "<div class='footer'>" +
+                "<p>This is an automated message from " + appName + ".</p>" +
                 "</div>" +
                 "</div>" +
                 "</body>" +
