@@ -1,6 +1,7 @@
 package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.EventRequest;
+import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.entity.EventConflict;
@@ -107,6 +108,34 @@ public class EventController {
         }
         MonthlyReportResponse report = eventService.getMonthlyReport(year, month);
         return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Gets analytics report with optional filters.
+     */
+    @GetMapping("/reports/analytics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AnalyticsReportResponse> getAnalyticsReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String venue,
+            @RequestParam(required = false) String organizerName) {
+
+        if (to.isBefore(from)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            AnalyticsReportResponse report = eventService.getAnalyticsReport(
+                    from, to, status, eventType, categoryId, venue, organizerName
+            );
+            return ResponseEntity.ok(report);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**

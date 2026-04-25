@@ -1,10 +1,15 @@
 package com.project.ems_server.service;
 
 import com.project.ems_server.dto.request.EventRequest;
+import com.project.ems_server.dto.response.AnalyticsReportResponse;
+import com.project.ems_server.dto.response.BreakdownItemResponse;
 import com.project.ems_server.dto.response.CategoryCountResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.EventTypeCountResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
+import com.project.ems_server.dto.response.OrganizerActivityResponse;
+import com.project.ems_server.dto.response.ReportEventDetailResponse;
+import com.project.ems_server.dto.response.TrendPointResponse;
 import com.project.ems_server.entity.*;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.enums.EventType;
@@ -19,9 +24,18 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Month;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -189,50 +203,299 @@ public class EventService {
 
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.with(TemporalAdjusters.lastDayOfMonth());
-        LocalDateTime startDateTime = from.atStartOfDay();
-        LocalDateTime endDateTime = to.atTime(23, 59, 59);
+        AnalyticsReportResponse analytics = getAnalyticsReport(from, to, null, null, null, null, null);
 
-        List<Event> events = eventRepository.findByStartTimeBetween(startDateTime, endDateTime);
+        List<EventTypeCountResponse> eventsByType = analytics.getEventsByType().stream()
+            .map(item -> EventTypeCountResponse.builder()
+                .eventType(item.getLabel())
+                .count(item.getCount())
+                .build())
+            .collect(Collectors.toList());
 
-        long approvedCount = events.stream().filter(e -> e.getStatus() == EventStatus.APPROVED).count();
-        long pendingCount = events.stream().filter(e -> e.getStatus() == EventStatus.PENDING).count();
-        long rejectedCount = events.stream().filter(e -> e.getStatus() == EventStatus.REJECTED).count();
-        long urgentCount = events.stream().filter(e -> e.getEventType() == EventType.URGENT).count();
-
-        List<EventTypeCountResponse> eventsByType = events.stream()
-                .collect(Collectors.groupingBy(Event::getEventType, Collectors.counting()))
-                .entrySet().stream()
-                .map(entry -> EventTypeCountResponse.builder()
-                        .eventType(entry.getKey() != null ? entry.getKey().name() : "UNKNOWN")
-                        .count(entry.getValue())
-                        .build())
-                .collect(Collectors.toList());
-
-        List<CategoryCountResponse> eventsByCategory = events.stream()
-                .collect(Collectors.groupingBy(event -> {
-                    return categoryRepository.findById(event.getCategoryId())
-                            .map(Category::getName)
-                            .orElse("Unknown");
-                }, Collectors.counting()))
-                .entrySet().stream()
-                .map(entry -> CategoryCountResponse.builder()
-                        .categoryName(entry.getKey())
-                        .count(entry.getValue())
-                        .build())
-                .collect(Collectors.toList());
+        List<CategoryCountResponse> eventsByCategory = analytics.getEventsByCategory().stream()
+            .map(item -> CategoryCountResponse.builder()
+                .categoryName(item.getLabel())
+                .count(item.getCount())
+                .build())
+            .collect(Collectors.toList());
 
         return MonthlyReportResponse.builder()
                 .year(year)
                 .month(month)
-                .totalEvents(events.size())
-                .approvedEvents(approvedCount)
-                .pendingEvents(pendingCount)
-                .rejectedEvents(rejectedCount)
-                .urgentEvents(urgentCount)
+            .totalEvents(analytics.getTotalEvents())
+            .approvedEvents(analytics.getApprovedEvents())
+            .pendingEvents(analytics.getPendingEvents())
+            .rejectedEvents(analytics.getRejectedEvents())
+            .cancelledEvents(analytics.getCancelledEvents())
+            .urgentEvents(analytics.getUrgentEvents())
+            .completedEvents(analytics.getCompletedEvents())
+            .upcomingEvents(analytics.getUpcomingEvents())
+            .conflictEvents(analytics.getConflictEvents())
+            .totalRegistrations(analytics.getTotalRegistrations())
+            .averageRegistrationsPerEvent(analytics.getAverageRegistrationsPerEvent())
+            .approvalRate(analytics.getApprovalRate())
+            .conflictRate(analytics.getConflictRate())
                 .eventsByType(eventsByType)
                 .eventsByCategory(eventsByCategory)
+            .eventsByStatus(analytics.getEventsByStatus())
+            .eventsByVenue(analytics.getEventsByVenue())
+            .topOrganizers(analytics.getTopOrganizers())
+            .events(analytics.getEvents())
                 .build();
     }
+
+        /**
+         * Builds an analytics report with optional filters over a date range.
+         */
+        public AnalyticsReportResponse getAnalyticsReport(
+            LocalDate from,
+            LocalDate to,
+            String status,
+            String eventType,
+            Long categoryId,
+            String venue,
+            String organizerName
+        ) {
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("End date must not be before start date");
+        }
+
+        LocalDateTime startDateTime = from.atStartOfDay();
+        LocalDateTime endDateTime = to.atTime(23, 59, 59);
+
+        List<Event> eventsInRange = eventRepository.findByStartTimeBetween(startDateTime, endDateTime);
+
+        Map<Long, Category> categoryMap = categoryRepository.findAll().stream()
+            .collect(Collectors.toMap(Category::getId, Function.identity(), (a, b) -> a));
+        Map<Long, User> userMap = userRepository.findAll().stream()
+            .collect(Collectors.toMap(User::getId, Function.identity(), (a, b) -> a));
+
+        EventStatus statusFilter = parseStatusFilter(status);
+        EventType eventTypeFilter = parseTypeFilter(eventType);
+
+        List<Event> filteredEvents = eventsInRange.stream()
+            .filter(event -> statusFilter == null || event.getStatus() == statusFilter)
+            .filter(event -> eventTypeFilter == null || event.getEventType() == eventTypeFilter)
+            .filter(event -> categoryId == null || categoryId.equals(event.getCategoryId()))
+            .filter(event -> venue == null || venue.isBlank() || event.getVenue().equalsIgnoreCase(venue.trim()))
+            .filter(event -> {
+                if (organizerName == null || organizerName.isBlank()) {
+                return true;
+                }
+                User organizer = userMap.get(event.getUserId());
+                if (organizer == null || organizer.getName() == null) {
+                return false;
+                }
+                return organizer.getName().toLowerCase(Locale.ROOT)
+                    .contains(organizerName.trim().toLowerCase(Locale.ROOT));
+            })
+            .collect(Collectors.toList());
+
+        Map<Long, Long> registrationsByEventId = buildRegistrationsMap(filteredEvents);
+        Set<Long> conflictEventIds = buildConflictEventIds();
+        LocalDateTime now = LocalDateTime.now();
+
+        long totalEvents = filteredEvents.size();
+        long approvedEvents = filteredEvents.stream().filter(event -> event.getStatus() == EventStatus.APPROVED).count();
+        long pendingEvents = filteredEvents.stream().filter(event -> event.getStatus() == EventStatus.PENDING).count();
+        long rejectedEvents = filteredEvents.stream().filter(event -> event.getStatus() == EventStatus.REJECTED).count();
+        long cancelledEvents = filteredEvents.stream().filter(event -> event.getStatus() == EventStatus.CANCELLED).count();
+        long urgentEvents = filteredEvents.stream().filter(event -> event.getEventType() == EventType.URGENT).count();
+        long completedEvents = filteredEvents.stream()
+            .filter(event -> event.getStatus() == EventStatus.APPROVED && event.getEndTime().isBefore(now))
+            .count();
+        long upcomingEvents = filteredEvents.stream()
+            .filter(event -> event.getStatus() == EventStatus.APPROVED && event.getStartTime().isAfter(now))
+            .count();
+        long conflictEvents = filteredEvents.stream().filter(event -> conflictEventIds.contains(event.getId())).count();
+
+        long totalRegistrations = filteredEvents.stream()
+            .mapToLong(event -> registrationsByEventId.getOrDefault(event.getId(), 0L))
+            .sum();
+
+        List<BreakdownItemResponse> eventsByStatus = filteredEvents.stream()
+            .collect(Collectors.groupingBy(event -> event.getStatus().name(), Collectors.counting()))
+            .entrySet().stream()
+            .map(entry -> BreakdownItemResponse.builder()
+                .label(entry.getKey())
+                .count(entry.getValue())
+                .build())
+            .sorted(Comparator.comparingLong(BreakdownItemResponse::getCount).reversed())
+            .collect(Collectors.toList());
+
+        List<BreakdownItemResponse> eventsByType = filteredEvents.stream()
+            .collect(Collectors.groupingBy(event -> event.getEventType() != null ? event.getEventType().name() : "UNKNOWN", Collectors.counting()))
+            .entrySet().stream()
+            .map(entry -> BreakdownItemResponse.builder()
+                .label(entry.getKey())
+                .count(entry.getValue())
+                .build())
+            .sorted(Comparator.comparingLong(BreakdownItemResponse::getCount).reversed())
+            .collect(Collectors.toList());
+
+        List<BreakdownItemResponse> eventsByCategory = filteredEvents.stream()
+            .collect(Collectors.groupingBy(event -> categoryMap.getOrDefault(event.getCategoryId(), new Category()).getName(), Collectors.counting()))
+            .entrySet().stream()
+            .map(entry -> BreakdownItemResponse.builder()
+                .label(entry.getKey() != null ? entry.getKey() : "Unknown")
+                .count(entry.getValue())
+                .build())
+            .sorted(Comparator.comparingLong(BreakdownItemResponse::getCount).reversed())
+            .collect(Collectors.toList());
+
+        List<BreakdownItemResponse> eventsByVenue = filteredEvents.stream()
+            .collect(Collectors.groupingBy(Event::getVenue, Collectors.counting()))
+            .entrySet().stream()
+            .map(entry -> BreakdownItemResponse.builder()
+                .label(entry.getKey() != null ? entry.getKey() : "Unknown")
+                .count(entry.getValue())
+                .build())
+            .sorted(Comparator.comparingLong(BreakdownItemResponse::getCount).reversed())
+            .limit(10)
+            .collect(Collectors.toList());
+
+        DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        List<TrendPointResponse> dailyTrend = filteredEvents.stream()
+            .collect(Collectors.groupingBy(event -> event.getStartTime().toLocalDate(), Collectors.counting()))
+            .entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(entry -> TrendPointResponse.builder()
+                .label(entry.getKey().format(dayFormatter))
+                .count(entry.getValue())
+                .build())
+            .collect(Collectors.toList());
+
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("MMM yyyy");
+        List<TrendPointResponse> monthlyTrend = filteredEvents.stream()
+            .collect(Collectors.groupingBy(event -> YearMonth.from(event.getStartTime()), Collectors.counting()))
+            .entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .map(entry -> TrendPointResponse.builder()
+                .label(entry.getKey().format(monthFormatter))
+                .count(entry.getValue())
+                .build())
+            .collect(Collectors.toList());
+
+        Map<Long, List<Event>> eventsByOrganizer = filteredEvents.stream()
+            .collect(Collectors.groupingBy(Event::getUserId));
+        List<OrganizerActivityResponse> topOrganizers = new ArrayList<>();
+        for (Map.Entry<Long, List<Event>> entry : eventsByOrganizer.entrySet()) {
+            Long organizerId = entry.getKey();
+            List<Event> organizerEvents = entry.getValue();
+            User organizer = userMap.get(organizerId);
+
+            long organizerRegistrations = organizerEvents.stream()
+                .mapToLong(event -> registrationsByEventId.getOrDefault(event.getId(), 0L))
+                .sum();
+
+            topOrganizers.add(OrganizerActivityResponse.builder()
+                .organizerId(organizerId)
+                .organizerName(organizer != null ? organizer.getName() : "Unknown")
+                .totalEvents(organizerEvents.size())
+                .approvedEvents(organizerEvents.stream().filter(event -> event.getStatus() == EventStatus.APPROVED).count())
+                .pendingEvents(organizerEvents.stream().filter(event -> event.getStatus() == EventStatus.PENDING).count())
+                .rejectedEvents(organizerEvents.stream().filter(event -> event.getStatus() == EventStatus.REJECTED).count())
+                .cancelledEvents(organizerEvents.stream().filter(event -> event.getStatus() == EventStatus.CANCELLED).count())
+                .totalRegistrations(organizerRegistrations)
+                .build());
+        }
+        topOrganizers.sort(Comparator.comparingLong(OrganizerActivityResponse::getTotalEvents).reversed());
+        if (topOrganizers.size() > 10) {
+            topOrganizers = topOrganizers.subList(0, 10);
+        }
+
+        List<ReportEventDetailResponse> eventDetails = filteredEvents.stream()
+            .sorted(Comparator.comparing(Event::getStartTime).reversed())
+            .map(event -> {
+                Category category = categoryMap.get(event.getCategoryId());
+                User organizer = userMap.get(event.getUserId());
+                return ReportEventDetailResponse.builder()
+                    .id(event.getId())
+                    .title(event.getTitle())
+                    .organizerName(organizer != null ? organizer.getName() : "Unknown")
+                    .categoryName(category != null ? category.getName() : "Unknown")
+                    .venue(event.getVenue())
+                    .status(event.getStatus().name())
+                    .eventType(event.getEventType() != null ? event.getEventType().name() : "UNKNOWN")
+                    .startTime(event.getStartTime())
+                    .endTime(event.getEndTime())
+                    .registrations(registrationsByEventId.getOrDefault(event.getId(), 0L))
+                    .hasConflict(conflictEventIds.contains(event.getId()))
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        return AnalyticsReportResponse.builder()
+            .periodStart(from)
+            .periodEnd(to)
+            .totalEvents(totalEvents)
+            .approvedEvents(approvedEvents)
+            .pendingEvents(pendingEvents)
+            .rejectedEvents(rejectedEvents)
+            .cancelledEvents(cancelledEvents)
+            .urgentEvents(urgentEvents)
+            .completedEvents(completedEvents)
+            .upcomingEvents(upcomingEvents)
+            .conflictEvents(conflictEvents)
+            .totalRegistrations(totalRegistrations)
+            .averageRegistrationsPerEvent(totalEvents == 0 ? 0.0 : (double) totalRegistrations / totalEvents)
+            .approvalRate(toPercentage(approvedEvents, totalEvents))
+            .conflictRate(toPercentage(conflictEvents, totalEvents))
+            .eventsByStatus(eventsByStatus)
+            .eventsByType(eventsByType)
+            .eventsByCategory(eventsByCategory)
+            .eventsByVenue(eventsByVenue)
+            .dailyTrend(dailyTrend)
+            .monthlyTrend(monthlyTrend)
+            .topOrganizers(topOrganizers)
+            .events(eventDetails)
+            .build();
+        }
+
+        private EventStatus parseStatusFilter(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return EventStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+        }
+
+        private EventType parseTypeFilter(String eventType) {
+        if (eventType == null || eventType.isBlank()) {
+            return null;
+        }
+        return EventType.valueOf(eventType.trim().toUpperCase(Locale.ROOT));
+        }
+
+        private Set<Long> buildConflictEventIds() {
+        Set<Long> ids = new HashSet<>();
+        for (EventConflict conflict : eventConflictRepository.findAll()) {
+            if (conflict.getEventId() != null) {
+            ids.add(conflict.getEventId());
+            }
+            if (conflict.getConflictWith() != null) {
+            ids.add(conflict.getConflictWith());
+            }
+        }
+        return ids;
+        }
+
+        private Map<Long, Long> buildRegistrationsMap(List<Event> events) {
+        if (events.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        Set<Long> eventIds = events.stream().map(Event::getId).collect(Collectors.toSet());
+        return eventAttendeeRepository.findAll().stream()
+            .filter(attendee -> eventIds.contains(attendee.getEventId()))
+            .collect(Collectors.groupingBy(EventAttendee::getEventId, Collectors.counting()));
+        }
+
+        private double toPercentage(long part, long total) {
+        if (total == 0) {
+            return 0.0;
+        }
+        return Math.round((((double) part / total) * 100.0) * 100.0) / 100.0;
+        }
 
     /**
      * Gets a single event by ID

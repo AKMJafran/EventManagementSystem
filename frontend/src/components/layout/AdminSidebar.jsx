@@ -14,6 +14,7 @@ export default function AdminSidebar() {
     { name: 'Manage Venues', path: '/manage-venues', icon: 'location_on' },
     { name: 'Notifications', path: '/admin/notifications', icon: 'notifications' },
     { name: 'Reports', path: '/admin/reports/monthly', icon: 'analytics' },
+    { name: 'Analytics Hub', path: '/admin/reports/analytics', icon: 'query_stats' },
   ];
 
   return (
