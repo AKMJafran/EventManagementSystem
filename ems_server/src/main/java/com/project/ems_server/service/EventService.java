@@ -133,12 +133,36 @@ public class EventService {
     }
 
     /**
-     * Gets events filtered by status and/or category
+     * Gets events filtered by status, category, and optional date range.
      */
-    public List<EventResponse> getEvents(EventStatus status, Long categoryId) {
+    public List<EventResponse> getEvents(EventStatus status, Long categoryId, LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new RuntimeException("Invalid date range: endDate must be on or after startDate");
+        }
+
         List<Event> events;
 
-        if (status != null && categoryId != null) {
+        if (startDate != null || endDate != null) {
+            LocalDate effectiveStart = startDate != null ? startDate : LocalDate.of(1970, 1, 1);
+            LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.of(9999, 12, 31);
+
+            LocalDateTime startDateTime = effectiveStart.atStartOfDay();
+            LocalDateTime endDateTime = effectiveEnd.atTime(23, 59, 59);
+
+            events = eventRepository.findByStartTimeBetween(startDateTime, endDateTime);
+
+            if (status != null) {
+                events = events.stream()
+                        .filter(event -> event.getStatus() == status)
+                        .collect(Collectors.toList());
+            }
+
+            if (categoryId != null) {
+                events = events.stream()
+                        .filter(event -> categoryId.equals(event.getCategoryId()))
+                        .collect(Collectors.toList());
+            }
+        } else if (status != null && categoryId != null) {
             events = eventRepository.findByStatusAndCategoryId(status, categoryId);
         } else if (status != null) {
             events = eventRepository.findByStatus(status);

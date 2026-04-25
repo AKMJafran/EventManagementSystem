@@ -60,13 +60,15 @@ public class EventController {
     }
 
     /**
-     * Gets events with optional status and category filters
-     * GET /events?status=APPROVED&categoryId=1
+         * Gets events with optional status, category, and date filters
+         * GET /events?status=APPROVED&categoryId=1&startDate=2026-04-01&endDate=2026-04-30
      */
     @GetMapping
     public ResponseEntity<List<EventResponse>> getEvents(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Long categoryId) {
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         
         EventStatus eventStatus = null;
         if (status != null && !status.isEmpty()) {
@@ -77,7 +79,11 @@ public class EventController {
             }
         }
 
-        List<EventResponse> events = eventService.getEvents(eventStatus, categoryId);
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new RuntimeException("Invalid date range: endDate must be on or after startDate");
+        }
+
+        List<EventResponse> events = eventService.getEvents(eventStatus, categoryId, startDate, endDate);
         return ResponseEntity.ok(events);
     }
 
