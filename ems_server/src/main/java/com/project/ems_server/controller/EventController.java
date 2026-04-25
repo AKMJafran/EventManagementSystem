@@ -1,5 +1,6 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.request.ConflictResolutionRequest;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
@@ -176,6 +177,22 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
     public ResponseEntity<List<EventConflict>> getConflicts() {
         List<EventConflict> conflicts = eventService.getConflicts();
         return ResponseEntity.ok(conflicts);
+    }
+
+    /**
+     * Resolves a conflict by reassigning date/time or venue (admin only)
+     * PATCH /events/{id}/resolve-conflict
+     */
+    @PatchMapping("/{id}/resolve-conflict")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EventResponse> resolveConflict(
+            @PathVariable Long id,
+            @RequestBody ConflictResolutionRequest request,
+            Authentication authentication) {
+
+        Long adminId = extractUserIdFromAuthentication(authentication);
+        EventResponse response = eventService.resolveConflict(id, request, adminId);
+        return ResponseEntity.ok(response);
     }
 
     /**

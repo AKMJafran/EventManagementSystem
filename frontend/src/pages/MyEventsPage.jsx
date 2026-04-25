@@ -172,6 +172,12 @@ export default function MyEventsPage() {
                     <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase mb-4 ${styles.badge}`}>
                       {event.status}
                     </span>
+                    {event.hasConflict && (
+                      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase text-on-error-container">
+                        <span className="material-symbols-outlined text-sm">warning</span>
+                        Conflict Detected
+                      </div>
+                    )}
 
                     <h3 className="text-2xl font-bold mb-2">{event.title}</h3>
 
@@ -207,9 +213,13 @@ export default function MyEventsPage() {
                       Reason: {event.rejectReason}
                     </p>
                   ) : (
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-4">
                       <span className="text-xs italic">
-                        {event.status === 'PENDING' && 'Awaiting Approval'}
+                        {event.hasConflict
+                          ? 'Admin needs to resolve a scheduling conflict before approval.'
+                          : event.status === 'PENDING'
+                            ? 'Awaiting Approval'
+                            : ''}
                       </span>
 
                       {event.status === 'PENDING' ? (

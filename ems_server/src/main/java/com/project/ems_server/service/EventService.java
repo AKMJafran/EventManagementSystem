@@ -1,5 +1,6 @@
 package com.project.ems_server.service;
 
+import com.project.ems_server.dto.request.ConflictResolutionRequest;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.CategoryCountResponse;
 import com.project.ems_server.dto.response.EventResponse;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,16 +42,15 @@ public class EventService {
     private final NotificationService notificationService;
 
     /**
-     * Creates a new event with PENDING status and blocks conflicting bookings.
+     * Creates a new event with PENDING status and records conflicts for admin review.
      */
     public EventResponse createEvent(EventRequest eventRequest, Long userId) {
+        validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+
         // Verify category exists
         if (!categoryRepository.existsById(eventRequest.getCategoryId())) {
             throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
         }
-
-        // Block conflicting bookings before saving the event
-        conflictService.checkStrictConflict(eventRequest);
 
         // Use Abstract Factory pattern to create event based on event type
         EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.getEventType());
@@ -66,6 +67,7 @@ public class EventService {
         );
 
         Event savedEvent = eventRepository.save(event);
+        conflictService.refreshConflictRecords(savedEvent, true);
         notifyAdminsOfNewEventRequest(savedEvent);
         return mapToResponse(savedEvent);
     }
@@ -97,6 +99,8 @@ public class EventService {
      * Updates an existing pending event belonging to the requesting student.
      */
     public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
+        validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
@@ -112,14 +116,6 @@ public class EventService {
             throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
         }
 
-        boolean dateOrVenueChanged = !event.getVenue().equals(eventRequest.getVenue())
-                || !event.getStartTime().equals(eventRequest.getStartTime())
-                || !event.getEndTime().equals(eventRequest.getEndTime());
-
-        if (dateOrVenueChanged) {
-            conflictService.checkStrictConflict(eventRequest);
-        }
-
         event.setTitle(eventRequest.getTitle());
         event.setDescription(eventRequest.getDescription());
         event.setCategoryId(eventRequest.getCategoryId());
@@ -132,6 +128,7 @@ public class EventService {
         event.setRejectReason(null);
 
         Event updatedEvent = eventRepository.save(event);
+        conflictService.refreshConflictRecords(updatedEvent, true);
         return mapToResponse(updatedEvent);
     }
 
@@ -251,6 +248,7 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
+        conflictService.ensureNoUnresolvedConflicts(event);
         approvalService.approveEvent(event);
     }
 
@@ -262,14 +260,82 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
         approvalService.rejectEvent(event, reason);
+        conflictService.refreshConflictRecords(event, false);
     }
 
     /**
      * Gets all conflicts
      */
     public List<EventConflict> getConflicts() {
+        List<EventConflict> activeConflicts = new ArrayList<>();
 
-        return eventConflictRepository.findAll();
+        for (EventConflict conflict : eventConflictRepository.findAll()) {
+            Event primary = conflict.getEvent();
+            Event secondary = conflict.getConflictingEvent();
+
+            if (!conflictService.eventsConflict(primary, secondary)) {
+                eventConflictRepository.delete(conflict);
+                continue;
+            }
+
+            activeConflicts.add(conflict);
+        }
+
+        return activeConflicts;
+    }
+
+    public EventResponse resolveConflict(Long eventId, ConflictResolutionRequest request, Long adminId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        String newVenue = (request.getVenue() == null || request.getVenue().isBlank())
+                ? event.getVenue()
+                : request.getVenue().trim();
+
+        if ((request.getStartTime() == null) != (request.getEndTime() == null)) {
+            throw new RuntimeException("Both startTime and endTime are required when changing the date or time");
+        }
+
+        if ((request.getVenue() == null || request.getVenue().isBlank())
+                && request.getStartTime() == null
+                && request.getEndTime() == null) {
+            throw new RuntimeException("Provide a new venue or a new date/time to resolve the conflict");
+        }
+
+        LocalDateTime newStartTime = request.getStartTime() != null ? request.getStartTime() : event.getStartTime();
+        LocalDateTime newEndTime = request.getEndTime() != null ? request.getEndTime() : event.getEndTime();
+
+        validateEventWindow(newStartTime, newEndTime);
+
+        EventRequest probeRequest = EventRequest.builder()
+                .title(event.getTitle())
+                .description(event.getDescription())
+                .categoryId(event.getCategoryId())
+                .eventType(event.getEventType())
+                .venue(newVenue)
+                .startTime(newStartTime)
+                .endTime(newEndTime)
+                .imageId(event.getImageId())
+                .build();
+
+        List<Event> remainingConflicts = conflictService.detectConflict(probeRequest, event.getId()).stream()
+                .filter(conflictingEvent -> !conflictingEvent.getId().equals(event.getId()))
+                .toList();
+
+        if (!remainingConflicts.isEmpty()) {
+            String conflictTitles = remainingConflicts.stream()
+                    .map(Event::getTitle)
+                    .collect(Collectors.joining(", "));
+            throw new RuntimeException("Conflict still exists with: " + conflictTitles);
+        }
+
+        event.setVenue(newVenue);
+        event.setStartTime(newStartTime);
+        event.setEndTime(newEndTime);
+
+        Event savedEvent = eventRepository.save(event);
+        conflictService.refreshConflictRecords(savedEvent, false);
+        return mapToResponse(savedEvent);
     }
 
     /**
@@ -314,6 +380,16 @@ public List<EventResponse> getEventsByUserId(Long userId) {
             .map(this::mapToResponse)
             .collect(Collectors.toList());
 }
+
+    private void validateEventWindow(LocalDateTime startTime, LocalDateTime endTime) {
+        if (startTime == null || endTime == null) {
+            throw new RuntimeException("Start time and end time are required");
+        }
+
+        if (!endTime.isAfter(startTime)) {
+            throw new RuntimeException("End time must be after start time");
+        }
+    }
 
     /**
      * Maps Event entity to EventResponse

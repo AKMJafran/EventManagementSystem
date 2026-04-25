@@ -55,7 +55,7 @@ export default function ManageEvents() {
       toast.success('Event approved');
       await reloadEvents();
     } catch (e) {
-      toast.error('Failed to approve event');
+      toast.error(e?.response?.data?.message || 'Failed to approve event');
       console.error(e);
     }
   }

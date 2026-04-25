@@ -5,6 +5,7 @@ import com.project.ems_server.entity.Event;
 import com.project.ems_server.entity.EventConflict;
 import com.project.ems_server.entity.Notification;
 import com.project.ems_server.entity.User;
+import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.enums.NotificationType;
 import com.project.ems_server.enums.Role;
 import com.project.ems_server.exception.VenueAlreadyBookedException;
@@ -15,12 +16,19 @@ import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 public class ConflictService {
+
+    private static final List<EventStatus> ACTIVE_STATUSES = List.of(EventStatus.PENDING, EventStatus.APPROVED);
 
     private final EventRepository eventRepository;
     private final EventConflictRepository eventConflictRepository;
@@ -29,56 +37,106 @@ public class ConflictService {
     private final EmailService emailService;
 
     /**
-     * Detects conflicts between a new event and existing APPROVED events
-     * If conflicts are found, saves them to the database and notifies admins
-     * 
-     * @param newEvent the event request to check for conflicts
-     * @return list of conflicting events (can be empty)
+     * Detects conflicts between a new event and active events.
+     * Conflicts exist when two events overlap in time or use the same venue on the same date.
      */
     public List<Event> detectConflict(EventRequest newEvent) {
-        // Query for APPROVED events with same venue and overlapping time
-        List<Event> conflictingEvents = eventRepository.findConflictingEvents(
+        List<Event> conflictingEvents = findConflicts(
                 newEvent.getVenue(),
                 newEvent.getStartTime(),
-                newEvent.getEndTime()
+                newEvent.getEndTime(),
+                null
         );
 
-        // If conflicts found, save them and notify admins
         if (!conflictingEvents.isEmpty()) {
-            // Note: newEvent is not yet persisted, so we can't save EventConflict records yet
-            // EventConflict records will be saved in EventService after the event is created
             notifyAdminsOfConflicts(newEvent, conflictingEvents);
         }
 
         return conflictingEvents;
     }
 
+    public List<Event> detectConflict(EventRequest eventRequest, Long excludeEventId) {
+        return findConflicts(
+                eventRequest.getVenue(),
+                eventRequest.getStartTime(),
+                eventRequest.getEndTime(),
+                excludeEventId
+        );
+    }
+
     /**
-     * Strict conflict check that throws exception if conflicts found.
-     * Demonstrates custom exception handling in advanced Java.
+     * Strict conflict check kept for compatibility with existing callers.
      */
     public void checkStrictConflict(EventRequest newEvent) throws VenueAlreadyBookedException {
         List<Event> conflicts = detectConflict(newEvent);
         if (!conflicts.isEmpty()) {
             String conflictTitles = conflicts.stream()
                     .map(Event::getTitle)
-                    .reduce((a, b) -> a + ", " + b)
-                    .orElse("Unknown");
+                    .collect(Collectors.joining(", "));
             throw new VenueAlreadyBookedException(
-                "Venue '" + newEvent.getVenue() + "' is already booked during this time. Conflicting events: " + conflictTitles
+                    "Venue or time is already in conflict. Conflicting events: " + conflictTitles
             );
         }
     }
 
-    /**
-     * Saves conflict records after an event has been created
-     * Should be called by EventService after creating a new event
-     * 
-     * @param newEventId the ID of the newly created event
-     * @param conflictingEventIds list of IDs of conflicting events
-     */
+    public List<Event> refreshConflictRecords(Event event, boolean notifyAdmins) {
+        eventConflictRepository.deleteByEventIdOrConflictWith(event.getId(), event.getId());
+
+        if (!ACTIVE_STATUSES.contains(event.getStatus())) {
+            return List.of();
+        }
+
+        List<Event> conflictingEvents = findConflicts(
+                event.getVenue(),
+                event.getStartTime(),
+                event.getEndTime(),
+                event.getId()
+        );
+
+        saveConflictRecords(event.getId(), conflictingEvents.stream().map(Event::getId).toList());
+
+        if (notifyAdmins && !conflictingEvents.isEmpty()) {
+            notifyAdminsOfConflicts(event, conflictingEvents);
+        }
+
+        return conflictingEvents;
+    }
+
+    public void ensureNoUnresolvedConflicts(Event event) {
+        refreshConflictRecords(event, false);
+        if (eventConflictRepository.existsByEventIdOrConflictWith(event.getId(), event.getId())) {
+            throw new RuntimeException("This event still has conflicts. Reassign the date or venue before approval.");
+        }
+    }
+
+    public boolean eventsConflict(Event firstEvent, Event secondEvent) {
+        if (firstEvent == null || secondEvent == null) {
+            return false;
+        }
+
+        if (!ACTIVE_STATUSES.contains(firstEvent.getStatus()) || !ACTIVE_STATUSES.contains(secondEvent.getStatus())) {
+            return false;
+        }
+
+        boolean overlappingTime = firstEvent.getStartTime().isBefore(secondEvent.getEndTime())
+                && firstEvent.getEndTime().isAfter(secondEvent.getStartTime());
+
+        boolean sameVenueOnSharedDate = firstEvent.getVenue() != null
+                && secondEvent.getVenue() != null
+                && firstEvent.getVenue().equalsIgnoreCase(secondEvent.getVenue())
+                && shareAnyCalendarDate(firstEvent, secondEvent);
+
+        return overlappingTime || sameVenueOnSharedDate;
+    }
+
     public void saveConflictRecords(Long newEventId, List<Long> conflictingEventIds) {
         for (Long conflictingEventId : conflictingEventIds) {
+            boolean alreadyExists = eventConflictRepository.existsByEventIdAndConflictWith(newEventId, conflictingEventId)
+                    || eventConflictRepository.existsByEventIdAndConflictWith(conflictingEventId, newEventId);
+            if (alreadyExists) {
+                continue;
+            }
+
             EventConflict conflict = EventConflict.builder()
                     .eventId(newEventId)
                     .conflictWith(conflictingEventId)
@@ -88,11 +146,68 @@ public class ConflictService {
         }
     }
 
-    /**
-     * Helper method to notify all admins of conflicts
-     */
+    private List<Event> findConflicts(String venue, LocalDateTime startTime, LocalDateTime endTime, Long excludeId) {
+        LocalDate eventDate = startTime.toLocalDate();
+        LocalDateTime dayStart = eventDate.atStartOfDay();
+        LocalDateTime dayEnd = eventDate.plusDays(1).atStartOfDay();
+
+        List<Event> timeConflicts = eventRepository.findActiveEventsWithTimeOverlap(
+                startTime,
+                endTime,
+                ACTIVE_STATUSES,
+                excludeId
+        );
+
+        List<Event> venueConflicts = eventRepository.findActiveEventsAtVenueOnDate(
+                venue,
+                dayStart,
+                dayEnd,
+                ACTIVE_STATUSES,
+                excludeId
+        );
+
+        Map<Long, Event> uniqueConflicts = Stream.concat(timeConflicts.stream(), venueConflicts.stream())
+                .collect(Collectors.toMap(Event::getId, event -> event, (first, second) -> first, LinkedHashMap::new));
+
+        return List.copyOf(uniqueConflicts.values());
+    }
+
+    private boolean shareAnyCalendarDate(Event firstEvent, Event secondEvent) {
+        LocalDate firstStartDate = firstEvent.getStartTime().toLocalDate();
+        LocalDate firstEndDate = firstEvent.getEndTime().toLocalDate();
+        LocalDate secondStartDate = secondEvent.getStartTime().toLocalDate();
+        LocalDate secondEndDate = secondEvent.getEndTime().toLocalDate();
+
+        return !firstEndDate.isBefore(secondStartDate) && !secondEndDate.isBefore(firstStartDate);
+    }
+
     private void notifyAdminsOfConflicts(EventRequest newEvent, List<Event> conflictingEvents) {
-        // Get all admin users
+        notifyAdminsOfConflicts(
+                newEvent.getTitle(),
+                newEvent.getVenue(),
+                newEvent.getStartTime(),
+                newEvent.getEndTime(),
+                conflictingEvents
+        );
+    }
+
+    private void notifyAdminsOfConflicts(Event event, List<Event> conflictingEvents) {
+        notifyAdminsOfConflicts(
+                event.getTitle(),
+                event.getVenue(),
+                event.getStartTime(),
+                event.getEndTime(),
+                conflictingEvents
+        );
+    }
+
+    private void notifyAdminsOfConflicts(
+            String title,
+            String venue,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            List<Event> conflictingEvents
+    ) {
         List<User> admins = userRepository.findByRole(Role.ADMIN);
 
         if (admins.isEmpty()) {
@@ -100,30 +215,23 @@ public class ConflictService {
             return;
         }
 
-        // Build notification message
         String conflictEventTitles = conflictingEvents.stream()
                 .map(Event::getTitle)
-                .reduce((a, b) -> a + ", " + b)
-                .orElse("Unknown");
+                .collect(Collectors.joining(", "));
 
         String notificationMessage = String.format(
-                "⚠️ EVENT CONFLICT DETECTED\n\n" +
-                "New Event: %s\n" +
-                "Venue: %s\n" +
-                "Time: %s to %s\n\n" +
-                "Conflicting with:\n%s",
-                newEvent.getTitle(),
-                newEvent.getVenue(),
-                newEvent.getStartTime(),
-                newEvent.getEndTime(),
+                "Event conflict detected.%n%nEvent: %s%nVenue: %s%nTime: %s to %s%n%nConflicts with:%n%s",
+                title,
+                venue,
+                startTime,
+                endTime,
                 conflictEventTitles
         );
 
-        // Notify each admin
         for (User admin : admins) {
-            // Create in-app notification
             Notification notification = Notification.builder()
                     .userId(admin.getId())
+                    .title("Conflict Alert")
                     .message(notificationMessage)
                     .type(NotificationType.CONFLICT)
                     .isRead(false)
@@ -131,10 +239,9 @@ public class ConflictService {
                     .build();
             notificationRepository.save(notification);
 
-            // Send email notification
             emailService.sendConflictAlertEmail(
                     admin.getEmail(),
-                    newEvent.getTitle(),
+                    title,
                     conflictEventTitles
             );
         }

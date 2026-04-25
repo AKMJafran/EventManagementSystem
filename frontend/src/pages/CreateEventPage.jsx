@@ -197,11 +197,19 @@ export default function CreateEventPage() {
       };
 
       if (isEditMode) {
-        await axiosInstance.put(`/events/${id}`, payload);
-        toast.success('Event updated successfully!');
+        const res = await axiosInstance.put(`/events/${id}`, payload);
+        toast.success(
+          res.data?.hasConflict
+            ? 'Event updated. Conflict flagged for admin review.'
+            : 'Event updated successfully!'
+        );
       } else {
-        await axiosInstance.post('/events', payload);
-        toast.success('Event created successfully!');
+        const res = await axiosInstance.post('/events', payload);
+        toast.success(
+          res.data?.hasConflict
+            ? 'Event created with a conflict. Admin review is required.'
+            : 'Event created successfully!'
+        );
       }
       navigate('/student/my-events');
     } catch (e) {
