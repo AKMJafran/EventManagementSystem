@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import useAuthStore from '../context/AuthContext';
 
 const schema = z.object({
-  email: z.string().min(1, 'Email is required'),
+  email: z.string().min(1, 'Email or Student ID is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -91,7 +91,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               <div className="space-y-2">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant ml-1" htmlFor="email">
-                  Email
+                  Email or Student ID
                 </label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-0 bottom-2.5 text-outline text-lg">person</span>
@@ -99,7 +99,7 @@ export default function LoginPage() {
                     id="email"
                     {...register('email')}
                     className={`w-full pl-8 py-3 bg-surface-container-high border-0 border-b-2 focus:ring-0 transition-all text-on-surface placeholder:text-outline/50 ${errors.email ? 'border-error focus:border-error' : 'border-transparent focus:border-primary'}`}
-                    placeholder="student@stu.ruh.ac.lk"
+                    placeholder="Enter your email or student ID"
                     type="text"
                   />
                 </div>

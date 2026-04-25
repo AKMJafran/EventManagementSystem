@@ -1,12 +1,10 @@
 import React, { useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
 import toast from 'react-hot-toast';
-import NotificationBell from '../NotificationBell';
 
 export default function StudentHeader({ user }) {
   const fileInputRef = useRef(null);
-  const location = useLocation();
 
   const handleProfileClick = () => {
     fileInputRef.current?.click();
@@ -32,7 +30,9 @@ export default function StudentHeader({ user }) {
       const formData = new FormData();
       formData.append('file', file);
       
-      const uploadRes = await axiosInstance.post('/files/upload', formData);
+      const uploadRes = await axiosInstance.post('/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       
       const fileId = uploadRes.data.fileId;
       
@@ -42,12 +42,7 @@ export default function StudentHeader({ user }) {
       // In a more complex app, we would directly update AuthContext state here or refetch. 
       // Telling the user to log in again is a simpler approach to refresh JWT token claims.
     } catch (error) {
-      toast.error(
-        error?.code === 'ECONNABORTED'
-          ? 'Profile picture upload is taking too long. Please try again.'
-          : 'Failed to update profile picture',
-        { id: toastId }
-      );
+      toast.error('Failed to update profile picture', { id: toastId });
       console.error(error);
     }
   };
@@ -60,8 +55,10 @@ export default function StudentHeader({ user }) {
         </div>
         
         <div className="flex items-center gap-6">
-          <NotificationBell enableStudentUiFixes key={location.pathname} />
           <div className="flex items-center gap-4">
+            <button className="p-2 text-on-surface-variant hover:text-primary transition-colors">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
             <div className="flex items-center gap-3 pl-4 border-l border-outline-variant/20">
               <div className="text-right">
                 <p className="text-xs font-bold text-on-surface leading-none">{user?.name || 'Student'}</p>
