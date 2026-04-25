@@ -180,7 +180,7 @@ export default function MyEventsPage() {
                       {event.hasConflict && (
                         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase text-on-error-container">
                           <span className="material-symbols-outlined text-sm">warning</span>
-                          Conflict Detected
+                          {(event.conflictStatus || 'CONFLICT_DETECTED').replaceAll('_', ' ')}
                         </div>
                       )}
 
@@ -218,7 +218,7 @@ export default function MyEventsPage() {
                       <div className="flex justify-between items-center gap-4">
                         <span className="text-xs italic">
                           {event.hasConflict
-                            ? 'Admin needs to resolve a scheduling conflict before approval.'
+                            ? event.conflictDetails?.[0]?.summary || 'Admin needs to resolve a scheduling conflict before approval.'
                             : event.status === 'PENDING'
                               ? 'Awaiting Approval'
                               : ''}

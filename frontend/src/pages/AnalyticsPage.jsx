@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { exportRowsToExcel } from '../utils/exportExcel';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -79,6 +76,79 @@ function compareValues(a, b, direction) {
   if (left < right) return direction === 'asc' ? -1 : 1;
   if (left > right) return direction === 'asc' ? 1 : -1;
   return 0;
+}
+
+function getMaxCount(items = []) {
+  return items.reduce((max, item) => Math.max(max, Number(item?.count) || 0), 0);
+}
+
+function formatPercent(count, total) {
+  if (!total) return '0%';
+  return `${Math.round((count / total) * 100)}%`;
+}
+
+function DistributionList({ items, total, colorMap }) {
+  if (!items.length) {
+    return <p className="text-sm text-on-surface-variant">No distribution available for this selection.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {items.map((item, idx) => {
+        const count = Number(item?.count) || 0;
+        const width = total ? `${(count / total) * 100}%` : '0%';
+        const color = colorMap?.[item.label] || TYPE_COLORS[idx % TYPE_COLORS.length];
+
+        return (
+          <div key={item.label} className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="font-medium text-teal-900 truncate">{item.label}</span>
+              </div>
+              <span className="text-sm text-on-surface-variant shrink-0">{count} ({formatPercent(count, total)})</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-surface-container">
+              <div className="h-2.5 rounded-full" style={{ width, backgroundColor: color }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TrendChart({ items }) {
+  if (!items.length) {
+    return <p className="text-sm text-on-surface-variant">No daily trend available for this selection.</p>;
+  }
+
+  const maxCount = getMaxCount(items) || 1;
+
+  return (
+    <div className="h-full flex items-end gap-2">
+      {items.map((item) => {
+        const count = Number(item?.count) || 0;
+        const height = `${Math.max((count / maxCount) * 100, count > 0 ? 10 : 4)}%`;
+
+        return (
+          <div key={item.label} className="flex-1 min-w-0 h-full flex flex-col justify-end gap-2">
+            <div className="flex-1 flex items-end">
+              <div
+                className="w-full rounded-t-md bg-teal-600/85 hover:bg-teal-700 transition-colors"
+                style={{ height }}
+                title={`${item.label}: ${count}`}
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-semibold text-teal-900">{count}</p>
+              <p className="text-[10px] text-on-surface-variant truncate">{item.label}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function AnalyticsPage() {
@@ -211,24 +281,23 @@ export default function AnalyticsPage() {
       return;
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(
-      visibleRows.map((item) => ({
-        Title: item.title,
-        Organizer: item.organizerName,
-        Category: item.categoryName,
-        Venue: item.venue,
-        Status: item.status,
-        Type: item.eventType,
-        StartTime: item.startTime,
-        EndTime: item.endTime,
-        Registrations: item.registrations,
-        Conflict: item.hasConflict ? 'Yes' : 'No',
-      }))
+    exportRowsToExcel(
+      visibleRows,
+      [
+        { header: 'Title', value: (item) => item.title },
+        { header: 'Organizer', value: (item) => item.organizerName },
+        { header: 'Category', value: (item) => item.categoryName },
+        { header: 'Venue', value: (item) => item.venue },
+        { header: 'Status', value: (item) => item.status },
+        { header: 'Type', value: (item) => item.eventType },
+        { header: 'Start Time', value: (item) => item.startTime },
+        { header: 'End Time', value: (item) => item.endTime },
+        { header: 'Registrations', value: (item) => item.registrations },
+        { header: 'Conflict', value: (item) => (item.hasConflict ? 'Yes' : 'No') },
+      ],
+      `faculty-analytics-${fromDate}-to-${toDate}.xls`,
+      'FacultyAnalytics'
     );
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'FacultyAnalytics');
-    XLSX.writeFile(workbook, `faculty-analytics-${fromDate}-to-${toDate}.xlsx`);
   };
 
   const exportPdf = () => {
@@ -237,32 +306,7 @@ export default function AnalyticsPage() {
       return;
     }
 
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(16);
-    doc.text('Faculty Event Analytics Report', 14, 18);
-    doc.setFontSize(10);
-    doc.text(`Range: ${fromDate} to ${toDate}`, 14, 25);
-    doc.text(`Events: ${report?.totalEvents || 0} | Approval Rate: ${report?.approvalRate || 0}%`, 14, 31);
-
-    autoTable(doc, {
-      startY: 38,
-      head: [['Title', 'Organizer', 'Category', 'Venue', 'Status', 'Type', 'Start', 'Registrations', 'Conflict']],
-      body: visibleRows.map((item) => [
-        item.title,
-        item.organizerName,
-        item.categoryName,
-        item.venue,
-        item.status,
-        item.eventType,
-        String(item.startTime || ''),
-        String(item.registrations || 0),
-        item.hasConflict ? 'Yes' : 'No',
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [13, 148, 136] },
-    });
-
-    doc.save(`faculty-analytics-${fromDate}-to-${toDate}.pdf`);
+    window.print();
   };
 
   const printReport = () => {
@@ -277,6 +321,10 @@ export default function AnalyticsPage() {
     { key: 'totalRegistrations', label: 'Registrations', value: report?.totalRegistrations || 0, hint: 'Registration count proxy' },
     { key: 'approvalRate', label: 'Approval Rate', value: `${report?.approvalRate || 0}%`, hint: 'Approved / Total' },
   ];
+  const totalEvents = report?.totalEvents || 0;
+  const statusData = report?.eventsByStatus || [];
+  const typeData = report?.eventsByType || [];
+  const trendData = report?.dailyTrend || [];
 
   return (
     <AdminLayout>
@@ -361,17 +409,7 @@ export default function AnalyticsPage() {
                   <CardTitle>Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={report?.eventsByStatus || []} dataKey="count" nameKey="label" outerRadius={110}>
-                        {(report?.eventsByStatus || []).map((entry, idx) => (
-                          <Cell key={entry.label} fill={STATUS_COLORS[entry.label] || TYPE_COLORS[idx % TYPE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <DistributionList items={statusData} total={totalEvents} colorMap={STATUS_COLORS} />
                 </CardContent>
               </Card>
 
@@ -380,15 +418,7 @@ export default function AnalyticsPage() {
                   <CardTitle>Events By Type</CardTitle>
                 </CardHeader>
                 <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={report?.eventsByType || []}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#0d9488" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <DistributionList items={typeData} total={totalEvents} />
                 </CardContent>
               </Card>
             </section>
@@ -400,15 +430,7 @@ export default function AnalyticsPage() {
                   <CardDescription>Events scheduled by day in selected period.</CardDescription>
                 </CardHeader>
                 <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={report?.dailyTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="count" stroke="#0f766e" strokeWidth={3} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <TrendChart items={trendData} />
                 </CardContent>
               </Card>
 
@@ -423,7 +445,7 @@ export default function AnalyticsPage() {
                       <div key={organizer.organizerId} className="flex items-center justify-between border-b border-surface-container pb-2">
                         <div>
                           <p className="font-semibold text-teal-900">{organizer.organizerName}</p>
-                          <p className="text-xs text-on-surface-variant">Approved: {organizer.approvedEvents} • Pending: {organizer.pendingEvents}</p>
+                          <p className="text-xs text-on-surface-variant">Approved: {organizer.approvedEvents} | Pending: {organizer.pendingEvents}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">{organizer.totalEvents}</p>

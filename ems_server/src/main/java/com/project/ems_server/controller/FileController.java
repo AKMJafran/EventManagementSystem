@@ -25,21 +25,46 @@ import java.util.Map;
 public class FileController {
 
     private static final Logger logger = LoggerFactory.getLogger(FileController.class);
+
     private final FileServerService fileServerService;
 
     @PostMapping("/upload")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> uploadFile(@RequestParam(value = "file", required = true) MultipartFile file) {
+    public ResponseEntity<?> uploadFile(
+            @RequestParam(value = "file", required = true) MultipartFile file) {
+
         try {
+            // kept from incoming branch
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "No file was uploaded"));
+            }
+
+            // kept from HEAD branch
             FileUploadResponse uploadResponse = fileServerService.uploadImage(file);
-            return ResponseEntity.status(HttpStatus.CREATED).body(uploadResponse);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(uploadResponse);
+
         } catch (ResponseStatusException e) {
+
             return ResponseEntity.status(e.getStatusCode())
-                    .body(Map.of("error", e.getReason() != null ? e.getReason() : "File upload failed"));
+                    .body(Map.of(
+                            "error",
+                            e.getReason() != null
+                                    ? e.getReason()
+                                    : "File upload failed"
+                    ));
+
         } catch (Exception e) {
+
             logger.error("File upload failed", e);
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to upload file", "details", e.getMessage()));
+                    .body(Map.of(
+                            "error", "Failed to upload file",
+                            "details", e.getMessage()
+                    ));
         }
     }
 
@@ -48,33 +73,75 @@ public class FileController {
             @PathVariable String fileId,
             @RequestParam long expires,
             @RequestParam String signature) {
+
         try {
-            if (!fileServerService.isValidAccessSignature(fileId, expires, signature)) {
+            if (!fileServerService.isValidAccessSignature(
+                    fileId,
+                    expires,
+                    signature)) {
+
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(Map.of("error", "Invalid or expired file access signature"));
+                        .body(Map.of(
+                                "error",
+                                "Invalid or expired file access signature"
+                        ));
             }
 
-            FileContentResult fileContent = fileServerService.fetchFileContent(fileId);
-            MediaType mediaType = fileContent.getContentType() != null && !fileContent.getContentType().isBlank()
-                    ? MediaType.parseMediaType(fileContent.getContentType())
-                    : MediaType.APPLICATION_OCTET_STREAM;
+            FileContentResult fileContent =
+                    fileServerService.fetchFileContent(fileId);
 
-            ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok()
-                    .contentType(mediaType)
-                    .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate());
+            MediaType mediaType =
+                    fileContent.getContentType() != null &&
+                    !fileContent.getContentType().isBlank()
+                            ? MediaType.parseMediaType(
+                                    fileContent.getContentType()
+                              )
+                            : MediaType.APPLICATION_OCTET_STREAM;
 
-            if (fileContent.getContentDisposition() != null && !fileContent.getContentDisposition().isBlank()) {
-                responseBuilder.header(HttpHeaders.CONTENT_DISPOSITION, fileContent.getContentDisposition());
+            ResponseEntity.BodyBuilder responseBuilder =
+                    ResponseEntity.ok()
+                            .contentType(mediaType)
+                            .cacheControl(
+                                    CacheControl.maxAge(
+                                            Duration.ofMinutes(5)
+                                    ).cachePrivate()
+                            );
+
+            if (fileContent.getContentDisposition() != null &&
+                !fileContent.getContentDisposition().isBlank()) {
+
+                responseBuilder.header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        fileContent.getContentDisposition()
+                );
             }
 
             return responseBuilder.body(fileContent.getContent());
+
         } catch (ResponseStatusException e) {
+
             return ResponseEntity.status(e.getStatusCode())
-                    .body(Map.of("error", e.getReason() != null ? e.getReason() : "Failed to load file"));
+                    .body(Map.of(
+                            "error",
+                            e.getReason() != null
+                                    ? e.getReason()
+                                    : "Failed to load file"
+                    ));
+
         } catch (Exception e) {
-            logger.error("File retrieval failed for fileId {}", fileId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to load file"));
+
+            logger.error(
+                    "File retrieval failed for fileId {}",
+                    fileId,
+                    e
+            );
+
+            return ResponseEntity.status(
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            ).body(Map.of(
+                    "error",
+                    "Failed to load file"
+            ));
         }
     }
 }

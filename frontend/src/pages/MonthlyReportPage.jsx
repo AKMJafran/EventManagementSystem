@@ -2,14 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import AdminLayout from '../components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
+import { exportRowsToExcel } from '../utils/exportExcel';
 
 const currentYear = new Date().getFullYear();
 const currentMonth = new Date().getMonth() + 1;
@@ -141,24 +139,23 @@ export default function MonthlyReportPage() {
       return;
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(
-      visibleRows.map((item) => ({
-        Title: item.title,
-        Organizer: item.organizerName,
-        Category: item.categoryName,
-        Venue: item.venue,
-        Status: item.status,
-        Type: item.eventType,
-        StartTime: item.startTime,
-        EndTime: item.endTime,
-        Registrations: item.registrations,
-        Conflict: item.hasConflict ? 'Yes' : 'No',
-      }))
+    exportRowsToExcel(
+      visibleRows,
+      [
+        { header: 'Title', value: (item) => item.title },
+        { header: 'Organizer', value: (item) => item.organizerName },
+        { header: 'Category', value: (item) => item.categoryName },
+        { header: 'Venue', value: (item) => item.venue },
+        { header: 'Status', value: (item) => item.status },
+        { header: 'Type', value: (item) => item.eventType },
+        { header: 'Start Time', value: (item) => item.startTime },
+        { header: 'End Time', value: (item) => item.endTime },
+        { header: 'Registrations', value: (item) => item.registrations },
+        { header: 'Conflict', value: (item) => (item.hasConflict ? 'Yes' : 'No') },
+      ],
+      `monthly-report-${year}-${String(month).padStart(2, '0')}.xls`,
+      'MonthlyReport'
     );
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'MonthlyReport');
-    XLSX.writeFile(workbook, `monthly-report-${year}-${String(month).padStart(2, '0')}.xlsx`);
   };
 
   const exportPdf = () => {
@@ -167,32 +164,7 @@ export default function MonthlyReportPage() {
       return;
     }
 
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(16);
-    doc.text('Monthly Faculty Event Report', 14, 18);
-    doc.setFontSize(10);
-    doc.text(`Month: ${monthNames[month - 1]} ${year}`, 14, 26);
-    doc.text(`Total Events: ${report?.totalEvents || 0} | Approval Rate: ${report?.approvalRate || 0}%`, 14, 32);
-
-    autoTable(doc, {
-      startY: 38,
-      head: [['Title', 'Organizer', 'Category', 'Venue', 'Status', 'Type', 'Start', 'Registrations', 'Conflict']],
-      body: visibleRows.map((item) => [
-        item.title,
-        item.organizerName,
-        item.categoryName,
-        item.venue,
-        item.status,
-        item.eventType,
-        String(item.startTime || ''),
-        String(item.registrations || 0),
-        item.hasConflict ? 'Yes' : 'No',
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [13, 148, 136] },
-    });
-
-    doc.save(`monthly-report-${year}-${String(month).padStart(2, '0')}.pdf`);
+    window.print();
   };
 
   const summaryCards = [

@@ -99,6 +99,24 @@ function EventDetailsContent({ event, loading, role }) {
           </dl>
         </aside>
       </section>
+
+      {event.conflictDetails?.length > 0 && (
+        <section className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-on-surface serif-heading">Conflict Review</h3>
+          <p className="mt-2 text-sm text-on-surface-variant">Current scheduling warnings tied to this event.</p>
+          <div className="mt-5 space-y-3">
+            {event.conflictDetails.map((conflict) => (
+              <div key={`${event.id}-${conflict.conflictingEventId}-${conflict.conflictType}`} className="rounded-2xl bg-surface-container-low p-4">
+                <div className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                  {conflict.severity?.replaceAll('_', ' ')}
+                </div>
+                <h4 className="mt-2 font-semibold text-on-surface">{conflict.conflictingEventTitle}</h4>
+                <p className="mt-1 text-sm text-on-surface-variant">{conflict.summary}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

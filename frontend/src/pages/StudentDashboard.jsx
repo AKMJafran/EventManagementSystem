@@ -1,16 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
-import { toast } from 'react-hot-toast';
-import { Link } from 'react-router-dom';
 import StudentLayout from '../components/layout/StudentLayout';
-import EventImage from '../components/EventImage';
+
+function buildMonthGrid(baseDate) {
+  const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  const start = new Date(firstDay);
+  start.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function sameDay(left, right) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function formatDateRange(event) {
+  const start = new Date(event.startTime);
+  const end = event.endTime ? new Date(event.endTime) : null;
+  const startLabel = `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} • ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  if (!end || Number.isNaN(end.getTime())) {
+    return startLabel;
+  }
+  return `${startLabel} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function statusTone(status) {
+  switch (status) {
+    case 'APPROVED':
+      return 'bg-secondary-container text-on-secondary-container';
+    case 'PENDING':
+      return 'bg-amber-100 text-amber-900';
+    case 'REJECTED':
+      return 'bg-error-container text-on-error-container';
+    default:
+      return 'bg-surface-container-high text-on-surface-variant';
+  }
+}
+
+function calendarTone(event) {
+  if (event.ownedByCurrentUser && event.status === 'PENDING') return 'bg-amber-500';
+  if (event.ownedByCurrentUser) return 'bg-primary';
+  if (event.attending) return 'bg-secondary';
+  return 'bg-tertiary';
+}
 
 export default function StudentDashboard() {
   const { user, isAuthenticated, authLoaded } = useAuthStore();
+  const [dashboardMonth] = useState(() => new Date());
   const [approvedEvents, setApprovedEvents] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
+  const [calendarFeed, setCalendarFeed] = useState({ events: [], reminders: [], overlapAlerts: [] });
   const [loading, setLoading] = useState(true);
+
+  const monthGrid = useMemo(() => buildMonthGrid(dashboardMonth), [dashboardMonth]);
 
   useEffect(() => {
     if (!authLoaded || !isAuthenticated) {
@@ -19,245 +72,203 @@ export default function StudentDashboard() {
 
     async function fetchData() {
       try {
-        const approvedRes = await axiosInstance.get('/events', {
-          params: { status: 'APPROVED' },
-        });
-        const approvedData = approvedRes.data.content || approvedRes.data || [];
-        setApprovedEvents(approvedData.slice(0, 2)); // Just show top 2 featured
+        const firstDay = new Date(dashboardMonth.getFullYear(), dashboardMonth.getMonth(), 1).toISOString().slice(0, 10);
+        const lastDay = new Date(dashboardMonth.getFullYear(), dashboardMonth.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-        const myRes = await axiosInstance.get('/events/user/my-events').catch(() => ({ data: [] }));
+        const [approvedRes, myRes, calendarRes] = await Promise.all([
+          axiosInstance.get('/events', { params: { status: 'APPROVED', startDate: firstDay, endDate: lastDay } }),
+          axiosInstance.get('/events/user/my-events').catch(() => ({ data: [] })),
+          axiosInstance.get('/events/student/calendar-feed', { params: { start: firstDay, end: lastDay } }),
+        ]);
+
+        const approvedData = approvedRes.data.content || approvedRes.data || [];
         const myData = myRes.data.content || myRes.data || [];
-        setMyEvents(myData.slice(0, 3)); // show top 3
-      } catch (e) {
-        toast.error('Failed to load events');
-        console.error(e);
+        setApprovedEvents(approvedData.slice(0, 3));
+        setMyEvents(myData.slice(0, 4));
+        setCalendarFeed(calendarRes.data || { events: [], reminders: [], overlapAlerts: [] });
+      } catch (error) {
+        toast.error('Failed to load dashboard data');
+        console.error(error);
       } finally {
         setLoading(false);
       }
     }
+
     fetchData();
-  }, [authLoaded, isAuthenticated, user]);
+  }, [authLoaded, dashboardMonth, isAuthenticated, user]);
 
   if (loading) {
     return (
       <StudentLayout user={user}>
-        <div className="text-center py-10">Loading...</div>
+        <div className="py-16 text-center text-on-surface-variant">Loading dashboard...</div>
       </StudentLayout>
     );
   }
 
   return (
     <StudentLayout user={user}>
-      {/* Hero Section */}
-      <section className="mb-16">
-        <div className="flex justify-between items-end">
-          <div>
-            <h1 className="text-5xl font-bold tracking-tight text-primary mb-2 serif-heading">Welcome back, {user?.name?.split(' ')[0] || 'Student'}</h1>
-            <p className="text-on-surface-variant text-lg">Curating the university's vibrant academic calendar.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex -space-x-3">
-              <img 
-                className="w-10 h-10 rounded-full border-2 border-background object-cover" 
-                alt="student coordinator" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuApTmt9kZPC9sCI24FhSSEmQbMLu4yk5I87jEChL8xwszeQcO6wlpgjuW5f154b20v14CDDRo79MNjvMaSvyuP9snYkR-r-aAiiteHCe9ikE3owbQMU_rObPwXQv21DiJha7dRDkJGtYlffRiFlMKYWblmAstW8IGdBXRjxkP_lYHBdeHdGTg6w14xpl7kmfeSWJSL8Xn_Go7FmVqqHRfLPJTTHYQUGuE7_y3yF8wPQeAlCLjnZkkKpJwSbDmsuRHZHjfRoiKdZwXJq"
-              />
-              <img 
-                className="w-10 h-10 rounded-full border-2 border-background object-cover" 
-                alt="young man with glasses" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXBYycNl3QY3QWDG_Ru4EuPstb_N8us0eZDgRFotGzrhEGxvvzooM6Z5iqSpLs5aLLcq6jwdEBeaEPGrLxL6CrJGYj7Le_p3UPnrYMMV7xNIHLp5Bvh121sYXrfb9fHXBhpxpQjy-GgPtIP25fWK6AcEhRb1DfFBrlMlu4kvPJliHi92aw_CXNl01s3kHhyseL-Er8BTHDWen0fydceFp-Sgkr-FXXxTJBnASf-rddeINXucWvKPsmDaRih1HuAwBKLbTb1Dob-JYl"
-              />
-              <div className="w-10 h-10 rounded-full border-2 border-background bg-tertiary-container flex items-center justify-center text-[10px] font-bold text-white">
-                +12
-              </div>
-            </div>
-            <p className="text-xs text-on-surface-variant font-medium">Faculty members online</p>
-          </div>
-        </div>
+      <section className="mb-10">
+        <h1 className="text-5xl font-bold text-primary serif-heading">Student Event Dashboard</h1>
+        <p className="mt-3 max-w-3xl text-lg text-on-surface-variant">
+          Track approved events, pending requests, and scheduling alerts in one place.
+        </p>
       </section>
 
-      {/* Grid Layout */}
-      <div className="grid grid-cols-12 gap-10">
-        {/* Section 1: Upcoming Approved Events (Featured) */}
-        <div className="col-span-12 lg:col-span-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-semibold flex items-center gap-3 serif-heading">
-              <span className="w-2 h-8 academic-gradient rounded-full"></span>
-              Upcoming Approved Events
-            </h2>
-            <Link to="/student/calendar" className="text-primary text-sm font-semibold hover:underline decoration-2 underline-offset-4">
-              View All
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-serif font-bold text-teal-900">This Month</h2>
+              <p className="text-sm text-on-surface-variant">Approved events, your requests, and registered sessions.</p>
+            </div>
+            <Link to="/student/calendar" className="rounded-full bg-surface-container-low px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface">
+              Open Calendar
             </Link>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {approvedEvents.length === 0 ? (
-              <p className="text-gray-500">No approved events found.</p>
-            ) : (
-              approvedEvents.map((event) => (
-                <div key={event.id} className="group relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl transition-all duration-500 border border-transparent hover:border-primary-container/10">
-                  <div className="h-48 overflow-hidden">
-                    <EventImage
-                      src={event.imageUrl}
-                      alt={event.title || 'Event cover'}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    />
-                    <div className="absolute top-4 left-4">
-                      <span className="bg-tertiary text-on-tertiary text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
-                        Featured
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center gap-2 text-primary font-bold text-[10px] uppercase tracking-wider mb-2">
-                      <span className="material-symbols-outlined text-sm">calendar_today</span>
-                      {new Date(event.startTime || event.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </div>
-                    <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors serif-heading">{event.title}</h3>
-                    <p className="text-sm text-on-surface-variant line-clamp-2 mb-6">{event.description || 'A vibrant university event bringing together students and faculty.'}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-on-surface-variant">location_on</span>
-                        <span className="text-xs text-on-surface-variant">{event.venue}</span>
-                      </div>
-                      <Link to={`/events/${event.id}`} className="text-primary hover:bg-primary/5 p-2 rounded-full transition-colors inline-block">
-                        <span className="material-symbols-outlined">arrow_forward</span>
+
+          <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label) => (
+              <div key={label} className="py-2">{label}</div>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-2">
+            {monthGrid.map((date) => {
+              const events = calendarFeed.events.filter((event) => sameDay(new Date(event.startTime), date));
+              const isCurrentMonth = date.getMonth() === dashboardMonth.getMonth();
+              const isToday = sameDay(date, new Date());
+
+              return (
+                <div
+                  key={date.toISOString()}
+                  className={`min-h-[104px] rounded-2xl border p-3 ${isCurrentMonth ? 'border-outline-variant/30 bg-surface-container-lowest' : 'border-transparent bg-surface-container-low opacity-50'}`}
+                >
+                  <div className={`text-sm font-semibold ${isToday ? 'text-primary' : 'text-on-surface'}`}>{date.getDate()}</div>
+                  <div className="mt-2 space-y-1">
+                    {events.slice(0, 3).map((event) => (
+                      <Link
+                        key={event.id}
+                        to={`/events/${event.id}`}
+                        className="block rounded-xl bg-surface-container-high px-2 py-1 text-left text-[11px] text-on-surface"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${calendarTone(event)}`} />
+                          <span className="truncate font-semibold">{event.title}</span>
+                        </div>
                       </Link>
-                    </div>
+                    ))}
+                    {events.length > 3 && (
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                        +{events.length - 3} more
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
-        </div>
+        </section>
 
-        {/* Section 2: My Recent Event Requests (Sidebar) */}
-        <div className="col-span-12 lg:col-span-4">
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold flex items-center gap-3 serif-heading">
-              <span className="w-2 h-8 bg-tertiary rounded-full"></span>
-              My Event Requests
-            </h2>
-          </div>
-          <div className="space-y-4">
-            {myEvents.length === 0 ? (
-              <p className="text-gray-500">No event requests found.</p>
-            ) : (
-              myEvents.map(event => {
-                let statusConfig = {
-                  colorClass: "border-primary",
-                  tagClass: "bg-secondary-container/30 text-secondary",
-                  label: "Approved",
-                  icon: "check_circle"
-                };
-                
-                if (event.status === 'PENDING') {
-                  statusConfig = {
-                    colorClass: "border-yellow-600",
-                    tagClass: "bg-tertiary-container/10 text-tertiary",
-                    label: "Pending Approval",
-                    icon: "schedule"
-                  };
-                } else if (event.status === 'REJECTED') {
-                  statusConfig = {
-                    colorClass: "border-error",
-                    tagClass: "bg-error-container/30 text-error",
-                    label: "Rejected",
-                    icon: "event_busy"
-                  };
-                }
-
-                return (
-                  <div key={event.id} className={`p-5 bg-surface-container-lowest rounded-xl shadow-sm border-l-4 ${statusConfig.colorClass}`}>
-                    <div className="flex justify-between items-start mb-3">
-                      <span className={`${statusConfig.tagClass} font-bold text-[10px] px-2 py-0.5 rounded uppercase tracking-tighter`}>
-                        {statusConfig.label}
-                      </span>
-                      <span className="text-[10px] text-on-surface-variant font-mono">REQ-{event.id.toString().padStart(4, '0')}</span>
-                    </div>
-                    <h4 className="font-bold text-on-surface mb-1 serif-heading">{event.title}</h4>
-                    <p className="text-xs text-on-surface-variant mb-4 line-clamp-1">Requesting {event.venue} for {event.category?.name || 'event'}...</p>
-                    
-                    <div className="flex items-center justify-between text-[10px] text-on-surface-variant border-t border-outline-variant/10 pt-4">
-                      <div className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">schedule</span>
-                        {new Date(event.startTime || event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        <div className="space-y-6">
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-serif font-bold text-teal-900">Upcoming Reminders</h2>
+            <div className="mt-5 space-y-3">
+              {calendarFeed.reminders.length === 0 ? (
+                <p className="text-sm text-on-surface-variant">No reminders for the next seven days.</p>
+              ) : (
+                calendarFeed.reminders.slice(0, 4).map((reminder) => (
+                  <div key={`${reminder.eventId}-${reminder.reminderType}`} className="rounded-2xl bg-surface-container-low p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-on-surface">{reminder.eventTitle}</h3>
+                        <p className="mt-1 text-xs text-on-surface-variant">{reminder.message}</p>
                       </div>
-                      {event.status === 'REJECTED' ? (
-                        <div className="text-error font-bold cursor-pointer hover:underline">View Reason</div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-xs">{statusConfig.icon}</span>
-                          Faculty: Dean Vance
-                        </div>
-                      )}
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase ${statusTone(reminder.status)}`}>
+                        {reminder.status}
+                      </span>
                     </div>
+                    <div className="mt-3 text-xs text-on-surface-variant">{formatDateRange(reminder)}</div>
                   </div>
-                );
-              })
-            )}
+                ))
+              )}
+            </div>
+          </section>
 
-            <Link 
-              to="/student/my-events" 
-              className="block text-center w-full py-4 text-xs font-bold text-on-surface-variant bg-surface-container hover:bg-surface-container-high rounded-xl transition-colors uppercase tracking-widest mt-4"
-            >
-              See History
-            </Link>
-          </div>
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-serif font-bold text-teal-900">Overlap Alerts</h2>
+            <div className="mt-5 space-y-3">
+              {calendarFeed.overlapAlerts.length === 0 ? (
+                <p className="text-sm text-on-surface-variant">No overlapping events involving you.</p>
+              ) : (
+                calendarFeed.overlapAlerts.slice(0, 3).map((alert) => (
+                  <div key={`${alert.primaryEventId}-${alert.relatedEventId}`} className="rounded-2xl bg-error-container/60 p-4 text-on-error-container">
+                    <div className="text-xs font-bold uppercase tracking-[0.2em]">{alert.severity.replaceAll('_', ' ')}</div>
+                    <p className="mt-2 text-sm font-semibold">{alert.summary}</p>
+                    <p className="mt-2 text-xs">{new Date(alert.startTime).toLocaleString()} - {new Date(alert.endTime).toLocaleString()}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
         </div>
       </div>
 
-      {/* Bento Grid - Institutional Stats/Guidance */}
-      <section className="mt-20">
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 md:col-span-4 p-8 bg-primary rounded-3xl text-on-primary relative overflow-hidden">
-            <div className="relative z-10">
-              <span className="material-symbols-outlined text-4xl mb-4 font-variation-fill">lightbulb</span>
-              <h3 className="text-2xl font-bold mb-2 serif-heading">Academic Guidelines</h3>
-              <p className="text-sm opacity-80 leading-relaxed mb-6">
-                Ensure your events meet university standards for safety, inclusivity, and academic excellence.
-              </p>
-              <button className="bg-white text-primary px-6 py-2 rounded-full text-xs font-bold hover:scale-105 transition-transform">Read Policy</button>
-            </div>
-            <div className="absolute -right-10 -bottom-10 opacity-10">
-              <span className="material-symbols-outlined text-[200px]">book</span>
-            </div>
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-serif font-bold text-teal-900">Approved Events</h2>
+            <Link to="/student/calendar" className="text-sm font-semibold text-primary">See all</Link>
           </div>
-          
-          <div className="col-span-12 md:col-span-5 p-8 bg-surface-container-highest rounded-3xl flex flex-col justify-between">
-            <div>
-              <h3 className="text-xl font-bold mb-4 serif-heading">Venue Capacity Insights</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Grand Ballroom</span>
-                  <span className="text-xs bg-secondary/10 text-secondary px-2 py-1 rounded">High Demand</span>
-                </div>
-                <div className="w-full bg-outline-variant/20 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-primary w-[85%] h-full"></div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Lecture Theatre 1</span>
-                  <span className="text-xs bg-tertiary/10 text-tertiary px-2 py-1 rounded">Moderate</span>
-                </div>
-                <div className="w-full bg-outline-variant/20 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-tertiary w-[45%] h-full"></div>
-                </div>
-              </div>
-            </div>
-            <div className="pt-6">
-              <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Updated: Today 08:00 AM</p>
-            </div>
+          <div className="space-y-4">
+            {approvedEvents.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">No approved events this month.</p>
+            ) : (
+              approvedEvents.map((event) => (
+                <Link key={event.id} to={`/events/${event.id}`} className="block rounded-2xl bg-surface-container-low p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-on-surface">{event.title}</h3>
+                      <p className="mt-1 text-xs text-on-surface-variant">{formatDateRange(event)}</p>
+                    </div>
+                    <span className="rounded-full bg-secondary-container px-3 py-1 text-[10px] font-bold uppercase text-on-secondary-container">
+                      {event.calendarLabel || 'APPROVED'}
+                    </span>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
-          
-          <div className="col-span-12 md:col-span-3 p-8 academic-gradient rounded-3xl text-white flex flex-col items-center justify-center text-center">
-            <span className="material-symbols-outlined text-5xl mb-4">support_agent</span>
-            <h4 className="text-lg font-bold mb-1 serif-heading">Need Assistance?</h4>
-            <p className="text-xs opacity-80 mb-6">Contact Faculty Liaison for urgent booking issues.</p>
-            <button className="border border-white/30 hover:bg-white/10 px-6 py-2 rounded-full text-xs font-bold transition-all">Get Help</button>
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-serif font-bold text-teal-900">My Requests</h2>
+            <Link to="/student/my-events" className="text-sm font-semibold text-primary">See history</Link>
           </div>
-        </div>
-      </section>
+          <div className="space-y-4">
+            {myEvents.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">No requests yet.</p>
+            ) : (
+              myEvents.map((event) => (
+                <Link key={event.id} to={`/events/${event.id}`} className="block rounded-2xl bg-surface-container-low p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-on-surface">{event.title}</h3>
+                      <p className="mt-1 text-xs text-on-surface-variant">{formatDateRange(event)}</p>
+                      {event.conflictDetails?.[0] && (
+                        <p className="mt-2 text-xs text-on-surface-variant">{event.conflictDetails[0].summary}</p>
+                      )}
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase ${statusTone(event.status)}`}>
+                      {event.status}
+                    </span>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
     </StudentLayout>
   );
 }
-

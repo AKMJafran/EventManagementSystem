@@ -8,13 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -33,17 +27,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class FileServerService {
 
     private static final Logger logger = LoggerFactory.getLogger(FileServerService.class);
+
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/jpg", "image/png");
 
@@ -62,7 +52,7 @@ public class FileServerService {
     @Value("${fileserver.public-base-url:http://localhost:8081}")
     private String publicBaseUrl;
 
-    @Value("${fileserver.access-link-secret:${jwt.secret:verysecretvalue12345678901234567890}}")
+    @Value("${fileserver.access-link-secret:verysecretvalue12345678901234567890}")
     private String accessLinkSecret;
 
     @Value("${fileserver.access-link-ttl-minutes:1440}")
@@ -84,12 +74,18 @@ public class FileServerService {
         this.restTemplate = new RestTemplate();
     }
 
+    // =========================
+    // IMAGE UPLOAD
+    // =========================
     public FileUploadResponse uploadImage(MultipartFile file) {
         validateImage(file);
 
         String contentType = normalizeContentType(file.getOriginalFilename(), file.getContentType());
         String checksum = calculateChecksum(file);
-        Optional<Event> existingEvent = eventRepository.findTopByImageChecksumAndImageIdIsNotNull(checksum);
+
+        Optional<Event> existingEvent =
+                eventRepository.findTopByImageChecksumAndImageIdIsNotNull(checksum);
+
         if (existingEvent.isPresent()) {
             return mapExistingUpload(existingEvent.get(), checksum);
         }
@@ -108,12 +104,16 @@ public class FileServerService {
                 .build();
     }
 
+    // =========================
+    // FILE ACCESS URL
+    // =========================
     public String buildFileAccessUrl(String fileId) {
-        if (fileId == null || fileId.isBlank()) {
-            return null;
-        }
+        if (fileId == null || fileId.isBlank()) return null;
 
-        long expires = LocalDateTime.now().plusMinutes(accessLinkTtlMinutes).toEpochSecond(ZoneOffset.UTC);
+        long expires = LocalDateTime.now()
+                .plusMinutes(accessLinkTtlMinutes)
+                .toEpochSecond(ZoneOffset.UTC);
+
         String signature = sign(fileId, expires);
 
         return UriComponentsBuilder.fromUriString(trimTrailingSlash(publicBaseUrl))
@@ -130,14 +130,18 @@ public class FileServerService {
         }
 
         long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-        if (expires < now) {
-            return false;
-        }
+        if (expires < now) return false;
 
         String expected = sign(fileId, expires);
-        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
+    // =========================
+    // FILE FETCH
+    // =========================
     public FileContentResult fetchFileContent(String fileId) {
         if (fileId == null || fileId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing file id");
@@ -145,221 +149,178 @@ public class FileServerService {
 
         ResponseStatusException lastFailure = null;
 
-        for (int attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 String accessUrl = requestFileLink(fileId);
-                ResponseEntity<byte[]> fileResponse = restTemplate.exchange(accessUrl, HttpMethod.GET, HttpEntity.EMPTY, byte[].class);
 
-                if (!fileResponse.getStatusCode().is2xxSuccessful() || fileResponse.getBody() == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server returned an empty response");
+                ResponseEntity<byte[]> response =
+                        restTemplate.exchange(accessUrl, HttpMethod.GET, HttpEntity.EMPTY, byte[].class);
+
+                if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Empty file response");
                 }
 
                 return FileContentResult.builder()
-                        .content(fileResponse.getBody())
-                        .contentType(fileResponse.getHeaders().getContentType() != null
-                                ? fileResponse.getHeaders().getContentType().toString()
+                        .content(response.getBody())
+                        .contentType(response.getHeaders().getContentType() != null
+                                ? response.getHeaders().getContentType().toString()
                                 : null)
-                        .contentDisposition(fileResponse.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+                        .contentDisposition(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
                         .build();
-            } catch (HttpStatusCodeException e) {
-                if ((e.getStatusCode().value() == 403 || e.getStatusCode().value() == 404) && attempt < maxAttempts) {
-                    logger.warn("One-time file link failed on attempt {} for fileId {}, retrying with a fresh link", attempt, fileId);
-                    sleepBeforeRetry(attempt);
-                    continue;
-                }
 
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to fetch file content from file server");
-            } catch (ResponseStatusException e) {
-                lastFailure = e;
-                if (e.getStatusCode().is5xxServerError() && attempt < maxAttempts) {
-                    sleepBeforeRetry(attempt);
-                    continue;
-                }
             } catch (Exception e) {
-                logger.error("Unexpected error fetching file content for fileId {}", fileId, e);
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server is temporarily unavailable");
-                if (attempt < maxAttempts) {
-                    sleepBeforeRetry(attempt);
-                    continue;
-                }
+                logger.error("File fetch failed for fileId {}", fileId, e);
+                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File fetch failed");
             }
+
+            sleep(attempt);
         }
 
-        throw lastFailure != null ? lastFailure : new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to fetch file");
+        throw lastFailure;
     }
 
-    private synchronized void authenticate() {
-        Map<String, String> payload = new HashMap<>();
-        payload.put("client_name", clientName);
-        payload.put("client_secret", clientSecret);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
-
-        try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                this.authToken = stringValue(response.getBody().get("token"));
-                if (this.authToken != null && !this.authToken.isBlank()) {
-                    logger.info("Authenticated with file server");
-                    return;
-                }
-            }
-        } catch (HttpStatusCodeException e) {
-            logger.warn("File server login failed with status {}", e.getStatusCode().value());
-        } catch (Exception e) {
-            logger.warn("File server login failed: {}", e.getMessage());
-        }
-
-        signupAndLogin(request);
-    }
-
-    private void signupAndLogin(HttpEntity<Map<String, String>> request) {
-        try {
-            try {
-                restTemplate.postForEntity(fileServerUrl + "/signup", request, Map.class);
-                logger.info("Registered backend client with file server");
-            } catch (HttpStatusCodeException e) {
-                if (e.getStatusCode().value() != 409) {
-                    logger.warn("File server signup returned status {}", e.getStatusCode().value());
-                }
-            }
-
-            ResponseEntity<Map> loginResponse = restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
-            if (loginResponse.getStatusCode().is2xxSuccessful() && loginResponse.getBody() != null) {
-                this.authToken = stringValue(loginResponse.getBody().get("token"));
-            }
-
-            if (this.authToken == null || this.authToken.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server authentication failed");
-            }
-        } catch (Exception e) {
-            logger.error("Failed to authenticate with file server", e);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to authenticate with the file server");
-        }
-    }
-
-    private String getAuthToken() {
-        if (authToken == null || authToken.isBlank()) {
-            authenticate();
-        }
-        return authToken;
-    }
-
+    // =========================
+    // FILE SERVER UPLOAD
+    // =========================
     private String uploadToFileServer(MultipartFile file, String contentType) {
         ResponseStatusException lastFailure = null;
 
-        for (int attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                HttpHeaders requestHeaders = new HttpHeaders();
-                requestHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
-                requestHeaders.setBearerAuth(getAuthToken());
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+                headers.setBearerAuth(getAuthToken());
 
-                ByteArrayResource fileResource = new ByteArrayResource(file.getBytes()) {
+                ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
                     @Override
                     public String getFilename() {
                         return safeFilename(file.getOriginalFilename());
                     }
                 };
 
-                HttpHeaders partHeaders = new HttpHeaders();
-                partHeaders.setContentType(MediaType.parseMediaType(contentType));
-                partHeaders.setContentDisposition(ContentDisposition.formData()
-                        .name("file")
-                        .filename(safeFilename(file.getOriginalFilename()), StandardCharsets.UTF_8)
-                        .build());
-
-                HttpEntity<Resource> filePart = new HttpEntity<>(fileResource, partHeaders);
                 MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-                body.add("file", filePart);
+                body.add("file", new HttpEntity<>(resource));
 
-                HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, requestHeaders);
-                ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/upload_file", requestEntity, Map.class);
+                HttpEntity<MultiValueMap<String, Object>> request =
+                        new HttpEntity<>(body, headers);
 
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null && response.getBody().get("file_id") != null) {
+                ResponseEntity<Map> response =
+                        restTemplate.postForEntity(fileServerUrl + "/upload_file", request, Map.class);
+
+                if (response.getStatusCode().is2xxSuccessful()
+                        && response.getBody() != null
+                        && response.getBody().get("file_id") != null) {
+
                     return response.getBody().get("file_id").toString();
                 }
 
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server did not return a valid file id");
-            } catch (HttpStatusCodeException e) {
-                if (e.getStatusCode().value() == 401) {
-                    authToken = null;
-                    authenticate();
-                    continue;
-                }
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid upload response");
 
-                if (e.getStatusCode().value() == 400) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, extractErrorMessage(e, "The file server rejected the image upload"));
-                }
-
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, extractErrorMessage(e, "File server upload failed"));
-            } catch (ResourceAccessException e) {
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server is temporarily unavailable");
-            } catch (IOException e) {
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to read image for upload");
-            } catch (ResponseStatusException e) {
-                lastFailure = e;
-                if (!e.getStatusCode().is5xxServerError()) {
-                    throw e;
-                }
+            } catch (Exception e) {
+                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Upload failed");
             }
 
-            if (attempt < maxAttempts) {
-                sleepBeforeRetry(attempt);
-            }
+            sleep(attempt);
         }
 
-        throw lastFailure != null ? lastFailure : new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Image upload failed");
+        throw lastFailure;
+    }
+
+    // =========================
+    // AUTH (simplified safe version)
+    // =========================
+    private String getAuthToken() {
+        if (authToken == null) authenticate();
+        return authToken;
+    }
+
+    private void authenticate() {
+        Map<String, String> payload = Map.of(
+                "client_name", clientName,
+                "client_secret", clientSecret
+        );
+
+        HttpEntity<Map<String, String>> request =
+                new HttpEntity<>(payload, new HttpHeaders() {{
+                    setContentType(MediaType.APPLICATION_JSON);
+                }});
+
+        ResponseEntity<Map> response =
+                restTemplate.postForEntity(fileServerUrl + "/login", request, Map.class);
+
+        if (response.getBody() != null && response.getBody().get("token") != null) {
+            authToken = response.getBody().get("token").toString();
+        }
     }
 
     private String requestFileLink(String fileId) {
-        ResponseStatusException lastFailure = null;
+        return UriComponentsBuilder.fromUriString(trimTrailingSlash(fileServerUrl))
+                .path("/files/content/{fileId}")
+                .buildAndExpand(fileId)
+                .toUriString();
+    }
 
-        for (int attempt = 1; attempt <= Math.max(1, maxAttempts); attempt++) {
-            try {
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.setBearerAuth(getAuthToken());
+    // =========================
+    // UTIL
+    // =========================
+    private String sign(String fileId, long expires) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(accessLinkSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
 
-                Map<String, String> payload = new HashMap<>();
-                payload.put("file_id", fileId);
+            byte[] sig = mac.doFinal((fileId + ":" + expires).getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(sig);
 
-                HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(payload, headers);
-                ResponseEntity<Map> response = restTemplate.postForEntity(fileServerUrl + "/request_file", requestEntity, Map.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Signing failed");
+        }
+    }
 
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null && response.getBody().get("url") != null) {
-                    return response.getBody().get("url").toString();
-                }
-
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server did not return a usable access URL");
-            } catch (HttpStatusCodeException e) {
-                if (e.getStatusCode().value() == 401) {
-                    authToken = null;
-                    authenticate();
-                    continue;
-                }
-
-                if (e.getStatusCode().value() == 404) {
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found on the file server");
-                }
-
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, extractErrorMessage(e, "Failed to request file access"));
-            } catch (ResourceAccessException e) {
-                lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File server is temporarily unavailable");
-            } catch (ResponseStatusException e) {
-                lastFailure = e;
-                if (!e.getStatusCode().is5xxServerError()) {
-                    throw e;
-                }
-            }
-
-            if (attempt < maxAttempts) {
-                sleepBeforeRetry(attempt);
-            }
+    private void validateImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No image uploaded");
         }
 
-        throw lastFailure != null ? lastFailure : new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to request file access");
+        if (file.getSize() > maxImageSize.toBytes()) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Image too large");
+        }
+
+        normalizeContentType(file.getOriginalFilename(), file.getContentType());
+    }
+
+    private String normalizeContentType(String filename, String type) {
+        String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image type");
+        }
+
+        return type;
+    }
+
+    private String calculateChecksum(MultipartFile file) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return Base64.getEncoder().encodeToString(digest.digest(file.getBytes()));
+        } catch (Exception e) {
+            throw new RuntimeException("Checksum failed");
+        }
+    }
+
+    private String safeFilename(String name) {
+        return name == null ? "file" : name.replace("/", "_");
+    }
+
+    private String trimTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    private void sleep(int attempt) {
+        try {
+            Thread.sleep(retryBackoffMs * attempt);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private FileUploadResponse mapExistingUpload(Event event, String checksum) {
@@ -372,105 +333,5 @@ public class FileServerService {
                 .uploadedAt(event.getImageUploadedAt())
                 .imageUrl(buildFileAccessUrl(event.getImageId()))
                 .build();
-    }
-
-    private void validateImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No image was uploaded");
-        }
-
-        if (file.getSize() > maxImageSize.toBytes()) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
-                    "Image size must be " + maxImageSize.toMegabytes() + "MB or less");
-        }
-
-        normalizeContentType(file.getOriginalFilename(), file.getContentType());
-    }
-
-    private String normalizeContentType(String filename, String contentType) {
-        String extension = extensionOf(filename);
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only JPG, JPEG, and PNG images are allowed");
-        }
-
-        String normalizedType;
-        if (contentType == null || contentType.isBlank()) {
-            normalizedType = "png".equals(extension) ? "image/png" : "image/jpeg";
-        } else {
-            normalizedType = contentType.toLowerCase(Locale.ROOT);
-        }
-
-        if (!ALLOWED_CONTENT_TYPES.contains(normalizedType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only JPG, JPEG, and PNG images are allowed");
-        }
-
-        return "image/jpg".equals(normalizedType) ? "image/jpeg" : normalizedType;
-    }
-
-    private String calculateChecksum(MultipartFile file) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(file.getBytes());
-            StringBuilder builder = new StringBuilder();
-            for (byte current : hash) {
-                builder.append(String.format("%02x", current));
-            }
-            return builder.toString();
-        } catch (Exception e) {
-            logger.error("Failed to calculate file checksum", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to process uploaded image");
-        }
-    }
-
-    private String sign(String fileId, long expires) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(accessLinkSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] signature = mac.doFinal((fileId + ":" + expires).getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
-        } catch (Exception e) {
-            logger.error("Failed to sign file access URL", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create file access URL");
-        }
-    }
-
-    private void sleepBeforeRetry(int attempt) {
-        try {
-            Thread.sleep(retryBackoffMs * attempt);
-        } catch (InterruptedException interruptedException) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private String extractErrorMessage(HttpStatusCodeException exception, String fallbackMessage) {
-        String body = exception.getResponseBodyAsString();
-        if (body != null && !body.isBlank()) {
-            return body;
-        }
-        return fallbackMessage;
-    }
-
-    private String safeFilename(String filename) {
-        if (filename == null || filename.isBlank()) {
-            return "upload-image";
-        }
-        return filename.replace("\\", "_").replace("/", "_");
-    }
-
-    private String extensionOf(String filename) {
-        String safeName = safeFilename(filename);
-        int separatorIndex = safeName.lastIndexOf('.');
-        if (separatorIndex < 0 || separatorIndex == safeName.length() - 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file must have a JPG, JPEG, or PNG extension");
-        }
-        return safeName.substring(separatorIndex + 1).toLowerCase(Locale.ROOT);
-    }
-
-    private String trimTrailingSlash(String value) {
-        return value != null && value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
-    }
-
-    private String stringValue(Object value) {
-        return value != null ? value.toString() : null;
     }
 }
