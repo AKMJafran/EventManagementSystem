@@ -8,20 +8,11 @@ import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
 
-const EVENT_TYPE_OPTIONS = [
-  { value: 'CULTURAL', label: 'Cultural' },
-  { value: 'TECHNICAL', label: 'Technical' },
-  { value: 'ACADEMIC', label: 'Academic' },
-  { value: 'SPORTS', label: 'Sports' },
-  { value: 'URGENT', label: 'Urgent' },
-];
-
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
   description: z.string().min(5, 'Description required'),
   categoryId: z.string().min(1, 'Category required'),
   subCategoryId: z.string().optional(),
-  eventType: z.string().min(1, 'Event type required'),
   venue: z.string().min(2, 'Venue required'),
   startTime: z.string(),
   endTime: z.string(),
@@ -195,7 +186,6 @@ export default function CreateEventPage() {
           description: eventToEdit.description || '',
           categoryId: selection.categoryId,
           subCategoryId: selection.subCategoryId,
-          eventType: eventToEdit.eventType || '',
           venue: eventToEdit.venue || '',
           startTime: toDateTimeLocalValue(eventToEdit.startTime),
           endTime: toDateTimeLocalValue(eventToEdit.endTime),
@@ -297,7 +287,6 @@ export default function CreateEventPage() {
         title: data.title,
         description: data.description,
         categoryId: data.subCategoryId || data.categoryId,
-        eventType: data.eventType,
         venue: data.venue,
         startTime: data.startTime,
         endTime: data.endTime,
@@ -421,23 +410,6 @@ export default function CreateEventPage() {
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
-                  <select 
-                    {...register('eventType')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
-                  >
-                    <option value="">Select Event Type</option>
-                    {EVENT_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
-                </div>
-                <div></div>
               </div>
 
               {/* Section 3: Logistics */}

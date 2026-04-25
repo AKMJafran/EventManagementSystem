@@ -65,13 +65,12 @@ public class EventService {
     public EventResponse createEvent(EventRequest eventRequest, Long userId) {
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
-        // Verify category exists
-        if (!categoryRepository.existsById(eventRequest.getCategoryId())) {
-            throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
-        }
+        Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found with id: " + eventRequest.getCategoryId()));
+        EventType derivedEventType = deriveEventTypeFromCategory(selectedCategory);
 
-        // Use Abstract Factory pattern to create event based on event type
-        EventFactoryInterface factory = eventAbstractFactory.getFactory(eventRequest.getEventType());
+        // Use Abstract Factory pattern to create event based on derived event type
+        EventFactoryInterface factory = eventAbstractFactory.getFactory(derivedEventType);
         Event event = factory.createEvent(
                 eventRequest.getTitle(),
                 eventRequest.getDescription(),
@@ -81,7 +80,7 @@ public class EventService {
                 eventRequest.getImageId(),
                 eventRequest.getStartTime(),
                 eventRequest.getEndTime(),
-                eventRequest.getEventType()
+                derivedEventType
         );
         applyEventImage(event, eventRequest, false);
 
@@ -131,9 +130,9 @@ public class EventService {
             throw new RuntimeException("Only pending events can be edited");
         }
 
-        if (!categoryRepository.existsById(eventRequest.getCategoryId())) {
-            throw new RuntimeException("Category not found with id: " + eventRequest.getCategoryId());
-        }
+        Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found with id: " + eventRequest.getCategoryId()));
+        EventType derivedEventType = deriveEventTypeFromCategory(selectedCategory);
 
         event.setTitle(eventRequest.getTitle());
         event.setDescription(eventRequest.getDescription());
@@ -141,7 +140,7 @@ public class EventService {
         event.setVenue(eventRequest.getVenue());
         event.setStartTime(eventRequest.getStartTime());
         event.setEndTime(eventRequest.getEndTime());
-        event.setEventType(eventRequest.getEventType());
+        event.setEventType(derivedEventType);
         applyEventImage(event, eventRequest, true);
         event.setStatus(EventStatus.PENDING);
         event.setRejectReason(null);
@@ -599,7 +598,6 @@ public class EventService {
                 .title(event.getTitle())
                 .description(event.getDescription())
                 .categoryId(event.getCategoryId())
-                .eventType(event.getEventType())
                 .venue(newVenue)
                 .startTime(newStartTime)
                 .endTime(newEndTime)
@@ -715,6 +713,23 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         if (!endTime.isAfter(startTime)) {
             throw new RuntimeException("End time must be after start time");
         }
+    }
+
+    private EventType deriveEventTypeFromCategory(Category category) {
+        Category parentCategory = category.getParentId() == null
+                ? category
+                : categoryRepository.findById(category.getParentId())
+                        .orElseThrow(() -> new RuntimeException("Parent category not found for category id: " + category.getId()));
+
+        String categoryName = parentCategory.getName() != null ? parentCategory.getName().trim().toUpperCase(Locale.ROOT) : "";
+
+        return switch (categoryName) {
+            case "CULTURAL" -> EventType.CULTURAL;
+            case "TECHNICAL" -> EventType.TECHNICAL;
+            case "ACADEMIC" -> EventType.ACADEMIC;
+            case "SPORTS" -> EventType.SPORTS;
+            default -> throw new RuntimeException("Unsupported category for event type mapping: " + parentCategory.getName());
+        };
     }
 
     private List<ReminderResponse> buildReminders(List<Event> events) {
