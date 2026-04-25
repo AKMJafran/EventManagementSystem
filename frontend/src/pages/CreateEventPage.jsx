@@ -6,6 +6,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 import StudentLayout from '../components/layout/StudentLayout';
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -52,6 +55,14 @@ export default function CreateEventPage() {
       ...item,
       name: item.name || item.categoryName || item.label || `Category ${item.id}`,
     }));
+
+  const EVENT_TYPE_OPTIONS = [
+    { value: 'CULTURAL', label: 'Cultural' },
+    { value: 'TECHNICAL', label: 'Technical' },
+    { value: 'ACADEMIC', label: 'Academic' },
+    { value: 'SPORTS', label: 'Sports' },
+    { value: 'URGENT', label: 'Urgent' },
+  ];
 
   const toDateTimeLocalValue = (dateString) => {
     if (!dateString) return '';
@@ -296,11 +307,154 @@ export default function CreateEventPage() {
     }
   };
 
+  const categoryOptions = categories.map((category) => ({
+    value: category.id?.toString() || '',
+    label: category.name || `Category ${category.id}`,
+  }));
+
+  const subCategoryOptions = subCategories.map((subCategory) => ({
+    value: subCategory.id?.toString() || '',
+    label: subCategory.name || `Subcategory ${subCategory.id}`,
+  }));
+
   return (
     <StudentLayout user={user}>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {/* UI unchanged for brevity (your original JSX stays SAME) */}
-      </form>
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-on-background">
+            {isEditMode ? 'Edit Event' : 'Create Event'}
+          </h1>
+          <p className="mt-2 text-sm text-on-surface-variant max-w-2xl">
+            {isEditMode
+              ? 'Update your event details and submit changes for review.'
+              : 'Fill in the event details to submit a new event request.'}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Input
+              label="Event Title"
+              placeholder="Enter event title"
+              error={errors.title?.message}
+              {...register('title')}
+            />
+
+            <Select
+              label="Event Type"
+              placeholder="Select event type"
+              options={EVENT_TYPE_OPTIONS}
+              error={errors.eventType?.message}
+              {...register('eventType')}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Select
+              label="Category"
+              placeholder={categoriesLoading ? 'Loading categories...' : 'Select category'}
+              options={categoryOptions}
+              error={errors.categoryId?.message}
+              disabled={categoriesLoading}
+              {...register('categoryId')}
+            />
+
+            <Select
+              label="Subcategory"
+              placeholder={subCategoryOptions.length ? 'Select subcategory' : 'Choose category first'}
+              options={subCategoryOptions}
+              disabled={!selectedCategory || subCategoriesLoading}
+              {...register('subCategoryId')}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Input
+              label="Venue"
+              placeholder="Enter venue or room"
+              error={errors.venue?.message}
+              {...register('venue')}
+            />
+
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Input
+                label="Start Date & Time"
+                type="datetime-local"
+                error={errors.startTime?.message}
+                {...register('startTime')}
+              />
+              <Input
+                label="End Date & Time"
+                type="datetime-local"
+                error={errors.endTime?.message}
+                {...register('endTime')}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              className="min-h-[160px] w-full rounded-md border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="Describe the event, agenda, and objective"
+              {...register('description')}
+            />
+            {errors.description?.message && (
+              <p className="text-sm text-red-500">{errors.description.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Event image</p>
+                <p className="text-sm text-gray-500">Upload a JPG or PNG file (max 5MB). Optional.</p>
+              </div>
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:text-blue-700"
+                onClick={clearImageSelection}
+              >
+                Remove image
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                onChange={handleImageChange}
+                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-full file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-white file:hover:bg-primary-700"
+              />
+              {imageError && <p className="text-sm text-red-500">{imageError}</p>}
+            </div>
+
+            {imageFeedback && <p className="text-sm text-green-600">{imageFeedback}</p>}
+
+            {imagePreview && (
+              <div className="rounded-xl border border-gray-200 bg-surface-container-lowest p-3">
+                <img
+                  src={imagePreview}
+                  alt="Selected preview"
+                  className="max-h-80 w-full rounded-lg object-contain"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+            <div className="text-sm text-on-surface-variant">
+              {isEditMode
+                ? 'Edit mode: existing event data is loaded automatically.'
+                : 'Create mode: all fields are required except the image.'}
+            </div>
+            <Button type="submit" isLoading={loading} className="w-full sm:w-auto">
+              {isEditMode ? 'Update Event' : 'Create Event'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </StudentLayout>
   );
 }
