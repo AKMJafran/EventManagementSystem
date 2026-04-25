@@ -273,8 +273,12 @@ export default function CreateEventPage() {
         } catch (uploadError) {
           const status = uploadError?.response?.status;
           const serverData = uploadError?.response?.data;
+          const isTimeout = uploadError?.code === 'ECONNABORTED';
           console.error('Image upload failed', { status, serverData, uploadError });
           toast.error(
+            isTimeout
+              ? 'Image upload is taking too long. Please try again in a moment.'
+              :
             serverData?.error
               ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
               : 'Failed to upload image. Event creation was stopped.'

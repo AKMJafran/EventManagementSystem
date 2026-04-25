@@ -1,11 +1,13 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+const DEFAULT_TIMEOUT_MS = 10000;
+const FILE_UPLOAD_TIMEOUT_MS = 30000;
 
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: DEFAULT_TIMEOUT_MS,
 });
 
 // Track whether a refresh is in progress to avoid multiple refresh requests
@@ -41,6 +43,9 @@ axiosInstance.interceptors.request.use(
       config.headers = config.headers || {};
       config.headers['Content-Type'] = undefined;
       config.headers['content-type'] = undefined;
+      if (config.timeout == null || config.timeout === DEFAULT_TIMEOUT_MS) {
+        config.timeout = FILE_UPLOAD_TIMEOUT_MS;
+      }
 
       if (config.headers.common) {
         config.headers.common['Content-Type'] = undefined;

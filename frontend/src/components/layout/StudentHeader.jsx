@@ -42,7 +42,12 @@ export default function StudentHeader({ user }) {
       // In a more complex app, we would directly update AuthContext state here or refetch. 
       // Telling the user to log in again is a simpler approach to refresh JWT token claims.
     } catch (error) {
-      toast.error('Failed to update profile picture', { id: toastId });
+      toast.error(
+        error?.code === 'ECONNABORTED'
+          ? 'Profile picture upload is taking too long. Please try again.'
+          : 'Failed to update profile picture',
+        { id: toastId }
+      );
       console.error(error);
     }
   };
