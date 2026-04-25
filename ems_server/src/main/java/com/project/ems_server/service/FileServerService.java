@@ -61,7 +61,7 @@ public class FileServerService {
     @Value("${fileserver.images.max-size:5MB}")
     private DataSize maxImageSize;
 
-    @Value("${fileserver.retry.max-attempts:3}")
+    @Value("${fileserver.retry.max-attempts:${fileserver.max-upload-attempts:3}}")
     private int maxAttempts;
 
     @Value("${fileserver.retry.backoff-ms:400}")
@@ -69,9 +69,9 @@ public class FileServerService {
 
     private volatile String authToken;
 
-    public FileServerService(EventRepository eventRepository) {
+    public FileServerService(EventRepository eventRepository, RestTemplate restTemplate) {
         this.eventRepository = eventRepository;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     // =========================
@@ -198,8 +198,12 @@ public class FileServerService {
                     }
                 };
 
+                HttpHeaders fileHeaders = new HttpHeaders();
+                fileHeaders.setContentType(MediaType.parseMediaType(contentType));
+                fileHeaders.setContentDispositionFormData("file", resource.getFilename());
+
                 MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-                body.add("file", new HttpEntity<>(resource));
+                body.add("file", new HttpEntity<>(resource, fileHeaders));
 
                 HttpEntity<MultiValueMap<String, Object>> request =
                         new HttpEntity<>(body, headers);
@@ -217,6 +221,7 @@ public class FileServerService {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Invalid upload response");
 
             } catch (Exception e) {
+                logger.warn("Remote upload attempt {} failed", attempt, e);
                 lastFailure = new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Upload failed");
             }
 
@@ -289,10 +294,16 @@ public class FileServerService {
     }
 
     private String normalizeContentType(String filename, String type) {
-        String ext = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+        String ext = getFileExtension(filename);
 
         if (!ALLOWED_EXTENSIONS.contains(ext)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image type");
+        }
+
+        if (type == null || !ALLOWED_CONTENT_TYPES.contains(type.toLowerCase())) {
+            return "jpg".equals(ext) || "jpeg".equals(ext)
+                    ? MediaType.IMAGE_JPEG_VALUE
+                    : MediaType.IMAGE_PNG_VALUE;
         }
 
         return type;
@@ -309,6 +320,14 @@ public class FileServerService {
 
     private String safeFilename(String name) {
         return name == null ? "file" : name.replace("/", "_");
+    }
+
+    private String getFileExtension(String filename) {
+        if (filename == null || !filename.contains(".")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image type");
+        }
+
+        return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
     }
 
     private String trimTrailingSlash(String url) {

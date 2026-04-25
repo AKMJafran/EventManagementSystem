@@ -1,106 +1,128 @@
 # Faculty Event Management System
 
-## 🎯 Project Overview
+Faculty Event Management System is a full-stack app for managing student and faculty events. The repository contains:
 
-This is a comprehensive **Faculty Event Management System** for the University of Ruhuna's Faculty of Technology, designed to manage student-organized events, club activities, and academic gatherings. Built with **Spring Boot** (backend) and **React** (frontend), it incorporates **advanced Java concepts** to demonstrate academic excellence.
+- `frontend/`: React + Vite client
+- `ems_server/`: Spring Boot API
+- an external file server integration used for image upload and file access
 
-### Key Features
-- **User Roles**: Students (create events), Admins/Deans (approve/reject).
-- **Event Management**: Create, approve, and track events with categories (Cultural, Sports, Technical, Academic).
-- **Conflict Detection**: Automatic venue/time conflict alerts with notifications.
-- **Notifications**: In-app and email alerts for approvals, conflicts, and reminders.
-- **Advanced Java Highlights**:
-  - OOP: Abstraction, Inheritance, Polymorphism (Event hierarchy).
-  - Design Patterns: Factory (event creation), Singleton (approval service), Observer (notifications), DAO (data access).
-  - Features: Streams API, Lambdas, Multithreading (@Scheduled), Custom Exceptions, File Handling.
-- **Demo-Attractive Elements**: Clean UI, real-time conflict resolution, calendar views, and viva-ready explanations.
+## Current Local Setup
 
-### Vision Alignment
-Based on faculty activities (e.g., HackTrail, Technospirits), this system handles diverse events with multi-level approvals and advanced architecture.
+These are the ports and services the project is currently wired for:
 
-## 👥 Team Plan & Roles
-- **Team Lead**: Oversee integration and demo preparation.
-- **Backend Developer**: Enhance advanced Java concepts (patterns, multithreading).
-- **Frontend Developer**: Improve UI/UX (add calendar, real-time updates).
-- **Tester/Documenter**: Write tests, update docs, prepare viva notes.
-- **Milestones**:
-  1. Week 1: Analyze gaps and refactor for advanced concepts.
-  2. Week 2: Implement missing features (e.g., Event subclasses, Factory pattern).
-  3. Week 3: Testing, UI polish, and demo rehearsal.
-  4. Week 4: Final demo with Q&A on advanced Java.
+- Frontend: `http://localhost:5173`
+- Spring Boot backend: `http://localhost:8081`
+- File server API: `http://localhost:8080/api`
 
-## 🚀 How to Run the Project
+Event and profile images are stored through the file server only. If the file server is down or misconfigured, image upload will fail.
 
-### Prerequisites
-- **Java 17** or higher
-- **Node.js 18+** and npm
-- **MySQL** (or PostgreSQL) database
-- **Maven** for backend
-- **Git** for cloning
+## Prerequisites
 
-### Backend Setup (Spring Boot)
-1. Clone the repo: `git clone <repo-url>`
-2. Navigate to `ems_server/`: `cd ems_server`
-3. DataSource configuration uses Spring singleton `@Bean` in `src/main/java/com/project/ems_server/config/DataSourceConfig.java`:
-   - `@Configuration`
-   - `@Bean` with `DataSourceProperties.initializeDataSourceBuilder().build()`
-   - This keeps exactly one `DataSource` instance in the Spring context (singleton scope)
+- Java 17
+- Node.js 18+
+- MySQL
+- A running file server compatible with:
+  - `POST /api/login`
+  - `POST /api/upload_file`
+  - `GET /api/files/content/{fileId}`
 
-4. Create `src/main/resources/application.properties` (copy from `application-template.properties`):
-   ```
-   # Database
-   spring.datasource.url=jdbc:mysql://localhost:3306/event_db
-   spring.datasource.username=your_mysql_username
-   spring.datasource.password=your_mysql_password
+## Backend Configuration
 
-   # For local tests with H2 (optional)
-   # spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+The backend reads configuration from `ems_server/src/main/resources/application.properties`.
 
-   # JPA
-   spring.jpa.hibernate.ddl-auto=update
-   spring.jpa.show-sql=true
+That file is gitignored by [`ems_server/.gitignore`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/.gitignore:28), so each machine should keep its own local copy.
 
-   # JWT Secret (generate a secure key)
-   jwt.secret=your_secure_jwt_secret_here
+You can start from [`application-template.properties`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1) and fill in real values.
 
-   # Email (for notifications)
-   spring.mail.host=localhost
-   spring.mail.port=25
-   spring.mail.username=your_email@gmail.com
-   spring.mail.password=your_app_password
-   spring.mail.properties.mail.smtp.auth=false
-   spring.mail.properties.mail.smtp.starttls.enable=false
-   ```
-   **Security Note**: `application.properties` is gitignored. Never commit real secrets!
-5. Install dependencies: `mvn clean install`
-6. Run the app: `mvn spring-boot:run`
-7. API available at `http://localhost:8081`
+Minimum required properties:
 
-### Frontend Setup (React)
-1. Navigate to `frontend/`: `cd frontend`
-2. Create `.env` file (if not present):
-   ```
-   VITE_API_BASE_URL=http://localhost:8081
-   ```
-3. Install dependencies: `npm install`
-4. Run the app: `npm run dev`
-5. Open `http://localhost:5173` in browser
+```properties
+server.port=8081
 
-### Testing
-- Use Postman for API testing (import collection from `Details/` if available).
-- Test user flows: Register → Login → Create Event → Admin Approve → Check Notifications.
-- Verify conflicts: Create overlapping events and check alerts.
+spring.datasource.url=jdbc:mysql://localhost:3306/EMS_Database
+spring.datasource.username=your_mysql_username
+spring.datasource.password=your_mysql_password
 
-## 🎓 Academic Demo Highlights
-- **Showcase Advanced Java**: Explain patterns (e.g., "Factory creates events polymorphically") with code snippets.
-- **Live Demo**: Create an event, trigger conflict, approve via admin, receive email.
-- **Viva Prep**: Be ready to discuss why Singleton for approval, Observer for notifications, etc.
-- **Attractiveness**: Simple UI, real-world relevance (faculty events), and technical depth.
+jwt.secret=your_jwt_secret
 
-## 📚 Additional Resources
-- [Details/](Details/) for requirements and roadmap.
-- [Spring Boot Docs](https://spring.io/projects/spring-boot) for backend.
-- [React Docs](https://react.dev/) for frontend.
-- Contact team lead for questions.
+fileserver.url=http://localhost:8080/api
+fileserver.client.name=test_backend
+fileserver.client.secret=your_file_server_client_secret
+fileserver.public-base-url=http://localhost:8081
 
-Let's build an outstanding system! 🚀
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
+```
+
+Optional but present in the current local setup:
+
+- SMTP mail settings for notification email
+- file server timeout and retry settings
+- file access signing secret
+
+## Frontend Configuration
+
+The frontend uses `VITE_API_BASE_URL` and defaults to `http://localhost:8081`.
+
+Create `frontend/.env` if needed:
+
+```env
+VITE_API_BASE_URL=http://localhost:8081
+```
+
+## Running the Project
+
+### 1. Start MySQL
+
+Make sure the target database exists and the credentials in `application.properties` are correct.
+
+### 2. Start the file server
+
+The backend depends on the external file server for all image uploads. It must be reachable at the configured `fileserver.url`.
+
+### 3. Start the Spring Boot backend
+
+From `ems_server/`:
+
+```powershell
+./mvnw.cmd spring-boot:run
+```
+
+If Maven is installed globally, this also works:
+
+```powershell
+mvn spring-boot:run
+```
+
+### 4. Start the frontend
+
+From `frontend/`:
+
+```powershell
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173`.
+
+## Image Upload Notes
+
+- Frontend uploads images to `POST /files/upload` on the Spring backend.
+- The Spring backend forwards the upload to the external file server.
+- The backend also generates signed URLs for `GET /files/content/{fileId}`.
+- If you get a `502` during upload, check the file server first:
+  - is it running
+  - is `fileserver.url` correct
+  - do `fileserver.client.name` and `fileserver.client.secret` match the file server
+
+## Useful Paths
+
+- [`frontend/src/pages/CreateEventPage.jsx`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/CreateEventPage.jsx:1)
+- [`frontend/src/pages/ManageEvents.jsx`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/ManageEvents.jsx:1)
+- [`frontend/src/api/axiosInstance.js`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/api/axiosInstance.js:1)
+- [`ems_server/src/main/java/com/project/ems_server/service/FileServerService.java`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/service/FileServerService.java:1)
+- [`ems_server/src/main/java/com/project/ems_server/controller/FileController.java`](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/controller/FileController.java:1)
+
+## Current Status
+
+The backend is now set to use the file server only for image storage. The local fallback was removed, but the multipart upload fix remains in place.
