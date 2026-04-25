@@ -216,23 +216,28 @@ export default function CreateEventPage() {
   return (
     <StudentLayout user={user}>
       <header className="mb-12">
-        <h1 className="text-4xl font-bold text-on-surface mb-2 serif-heading">{isEditMode ? 'Edit Pending Event' : 'Create New Event'}</h1>
-        <p className="text-on-surface-variant max-w-2xl">
-          {isEditMode ? 'Update the event details before faculty review.' : 'Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.'}
+        <h1 className="font-headline text-4xl font-bold text-on-surface tracking-tight mb-2">
+          {isEditMode ? 'Edit Pending Event' : 'Create New Event'}
+        </h1>
+        <p className="font-body text-on-surface-variant max-w-2xl">
+          {isEditMode 
+            ? 'Update the event details before faculty review.' 
+            : 'Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.'}
         </p>
       </header>
       
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="flex-1 space-y-12">
-          <section className="bg-surface-container-lowest p-8 rounded-xl shadow-2xl shadow-primary/5">
+          <section className="bg-surface-container-lowest p-8 rounded-xl shadow-[0_24px_40px_rgba(0,128,128,0.04)]">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
             
+              {/* Section 1: Identity */}
               <div className="grid grid-cols-1 gap-8">
                 <div className="relative">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Title</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Title</label>
                   <input 
                     {...register('title')} 
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-lg font-bold placeholder:opacity-30 rounded-t-lg" 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-lg font-headline placeholder:opacity-30" 
                     placeholder="e.g., Annual Symposium on Digital Ethics" 
                     type="text"
                   />
@@ -240,25 +245,23 @@ export default function CreateEventPage() {
                 </div>
                 
                 <div className="relative">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Description</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Description</label>
                   <textarea 
                     {...register('description')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 resize-none placeholder:opacity-30 rounded-t-lg" 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 resize-none placeholder:opacity-30" 
                     placeholder="Describe the purpose, target audience, and key highlights..." 
                     rows="4"
                   />
                   {errors.description && <p className="text-error text-xs mt-1 font-bold">{errors.description.message}</p>}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-8">
                 <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Image</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Image</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    className="w-full bg-surface-container-high border-0 focus:ring-0 rounded-t-lg text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl"
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-2 text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl file:mr-4 file:cursor-pointer hover:file:bg-primary-container/30"
                   />
                   {imageError && (
                     <p className="text-error text-xs mt-2 font-bold">{imageError}</p>
@@ -267,19 +270,20 @@ export default function CreateEventPage() {
                     <img
                       src={imagePreview}
                       alt="Event preview"
-                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10"
+                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10 shadow-sm"
                     />
                   )}
                 </div>
               </div>
 
+              {/* Section 2: Classification */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Category</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Category</label>
                   <select 
                     {...register('categoryId')}
                     disabled={categoriesLoading}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
                   >
                     <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
                     {categories.map(cat => (
@@ -291,11 +295,11 @@ export default function CreateEventPage() {
                 
                 {subCategories.length > 0 ? (
                   <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Sub-Category</label>
+                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Sub-Category</label>
                     <select 
                       {...register('subCategoryId')}
                       disabled={subCategoriesLoading}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
                     >
                       <option value="">{subCategoriesLoading ? 'Loading...' : 'Select Sub-Category'}</option>
                       {subCategories.map(sub => (
@@ -305,10 +309,10 @@ export default function CreateEventPage() {
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
+                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
                     <select 
                       {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
                     >
                       <option value="">Select Event Type</option>
                       <option value="CULTURAL">Cultural</option>
@@ -325,10 +329,10 @@ export default function CreateEventPage() {
               {subCategories.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
+                    <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Type</label>
                     <select 
                       {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
+                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
                     >
                       <option value="">Select Event Type</option>
                       <option value="CULTURAL">Cultural</option>
@@ -343,50 +347,52 @@ export default function CreateEventPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Section 3: Logistics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Venue</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Venue</label>
                   <input 
                     {...register('venue')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
                     placeholder="Enter Venue Name"
                   />
                   {errors.venue && <p className="text-error text-xs mt-1 font-bold">{errors.venue.message}</p>}
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Start Date & Time</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Start Date & Time</label>
                   <input 
                     {...register('startTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
                     type="datetime-local"
                   />
                   {errors.startTime && <p className="text-error text-xs mt-1 font-bold">{errors.startTime.message}</p>}
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">End Date & Time</label>
+                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">End Date & Time</label>
                   <input 
                     {...register('endTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
+                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
                     type="datetime-local"
                   />
                   {errors.endTime && <p className="text-error text-xs mt-1 font-bold">{errors.endTime.message}</p>}
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex items-center justify-end gap-6 pt-6">
                 <button 
                   type="button"
                   onClick={() => navigate('/student')}
-                  className="px-8 py-4 text-on-surface-variant font-bold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
+                  className="px-8 py-4 text-on-surface-variant font-semibold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
                   disabled={isSubmitting || loading}
-                  className="px-10 py-4 academic-gradient text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
+                  className="px-10 py-4 bg-gradient-to-br from-[#006565] to-[#008080] text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
                 >
                   {isSubmitting || loading ? 'Submitting...' : (isEditMode ? 'Update Request' : 'Submit Request')}
                 </button>
@@ -395,13 +401,14 @@ export default function CreateEventPage() {
           </section>
         </div>
 
+        {/* Sidebar Guidelines */}
         <aside className="w-full lg:w-80 space-y-8">
           <div className="bg-surface-container-low p-8 rounded-xl border-l-4 border-tertiary">
-            <h3 className="text-xl font-bold mb-4 text-primary serif-heading">Submission Guidelines</h3>
+            <h3 className="font-headline text-xl font-bold mb-4 text-primary">Submission Guidelines</h3>
             <ul className="space-y-6">
               <li className="flex gap-4">
                 <span className="material-symbols-outlined text-tertiary shrink-0">info</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Ensure all event venues are booked at least <strong className="text-on-surface">2 weeks</strong> in advance.</p>
+                <p className="text-sm text-on-surface-variant leading-relaxed">Ensure all event venues are booked at least <strong>2 weeks</strong> in advance.</p>
               </li>
               <li className="flex gap-4">
                 <span className="material-symbols-outlined text-tertiary shrink-0">verified_user</span>
@@ -409,23 +416,25 @@ export default function CreateEventPage() {
               </li>
               <li className="flex gap-4">
                 <span className="material-symbols-outlined text-tertiary shrink-0">group</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Events exceeding <strong className="text-on-surface">200 attendees</strong> require security clearance.</p>
+                <p className="text-sm text-on-surface-variant leading-relaxed">Events exceeding <strong>200 attendees</strong> require security clearance.</p>
               </li>
             </ul>
           </div>
           
-          <div className="relative overflow-hidden group rounded-xl aspect-4/5">
+          {/* Quick Context Card */}
+          <div className="relative overflow-hidden group rounded-xl aspect-[4/5]">
             <img 
               alt="Academic Campus" 
               className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCokpOP5O0X7kVdS3rFhFSjWwQZNGmfy4v2Y7WrNufEG2FBoLo0nffJONmtdImpO6PJw1nHX2DucAqVTvZzUOtY-0Yfe-B-T7a3cB_uTWnfqmCuG76NvijQ7II8cNpeRzSsN6nzhHrQvGffDLdRPLYaRR2-fA7GRHwNqrCR1bb3sG9_PwywyRbVB8RvbkrlZ898XAmHIlbuetffdkqiQKgLzo--WUoIsOU4Roe5-HXoWyc81R45uxV0F4iKLcWv5hY0MTiGqwGEawc"
             />
-            <div className="absolute inset-0 bg-linear-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
-              <h4 className="text-white text-lg font-bold mb-1 serif-heading">Tradition of Excellence</h4>
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
+              <h4 className="font-headline text-white text-lg font-bold mb-1">Tradition of Excellence</h4>
               <p className="text-white/80 text-xs">Curating events that define our academic legacy.</p>
             </div>
           </div>
           
+          {/* Tooltip Area */}
           <div className="p-4 bg-primary-container/10 border border-primary-container/20 rounded-lg">
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-primary text-sm mt-0.5">lightbulb</span>
