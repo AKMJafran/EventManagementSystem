@@ -14,6 +14,7 @@ import MyEventsPage from './pages/MyEventsPage';
 import AdminDashboard from './pages/AdminDashboard';
 import CalendarPage from './pages/CalendarPage';
 import MonthlyReportPage from './pages/MonthlyReportPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import ManageStudents from './pages/ManageStudents';
 import ManageVenues from './pages/ManageVenues';
 import LandingPage from './pages/LandingPage';
@@ -64,6 +65,7 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/calendar" element={<CalendarPage />} />
         <Route path="/admin/reports/monthly" element={<MonthlyReportPage />} />
+        <Route path="/admin/reports/analytics" element={<AnalyticsPage />} />
         <Route path="/manage-categories" element={<ManageCategories />} />
         <Route path="/manage-events" element={<ManageEvents />} />
         <Route path="/manage-students" element={<ManageStudents />} />

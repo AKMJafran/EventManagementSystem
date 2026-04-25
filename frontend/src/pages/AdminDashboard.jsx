@@ -7,6 +7,12 @@ import EventImage from '../components/EventImage';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, conflicts: 0 });
+  const [reportStats, setReportStats] = useState({
+    approvalRate: 0,
+    upcoming: 0,
+    completed: 0,
+    registrations: 0,
+  });
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,8 +25,21 @@ export default function AdminDashboard() {
         const pendingEvents = allEvents.filter(e => e.status === 'PENDING');
         
         const conflictsRes = await axiosInstance.get('/events/admin/conflicts').catch(() => ({ data: [] }));
+
+        const today = new Date();
+        const from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+        const to = today.toISOString().slice(0, 10);
+        const analyticsRes = await axiosInstance.get('/events/reports/analytics', {
+          params: { from, to },
+        }).catch(() => ({ data: {} }));
         
         setStats({ total, pending: pendingEvents.length, conflicts: conflictsRes.data?.length || 0 });
+        setReportStats({
+          approvalRate: analyticsRes.data?.approvalRate || 0,
+          upcoming: analyticsRes.data?.upcomingEvents || 0,
+          completed: analyticsRes.data?.completedEvents || 0,
+          registrations: analyticsRes.data?.totalRegistrations || 0,
+        });
         setPendingApprovals(pendingEvents);
       } catch (e) {
         toast.error('Failed to load admin stats');
@@ -84,9 +103,27 @@ export default function AdminDashboard() {
         <div className="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between group hover:bg-secondary transition-all duration-300 shadow-sm border border-outline-variant/10">
           <span className="material-symbols-outlined text-secondary group-hover:text-white text-3xl mb-4">leaderboard</span>
           <div>
-            <p className="text-4xl font-bold group-hover:text-white">82%</p>
-            <p className="text-sm font-medium text-on-surface-variant group-hover:text-secondary-fixed tracking-wide">Venue Utilization</p>
+            <p className="text-4xl font-bold group-hover:text-white">{reportStats.approvalRate}%</p>
+            <p className="text-sm font-medium text-on-surface-variant group-hover:text-secondary-fixed tracking-wide">Approval Rate (Month)</p>
           </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
+          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Upcoming Events</p>
+          <p className="text-3xl font-bold text-teal-900">{reportStats.upcoming}</p>
+          <p className="text-sm text-on-surface-variant mt-2">Approved events scheduled ahead.</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
+          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Completed Events</p>
+          <p className="text-3xl font-bold text-teal-900">{reportStats.completed}</p>
+          <p className="text-sm text-on-surface-variant mt-2">Approved events that already finished.</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
+          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Registrations</p>
+          <p className="text-3xl font-bold text-teal-900">{reportStats.registrations}</p>
+          <p className="text-sm text-on-surface-variant mt-2">Participation proxy for this month.</p>
         </div>
       </section>
 
@@ -137,7 +174,7 @@ export default function AdminDashboard() {
           {/* Quick Actions Layout */}
           <div className="pt-8">
             <h3 className="text-xl font-bold serif-heading mb-6">Administrative Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Link to="/manage-categories" className="flex items-center gap-4 p-6 bg-white border border-outline-variant/10 rounded-xl hover:shadow-xl hover:shadow-primary/5 transition-all text-left">
                 <div className="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary">category</span>
@@ -154,6 +191,15 @@ export default function AdminDashboard() {
                 <div>
                   <p className="font-bold">Generate Reports</p>
                   <p className="text-xs text-on-surface-variant">Monthly utilization & engagement</p>
+                </div>
+              </Link>
+              <Link to="/admin/reports/analytics" className="flex items-center gap-4 p-6 bg-white border border-outline-variant/10 rounded-xl hover:shadow-xl hover:shadow-primary/5 transition-all text-left">
+                <div className="w-12 h-12 rounded-full bg-primary-fixed-dim flex items-center justify-center">
+                  <span className="material-symbols-outlined text-primary">query_stats</span>
+                </div>
+                <div>
+                  <p className="font-bold">Analytics Hub</p>
+                  <p className="text-xs text-on-surface-variant">Range analytics and drill-down exports</p>
                 </div>
               </Link>
             </div>
@@ -224,7 +270,7 @@ export default function AdminDashboard() {
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQPupxUnyGvXxMtbSGsPk-6TixkAN5pQxdZBGGy1TsSeazi6G9BayZHEdydTq41ZZpJ0qDGLGNunabob74sPyi6FdoLfYw0f2GUFaH8fK8rdfMKpjuvS-7jypog1_Rjrc_cuSHXT1YD65G7Qim8x8wj9mAm7KFlaG6gHjSFAvLTnGsu6UCLfs_pHAZkFLeqLYnAuWNci5FvsprERp52XRhprGsZZe9wZjuA2lOdmf8j3ZH5rini0R3SsXWc58lOH9QauOhtk5us9UR"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-teal-900/90 to-transparent p-6 flex flex-col justify-end">
+            <div className="absolute inset-0 bg-linear-to-t from-teal-900/90 to-transparent p-6 flex flex-col justify-end">
               <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Venue Highlight</p>
               <h4 className="text-white font-bold text-lg">Main Auditorium</h4>
               <p className="text-white/80 text-xs">Currently: Open for Bookings</p>
