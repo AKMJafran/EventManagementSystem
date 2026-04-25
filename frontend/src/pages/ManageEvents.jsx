@@ -305,6 +305,14 @@ export default function ManageEvents() {
                           <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>cancel</span>
                         </button>
                         <button
+                          disabled={event.status !== 'PENDING'}
+                          onClick={() => navigate(`/admin/edit-event/${event.id}`)}
+                          className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-colors disabled:cursor-not-allowed"
+                          title="Edit"
+                        >
+                          <span className="material-symbols-outlined">edit</span>
+                        </button>
+                        <button
                           onClick={() => navigate(`/events/${event.id}`)}
                           className="p-2 rounded-lg text-outline hover:bg-surface-container-high transition-colors"
                           title="View details"
@@ -383,7 +391,7 @@ export default function ManageEvents() {
       {/* Floating Action Button */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-4 z-50">
         <button 
-          onClick={() => navigate('/create-event')}
+          onClick={() => navigate('/admin/create-event')}
           className="editorial-gradient h-16 w-16 rounded-full flex items-center justify-center text-white shadow-2xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all group"
         >
           <span className="material-symbols-outlined text-3xl">add</span>
