@@ -16,6 +16,22 @@ import java.util.stream.Collectors;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(FileServerException.class)
+    public ResponseEntity<ErrorResponse> handleFileServerException(FileServerException ex, WebRequest request) {
+        HttpStatus status = ex.getStatus() != null ? ex.getStatus() : HttpStatus.BAD_GATEWAY;
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .message(ex.getMessage())
+                .details(ex.getDetails())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(errorResponse, status);
+    }
+
     /**
      * Handle validation errors
      */
@@ -106,6 +122,7 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error("Internal Server Error")
                 .message("An unexpected error occurred. Please try again later.")
+            .details(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
 

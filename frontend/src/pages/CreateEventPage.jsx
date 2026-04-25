@@ -180,8 +180,9 @@ export default function CreateEventPage() {
           toast.error(
             serverData?.error
               ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
-              : 'Failed to upload image. Event will be saved without a new upload.'
+              : 'Failed to upload image. Event creation was stopped.'
           );
+          return;
         }
       }
 
