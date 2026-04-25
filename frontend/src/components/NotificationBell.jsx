@@ -226,13 +226,13 @@ export default function NotificationBell() {
 
       {selectedNotification && (
         <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-5 border-b flex items-start justify-between gap-4">
+          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">
                   {selectedNotification.type?.replace('_', ' ') || 'Notification'}
                 </p>
-                <h2 className="text-2xl font-serif font-bold text-slate-900 mt-2">
+                <h2 className="text-3xl font-serif font-bold text-slate-900 mt-2">
                   {selectedNotification.title || 'Notification'}
                 </h2>
               </div>
@@ -245,17 +245,27 @@ export default function NotificationBell() {
               </button>
             </div>
 
-            <div className="px-6 py-6 space-y-5">
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>{new Date(selectedNotification.createdAt).toLocaleString()}</span>
-                <span className={`px-2.5 py-1 rounded-full font-semibold ${selectedNotification.isRead ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'}`}>
-                  {selectedNotification.isRead ? 'Read' : 'New'}
-                </span>
+            <div className="px-6 py-6 space-y-5 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <p className="text-slate-500">Sender / Source</p>
+                  <p className="font-semibold text-slate-900 mt-1">System Administrator</p>
+                  <p className="text-slate-600">Automated Notification</p>
+                  <p className="text-xs text-slate-400 mt-1">SYSTEM GENERATED</p>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <p className="text-slate-500">Delivery State</p>
+                  <p className="font-semibold text-slate-900 mt-1">{selectedNotification.isRead ? 'Read' : 'New'}</p>
+                  <p className="text-slate-600">{new Date(selectedNotification.createdAt).toLocaleString()}</p>
+                </div>
               </div>
 
-              <p className="text-slate-700 leading-7 whitespace-pre-wrap">
-                {selectedNotification.message}
-              </p>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-2">Full Message</p>
+                <p className="text-slate-700 leading-7 whitespace-pre-wrap">
+                  {selectedNotification.message}
+                </p>
+              </div>
             </div>
           </div>
         </div>
