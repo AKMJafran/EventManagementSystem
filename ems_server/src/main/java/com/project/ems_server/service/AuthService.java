@@ -6,10 +6,12 @@ import com.project.ems_server.dto.request.ResetPasswordRequest;
 import com.project.ems_server.dto.request.VerifyOtpRequest;
 import com.project.ems_server.dto.response.AuthResponse;
 import com.project.ems_server.entity.RefreshToken;
+import com.project.ems_server.entity.StudentProfile;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.OtpType;
 import com.project.ems_server.enums.Role;
 import com.project.ems_server.repository.RefreshTokenRepository;
+import com.project.ems_server.repository.StudentProfileRepository;
 import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,12 +20,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final StudentProfileRepository studentProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OtpService otpService;
     private final EmailService emailService;
@@ -36,26 +40,42 @@ public class AuthService {
      * Registers a new user with isVerified=false and sends OTP email
      */
     public void register(RegisterRequest registerRequest) {
+        String normalizedStudentNumber = registerRequest.getStudentNumber().trim();
+        String normalizedEmail = registerRequest.getEmail().trim().toLowerCase(Locale.ROOT);
+
         // Check if user already exists
-        if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
-            throw new RuntimeException("User already exists with email: " + registerRequest.getEmail());
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
+            throw new RuntimeException("Invalid registration: email is already in use.");
+        }
+
+        StudentProfile studentProfile = studentProfileRepository.findByStudentNumber(normalizedStudentNumber)
+                .orElseThrow(() -> new RuntimeException("Invalid registration: student number is not pre-approved."));
+
+        if (!studentProfile.getOfficialEmail().equalsIgnoreCase(normalizedEmail)) {
+            throw new RuntimeException("Invalid registration: email does not match official university email.");
+        }
+
+        if (Boolean.TRUE.equals(studentProfile.getIsRegistered())) {
+            throw new RuntimeException("Invalid registration: this student number is already registered.");
         }
 
         // Create new user
         User user = User.builder()
                 .name(registerRequest.getName())
-                .email(registerRequest.getEmail())
+                .email(normalizedEmail)
                 .password(passwordEncoder.encode(registerRequest.getPassword()))
                 .role(Role.STUDENT)
                 .isVerified(false)
                 .build();
 
         userRepository.save(user);
+        studentProfile.setIsRegistered(true);
+        studentProfileRepository.save(studentProfile);
 
         // Generate and send OTP
         String otp = otpService.generateOtp();
-        otpService.saveOtp(registerRequest.getEmail(), otp, OtpType.REGISTER);
-        emailService.sendOtpEmail(registerRequest.getEmail(), otp);
+        otpService.saveOtp(normalizedEmail, otp, OtpType.REGISTER);
+        emailService.sendOtpEmail(normalizedEmail, otp);
     }
 
     /**
