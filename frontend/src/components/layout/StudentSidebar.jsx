@@ -7,8 +7,8 @@ export default function StudentSidebar() {
   const logout = useAuthStore((s) => s.logout);
 
   const links = [
-    { to: "/student", icon: "dashboard", label: "Dashboard" },
-    { to: "/student/my-events", icon: "event_note", label: "Event Requests" },
+    { to: "/student/dashboard", icon: "dashboard", label: "Dashboard" },
+    { to: "/student/my-events", icon: "event_note", label: "My Events" },
     { to: "/student/calendar", icon: "meeting_room", label: "Venue Booking" },
     { to: "/student/clubs", icon: "account_balance", label: "Clubs" },
   ];
@@ -33,7 +33,7 @@ export default function StudentSidebar() {
             className="w-full flex items-center justify-center gap-2 py-3 academic-gradient text-white rounded-lg shadow-lg shadow-primary/20 hover:opacity-90 transition-all font-medium text-sm"
           >
             <span className="material-symbols-outlined text-sm">add_circle</span>
-            <span>Create New Request</span>
+            <span>Create Event</span>
           </Link>
         </div>
 

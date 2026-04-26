@@ -56,8 +56,8 @@ export default function AdminSidebar() {
           to="/admin/create-event"
           className="w-full btn-gradient text-on-primary py-3 px-4 rounded-lg font-semibold mb-6 shadow-xl shadow-primary/20 flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
         >
-          <span className="material-symbols-outlined text-sm">add</span>
-          Create New Event
+          <span className="material-symbols-outlined text-sm">event</span>
+          Create Event
         </Link>
         <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-400/40 dark:hover:bg-zinc-600/50 transition-all rounded-lg">
           <span className="material-symbols-outlined text-lg">logout</span>

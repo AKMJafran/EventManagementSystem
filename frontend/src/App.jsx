@@ -8,8 +8,11 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import StudentDashboard from './pages/StudentDashboard';
 import CreateEventPage from './pages/CreateEventPage';
+import EditEventPage from './pages/EditEventPage';
 import MyEventsPage from './pages/MyEventsPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminCreateEventPage from './pages/AdminCreateEventPage';
+import AdminEditEventPage from './pages/AdminEditEventPage';
 import CalendarPage from './pages/CalendarPage';
 import MonthlyReportPage from './pages/MonthlyReportPage';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -23,8 +26,11 @@ import ConflictsPage from './pages/ConflictsPage';
 import NotificationManagerPage from './pages/NotificationManagerPage';
 import EventDetailsPage from './pages/EventDetailsPage';
 import LecturerDashboard from './pages/LecturerDashboard';
+import LecturerCreateEventPage from './pages/LecturerCreateEventPage';
+import LecturerEditEventPage from './pages/LecturerEditEventPage';
 import LecturerEventsPage from './pages/LecturerEventsPage';
 import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
+import LecturerMyEventsPage from './pages/LecturerMyEventsPage';
 import LecturerPendingApprovalsPage from './pages/LecturerPendingApprovalsPage';
 import LecturerProfilePage from './pages/LecturerProfilePage';
 import StudentClubsPage from './pages/StudentClubsPage';
@@ -46,7 +52,7 @@ const Home = () => {
 };
 
 function App() {
-  const { loadFromStorage, authLoaded, user } = useAuthStore();
+  const { loadFromStorage, authLoaded } = useAuthStore();
 
   useEffect(() => {
     loadFromStorage();
@@ -64,17 +70,13 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/change-password" element={<ChangePasswordPage />} />
-        <Route
-          path="/create-event"
-          element={<Navigate to={user?.role === 'ADMIN' ? '/admin/create-event' : '/student/create-event'} replace />}
-        />
         <Route path="/events/:id" element={<EventDetailsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="STUDENT" />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/create-event" element={<CreateEventPage />} />
-        <Route path="/student/edit-event/:id" element={<CreateEventPage />} />
+        <Route path="/student/edit-event/:id" element={<EditEventPage />} />
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
         <Route path="/student/clubs" element={<StudentClubsPage />} />
@@ -91,16 +93,19 @@ function App() {
         <Route path="/manage-students" element={<ManageStudents />} />
         <Route path="/manage-lecturers" element={<ManageLecturers />} />
         <Route path="/manage-venues" element={<ManageVenues />} />
-        <Route path="/admin/create-event" element={<CreateEventPage />} />
-        <Route path="/admin/edit-event/:id" element={<CreateEventPage />} />
+        <Route path="/admin/create-event" element={<AdminCreateEventPage />} />
+        <Route path="/admin/edit-event/:id" element={<AdminEditEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
         <Route path="/admin/notifications" element={<NotificationManagerPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="LECTURER" />}>
         <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
+        <Route path="/lecturer/create-event" element={<LecturerCreateEventPage />} />
+        <Route path="/lecturer/edit-event/:id" element={<LecturerEditEventPage />} />
         <Route path="/lecturer/events" element={<LecturerEventsPage />} />
         <Route path="/lecturer/my-clubs" element={<LecturerMyClubsPage />} />
+        <Route path="/lecturer/my-events" element={<LecturerMyEventsPage />} />
         <Route path="/lecturer/pending-approvals" element={<LecturerPendingApprovalsPage />} />
         <Route path="/lecturer/calendar" element={<CalendarPage />} />
         <Route path="/lecturer/profile" element={<LecturerProfilePage />} />

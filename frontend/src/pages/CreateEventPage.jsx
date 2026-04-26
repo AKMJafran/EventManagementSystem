@@ -1,519 +1,326 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useNavigate, useParams } from 'react-router-dom';
-import axiosInstance from '../api/axiosInstance';
-import useAuthStore from '../context/AuthContext';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
+import EventFormShell from '../components/events/EventFormShell';
+import {
+  clubEventSchema,
+  individualEventSchema,
+} from '../components/events/eventFormShared';
+import { createEvent as createEventRequest } from '../api/eventApi';
+import { getMyClub } from '../api/clubApi';
+import useAuthStore from '../context/AuthContext';
 
-const schema = z.object({
-  title: z.string().min(2, 'Title required'),
-  description: z.string().min(5, 'Description required'),
-  categoryId: z.string().min(1, 'Category required'),
-  subCategoryId: z.string().optional(),
-  venue: z.string().min(2, 'Venue required'),
-  startTime: z.string(),
-  endTime: z.string(),
-  imageId: z.string().optional(),
-});
+function OrganizerTypeCard({
+  icon,
+  title,
+  description,
+  steps,
+  buttonLabel,
+  accentClass,
+  accentSoftClass,
+  onClick,
+  loading = false,
+}) {
+  return (
+    <article
+      className={`flex h-full flex-col rounded-[2rem] border bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl ${accentClass}`}
+    >
+      <div className={`inline-flex h-16 w-16 items-center justify-center rounded-2xl text-3xl ${accentSoftClass}`}>
+        <span>{icon}</span>
+      </div>
+      <h2 className="mt-5 text-2xl font-bold text-slate-900">{title}</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+
+      <div className="mt-6 flex-1 rounded-2xl bg-slate-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Approval</p>
+        <ol className="mt-3 space-y-2 text-sm text-slate-700">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+
+      <button
+        className="mt-6 inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={loading}
+        onClick={onClick}
+        type="button"
+      >
+        {loading ? 'Checking club status...' : buttonLabel}
+      </button>
+    </article>
+  );
+}
 
 export default function CreateEventPage() {
-  const { user } = useAuthStore();
   const navigate = useNavigate();
-  const { id } = useParams();
-  const isEditMode = Boolean(id);
-  const [categories, setCategories] = useState([]);
-  const [subCategories, setSubCategories] = useState([]);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [existingImageId, setExistingImageId] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageError, setImageError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
-  const [eventToEdit, setEventToEdit] = useState(null);
+  const { user } = useAuthStore();
+  const [organizerType, setOrganizerType] = useState('');
+  const [checkingClub, setCheckingClub] = useState(false);
+  const [clubData, setClubData] = useState(null);
+  const [clubWarning, setClubWarning] = useState(null);
 
-  const normalizeCategories = (items) => {
-    return items.map((item) => ({
-      ...item,
-      name: item.name || item.categoryName || item.label || `Category ${item.id}`,
-    }));
-  };
+  async function handleClubSelection() {
+    setCheckingClub(true);
+    setClubWarning(null);
 
-  const toDateTimeLocalValue = (dateString) => {
-    if (!dateString) return '';
-    const normalized = dateString.replace(' ', 'T');
-    const date = new Date(normalized);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-    const timezoneOffsetMs = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
-  };
+    try {
+      const response = await getMyClub();
+      const club = response.data;
 
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('');
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Please select a valid image file.');
-      toast.error('Please select an image file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Image size must be 5MB or less.');
-      toast.error('File size should not exceed 5MB.');
-      return;
-    }
-
-    setImageError('');
-    setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result?.toString() || null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const { register, handleSubmit, watch, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm({
-    resolver: zodResolver(schema),
-  });
-
-  const selectedCategory = watch('categoryId');
-
-  const loadSubCategories = async (parentId) => {
-    if (!parentId) {
-      return [];
-    }
-
-    const res = await axiosInstance.get(`/categories/${parentId}/sub`);
-    return normalizeCategories(res.data);
-  };
-
-  const resolveCategorySelection = async (categoryId, parentCategories) => {
-    const normalizedCategoryId = categoryId?.toString();
-    if (!normalizedCategoryId) {
-      return { categoryId: '', subCategoryId: '', subCategories: [] };
-    }
-
-    const matchingParent = parentCategories.find(
-      (category) => category.id?.toString() === normalizedCategoryId
-    );
-
-    if (matchingParent) {
-      return {
-        categoryId: normalizedCategoryId,
-        subCategoryId: '',
-        subCategories: await loadSubCategories(normalizedCategoryId),
-      };
-    }
-
-    for (const parentCategory of parentCategories) {
-      const nestedSubCategories = await loadSubCategories(parentCategory.id);
-      const matchingSubCategory = nestedSubCategories.find(
-        (subCategory) => subCategory.id?.toString() === normalizedCategoryId
-      );
-
-      if (matchingSubCategory) {
-        return {
-          categoryId: parentCategory.id?.toString() || '',
-          subCategoryId: normalizedCategoryId,
-          subCategories: nestedSubCategories,
-        };
-      }
-    }
-
-    return { categoryId: normalizedCategoryId, subCategoryId: '', subCategories: [] };
-  };
-
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await axiosInstance.get('/categories');
-        setCategories(normalizeCategories(res.data));
-      } catch (e) {
-        toast.error('Failed to load categories');
-        console.error(e);
-      } finally {
-        setCategoriesLoading(false);
-      }
-    }
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchEvent = async () => {
-      try {
-        const res = await axiosInstance.get(`/events/${id}`);
-        setEventToEdit(res.data);
-      } catch (e) {
-        toast.error('Failed to load event for editing');
-        console.error(e);
-      }
-    };
-
-    fetchEvent();
-  }, [id]);
-
-  useEffect(() => {
-    if (!isEditMode || !eventToEdit || categoriesLoading) return;
-
-    let cancelled = false;
-
-    async function initializeEditForm() {
-      try {
-        const selection = await resolveCategorySelection(eventToEdit.categoryId, categories);
-
-        if (cancelled) return;
-
-        setSubCategories(selection.subCategories);
-        reset({
-          title: eventToEdit.title || '',
-          description: eventToEdit.description || '',
-          categoryId: selection.categoryId,
-          subCategoryId: selection.subCategoryId,
-          venue: eventToEdit.venue || '',
-          startTime: toDateTimeLocalValue(eventToEdit.startTime),
-          endTime: toDateTimeLocalValue(eventToEdit.endTime),
-          imageId: eventToEdit.imageId || '',
+      if (club?.status !== 'ACTIVE') {
+        setOrganizerType('');
+        setClubData(null);
+        setClubWarning({
+          status: club?.status || 'NOT_REGISTERED',
+          clubName: club?.name || '',
         });
-
-        setExistingImageId(eventToEdit.imageId || null);
-        setSelectedImage(null);
-        setImagePreview(eventToEdit.imageUrl || null);
-      } catch (e) {
-        if (!cancelled) {
-          toast.error('Failed to resolve event categories');
-          console.error(e);
-        }
-      }
-    }
-
-    initializeEditForm();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isEditMode, eventToEdit, categoriesLoading, categories, reset]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchSubCategories() {
-      if (!selectedCategory) {
-        setSubCategories([]);
-        setSubCategoriesLoading(false);
-        setValue('subCategoryId', '');
         return;
       }
 
-      setSubCategoriesLoading(true);
-
-      try {
-        const normalizedSubCategories = await loadSubCategories(selectedCategory);
-        if (cancelled) return;
-
-        setSubCategories(normalizedSubCategories);
-
-        const selectedSubCategory = getValues('subCategoryId');
-        const hasSelectedSubCategory = normalizedSubCategories.some(
-          (subCategory) => subCategory.id?.toString() === selectedSubCategory
-        );
-
-        if (!hasSelectedSubCategory) {
-          setValue('subCategoryId', '');
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setSubCategories([]);
-          setValue('subCategoryId', '');
-          toast.error('Failed to load sub-categories');
-          console.error(e);
-        }
-      } finally {
-        if (!cancelled) {
-          setSubCategoriesLoading(false);
-        }
-      }
-    }
-
-    fetchSubCategories();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCategory, getValues, setValue]);
-
-  const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      let imageId = existingImageId;
-      
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('file', selectedImage);
-        
-        try {
-          const uploadRes = await axiosInstance.post('/files/upload', formData);
-          imageId = uploadRes.data.fileId;
-        } catch (uploadError) {
-          const status = uploadError?.response?.status;
-          const serverData = uploadError?.response?.data;
-          const isTimeout = uploadError?.code === 'ECONNABORTED';
-          console.error('Image upload failed', { status, serverData, uploadError });
-          toast.error(
-            isTimeout
-              ? 'Image upload is taking too long. Please try again in a moment.'
-              :
-            serverData?.error
-              ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
-              : 'Failed to upload image. Event creation was stopped.'
-          );
-          return;
-        }
-      }
-
-      const payload = {
-        title: data.title,
-        description: data.description,
-        categoryId: data.subCategoryId || data.categoryId,
-        venue: data.venue,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        imageId: imageId,
-      };
-
-      if (isEditMode) {
-        await axiosInstance.put(`/events/${id}`, payload);
-        toast.success('Event updated successfully!');
+      setClubData(club);
+      setOrganizerType('CLUB_EVENT');
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        setClubWarning({ status: 'NOT_REGISTERED', clubName: '' });
       } else {
-        await axiosInstance.post('/events', payload);
-        toast.success('Event created successfully!');
+        toast.error(error?.response?.data?.message || 'Failed to load your club details.');
+        console.error(error);
       }
-      navigate('/student/my-events');
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to create event');
-      console.error(e);
     } finally {
-      setLoading(false);
+      setCheckingClub(false);
     }
-  };
+  }
+
+  async function submitStudentEvent(payload) {
+    return createEventRequest({
+      title: payload.title,
+      description: payload.description,
+      categoryId: payload.categoryId,
+      subCategoryId: payload.subCategoryId || null,
+      eventType: payload.eventType,
+      venue: payload.venue,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      organizerType,
+      clubId: organizerType === 'CLUB_EVENT' ? clubData?.id || null : null,
+      isMultiDay: payload.isMultiDay,
+      isPublic: payload.isPublic,
+      imageId: payload.imageId || null,
+    });
+  }
+
+  async function handleSuccess() {
+    toast.success(
+      organizerType === 'CLUB_EVENT'
+        ? 'Event submitted successfully! Your event is pending Senior Treasurer approval.'
+        : 'Event submitted successfully! Your event is pending Dean approval.'
+    );
+    navigate('/student/my-events');
+  }
+
+  const organizerHeader =
+    organizerType === 'CLUB_EVENT' ? (
+      <section className="rounded-[2rem] border border-purple-200 bg-purple-50 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-white px-4 py-2 text-sm font-semibold text-purple-800">
+              <span>🏛️</span>
+              Club Event
+            </div>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-purple-100">
+              <span className="text-slate-500">Under:</span>
+              <span>{clubData?.name || 'Active Club'}</span>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">
+              This event requires Treasurer then Dean approval.
+            </p>
+          </div>
+          <button
+            className="text-sm font-semibold text-purple-700 transition hover:text-purple-900"
+            onClick={() => {
+              setOrganizerType('');
+              setClubData(null);
+              setClubWarning(null);
+            }}
+            type="button"
+          >
+            ← Change Type
+          </button>
+        </div>
+      </section>
+    ) : (
+      <section className="rounded-[2rem] border border-sky-200 bg-sky-50 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-800">
+              <span>👤</span>
+              Personal Event
+            </div>
+            <p className="mt-4 text-sm text-slate-600">This event will go to the Dean for approval.</p>
+          </div>
+          <button
+            className="text-sm font-semibold text-sky-700 transition hover:text-sky-900"
+            onClick={() => {
+              setOrganizerType('');
+              setClubWarning(null);
+            }}
+            type="button"
+          >
+            ← Change Type
+          </button>
+        </div>
+      </section>
+    );
+
+  const approvalContent =
+    organizerType === 'CLUB_EVENT' ? (
+      <section className="rounded-[1.75rem] bg-purple-50 p-5 ring-1 ring-purple-100">
+        <h3 className="text-base font-semibold text-purple-900">📋 After you submit</h3>
+        <ol className="mt-3 space-y-2 text-sm text-purple-950/80">
+          <li>1. Your event is submitted for review</li>
+          <li>2. {clubData?.seniorTreasurerLecturerName || 'Senior Treasurer'} reviews and approves</li>
+          <li>3. Dean gives final approval</li>
+          <li>4. You get notified at each step</li>
+          <li>5. If approved, all students are notified</li>
+        </ol>
+      </section>
+    ) : (
+      <section className="rounded-[1.75rem] bg-sky-50 p-5 ring-1 ring-sky-100">
+        <h3 className="text-base font-semibold text-sky-900">📋 After you submit</h3>
+        <ol className="mt-3 space-y-2 text-sm text-sky-950/80">
+          <li>1. Your event is submitted for review</li>
+          <li>2. Dean reviews and approves or rejects</li>
+          <li>3. You get notified by email and notification</li>
+          <li>4. If approved, all students are notified</li>
+        </ol>
+      </section>
+    );
 
   return (
     <StudentLayout user={user}>
-      <header className="mb-12">
-        <h1 className="font-headline text-4xl font-bold text-on-surface tracking-tight mb-2">
-          {isEditMode ? 'Edit Pending Event' : 'Create New Event'}
-        </h1>
-        <p className="font-body text-on-surface-variant max-w-2xl">
-          {isEditMode 
-            ? 'Update the event details before faculty review.' 
-            : 'Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.'}
-        </p>
-      </header>
-      
-      <div className="flex flex-col lg:flex-row gap-12">
-        <div className="flex-1 space-y-12">
-          <section className="bg-surface-container-lowest p-8 rounded-xl shadow-[0_24px_40px_rgba(0,128,128,0.04)]">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-            
-              {/* Section 1: Identity */}
-              <div className="grid grid-cols-1 gap-8">
-                <div className="relative">
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Title</label>
-                  <input 
-                    {...register('title')} 
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-lg font-headline placeholder:opacity-30" 
-                    placeholder="e.g., Annual Symposium on Digital Ethics" 
-                    type="text"
-                  />
-                  {errors.title && <p className="text-error text-xs mt-1 font-bold">{errors.title.message}</p>}
-                </div>
-                
-                <div className="relative">
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Description</label>
-                  <textarea 
-                    {...register('description')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 resize-none placeholder:opacity-30" 
-                    placeholder="Describe the purpose, target audience, and key highlights..." 
-                    rows="4"
-                  />
-                  {errors.description && <p className="text-error text-xs mt-1 font-bold">{errors.description.message}</p>}
-                </div>
+      {!organizerType && !clubWarning && (
+        <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center">
+          <section className="w-full max-w-5xl rounded-[2.5rem] bg-white p-8 shadow-sm ring-1 ring-slate-200 md:p-10">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-teal-700">Create Event</p>
+              <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
+                What type of event are you organizing?
+              </h1>
+              <p className="mt-4 text-base leading-7 text-slate-600">
+                Choose the organizer type first so we can prepare the correct approval flow and event form.
+              </p>
+            </div>
 
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Event Image</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-2 text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl file:mr-4 file:cursor-pointer hover:file:bg-primary-container/30"
-                  />
-                  {imageError && (
-                    <p className="text-error text-xs mt-2 font-bold">{imageError}</p>
-                  )}
-                  {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Event preview"
-                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10 shadow-sm"
-                    />
-                  )}
-                </div>
-              </div>
+            <div className="mt-10 grid gap-6 lg:grid-cols-2">
+              <OrganizerTypeCard
+                accentClass="border-sky-200 hover:border-sky-300"
+                accentSoftClass="bg-sky-100 text-sky-800"
+                buttonLabel="Select This"
+                description="An event you are organizing on your own behalf."
+                icon="👤"
+                onClick={() => {
+                  setClubWarning(null);
+                  setClubData(null);
+                  setOrganizerType('INDIVIDUAL_STUDENT');
+                }}
+                steps={[
+                  '1. Submit',
+                  '2. Dean approves',
+                  '3. Published',
+                ]}
+                title="Personal Event"
+              />
 
-              {/* Section 2: Classification */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Category</label>
-                  <select 
-                    {...register('categoryId')}
-                    disabled={categoriesLoading}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4"
-                  >
-                    <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                  {errors.categoryId && <p className="text-error text-xs mt-1 font-bold">{errors.categoryId.message}</p>}
-                </div>
-
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Sub-Category</label>
-                  <select 
-                    {...register('subCategoryId')}
-                    disabled={!selectedCategory || subCategoriesLoading || subCategories.length === 0}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 disabled:opacity-60"
-                  >
-                    <option value="">
-                      {!selectedCategory
-                        ? 'Select Category First'
-                        : subCategoriesLoading
-                          ? 'Loading...'
-                          : subCategories.length > 0
-                            ? 'Select Sub-Category'
-                            : 'No Sub-Categories Available'}
-                    </option>
-                    {subCategories.map(sub => (
-                      <option key={sub.id} value={sub.id}>{sub.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Section 3: Logistics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-                <div className="md:col-span-2">
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Venue</label>
-                  <input 
-                    {...register('venue')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
-                    placeholder="Enter Venue Name"
-                  />
-                  {errors.venue && <p className="text-error text-xs mt-1 font-bold">{errors.venue.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">Start Date & Time</label>
-                  <input 
-                    {...register('startTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
-                    type="datetime-local"
-                  />
-                  {errors.startTime && <p className="text-error text-xs mt-1 font-bold">{errors.startTime.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="block font-label text-sm font-semibold text-on-surface-variant mb-2">End Date & Time</label>
-                  <input 
-                    {...register('endTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4" 
-                    type="datetime-local"
-                  />
-                  {errors.endTime && <p className="text-error text-xs mt-1 font-bold">{errors.endTime.message}</p>}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-6 pt-6">
-                <button 
-                  type="button"
-                  onClick={() => navigate('/student')}
-                  className="px-8 py-4 text-on-surface-variant font-semibold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting || loading}
-                  className="px-10 py-4 bg-gradient-to-br from-[#006565] to-[#008080] text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
-                >
-                  {isSubmitting || loading ? 'Submitting...' : (isEditMode ? 'Update Request' : 'Submit Request')}
-                </button>
-              </div>
-            </form>
+              <OrganizerTypeCard
+                accentClass="border-purple-200 hover:border-purple-300"
+                accentSoftClass="bg-purple-100 text-purple-800"
+                buttonLabel="Select This"
+                description="An official event under your registered club."
+                icon="🏛️"
+                loading={checkingClub}
+                onClick={handleClubSelection}
+                steps={[
+                  '1. Submit',
+                  '2. Treasurer approves',
+                  '3. Dean approves',
+                  '4. Published',
+                ]}
+                title="Club Event"
+              />
+            </div>
           </section>
         </div>
+      )}
 
-        {/* Sidebar Guidelines */}
-        <aside className="w-full lg:w-80 space-y-8">
-          <div className="bg-surface-container-low p-8 rounded-xl border-l-4 border-tertiary">
-            <h3 className="font-headline text-xl font-bold mb-4 text-primary">Submission Guidelines</h3>
-            <ul className="space-y-6">
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">info</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Ensure all event venues are booked at least <strong>2 weeks</strong> in advance.</p>
-              </li>
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">verified_user</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Risk assessment forms must be attached for outdoor events.</p>
-              </li>
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">group</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Events exceeding <strong>200 attendees</strong> require security clearance.</p>
-              </li>
-            </ul>
-          </div>
-          
-          {/* Quick Context Card */}
-          <div className="relative overflow-hidden group rounded-xl aspect-[4/5]">
-            <img 
-              alt="Academic Campus" 
-              className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCokpOP5O0X7kVdS3rFhFSjWwQZNGmfy4v2Y7WrNufEG2FBoLo0nffJONmtdImpO6PJw1nHX2DucAqVTvZzUOtY-0Yfe-B-T7a3cB_uTWnfqmCuG76NvijQ7II8cNpeRzSsN6nzhHrQvGffDLdRPLYaRR2-fA7GRHwNqrCR1bb3sG9_PwywyRbVB8RvbkrlZ898XAmHIlbuetffdkqiQKgLzo--WUoIsOU4Roe5-HXoWyc81R45uxV0F4iKLcWv5hY0MTiGqwGEawc"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
-              <h4 className="font-headline text-white text-lg font-bold mb-1">Tradition of Excellence</h4>
-              <p className="text-white/80 text-xs">Curating events that define our academic legacy.</p>
+      {!organizerType && clubWarning && (
+        <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center">
+          <section className="w-full max-w-3xl rounded-[2.5rem] border border-amber-200 bg-amber-50 p-8 shadow-sm">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-amber-600 shadow-sm">
+              <span className="material-symbols-outlined text-3xl">warning</span>
             </div>
-          </div>
-          
-          {/* Tooltip Area */}
-          <div className="p-4 bg-primary-container/10 border border-primary-container/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-primary text-sm mt-0.5">lightbulb</span>
-              <div className="text-xs text-on-surface-variant italic">
-                "Events with rich descriptions and clear categories are 40% more likely to be approved on the first review."
-              </div>
+            <h1 className="mt-5 text-3xl font-bold text-amber-950">You need an active club to create club events.</h1>
+            <p className="mt-3 text-base leading-7 text-amber-900/80">
+              Your club is currently{' '}
+              <span className="font-semibold">
+                {clubWarning.status === 'NOT_REGISTERED' ? 'not registered' : clubWarning.status}
+              </span>
+              {clubWarning.clubName ? ` (${clubWarning.clubName})` : ''}. Register or activate your club first, then try again.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                className="inline-flex items-center justify-center rounded-2xl bg-amber-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-amber-800"
+                to="/student/clubs"
+              >
+                Go to Clubs Page
+              </Link>
+              <button
+                className="inline-flex items-center justify-center rounded-2xl border border-amber-300 px-5 py-3 text-sm font-semibold text-amber-900 transition hover:bg-white"
+                onClick={() => setClubWarning(null)}
+                type="button"
+              >
+                ← Back
+              </button>
             </div>
-          </div>
-        </aside>
-      </div>
+          </section>
+        </div>
+      )}
+
+      {organizerType && (
+        <EventFormShell
+          allowedEventTypes={undefined}
+          approvalContent={approvalContent}
+          cancelLabel="Cancel"
+          conflictMessage={
+            organizerType === 'CLUB_EVENT'
+              ? `Venue conflict! ${clubData?.name ? `Please update the request for ${clubData.name}.` : 'Please choose a different venue or time.'}`
+              : 'Venue conflict! This venue is already booked for an approved event at this time.'
+          }
+          defaultValues={{
+            isMultiDay: false,
+            isPublic: false,
+          }}
+          generalErrorMessage="Failed to submit event."
+          headerContent={organizerHeader}
+          hiddenFields={
+            organizerType === 'CLUB_EVENT'
+              ? { organizerType: 'CLUB_EVENT', clubId: clubData?.id || '' }
+              : { organizerType: 'INDIVIDUAL_STUDENT' }
+          }
+          onCancel={() => navigate('/student/my-events')}
+          onSuccess={handleSuccess}
+          pageDescription="Fill in the event details below. Required fields help the reviewers approve your request faster."
+          pageTitle="Create Event Request"
+          schema={organizerType === 'CLUB_EVENT' ? clubEventSchema : individualEventSchema}
+          submitLabel={
+            organizerType === 'CLUB_EVENT' ? 'Submit for Treasurer Review' : 'Submit for Dean Approval'
+          }
+          submitRequest={submitStudentEvent}
+          submittingLabel="Submitting..."
+        />
+      )}
     </StudentLayout>
   );
 }
