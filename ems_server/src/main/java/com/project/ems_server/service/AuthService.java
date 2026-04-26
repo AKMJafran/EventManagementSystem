@@ -5,9 +5,11 @@ import com.project.ems_server.dto.request.LoginRequest;
 import com.project.ems_server.dto.request.ResetPasswordRequest;
 import com.project.ems_server.dto.response.AuthResponse;
 import com.project.ems_server.entity.RefreshToken;
+import com.project.ems_server.entity.StudentProfile;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.OtpType;
 import com.project.ems_server.repository.RefreshTokenRepository;
+import com.project.ems_server.repository.StudentProfileRepository;
 import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,6 +24,7 @@ import java.time.LocalDateTime;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final StudentProfileRepository studentProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OtpService otpService;
     private final EmailService emailService;
@@ -31,16 +34,25 @@ public class AuthService {
     private final FileServerService fileServerService;
 
     public AuthResponse login(LoginRequest loginRequest) {
-        User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        String identifier = loginRequest.getEmail().trim();
+
+        // Try to find user by email first, then by student registration number
+        User user = userRepository.findByEmail(identifier)
+                .orElseGet(() -> {
+                    StudentProfile profile = studentProfileRepository.findByStudentNumber(identifier)
+                            .orElseThrow(() -> new RuntimeException("User not found"));
+                    return userRepository.findByEmail(profile.getOfficialEmail())
+                            .orElseThrow(() -> new RuntimeException("User not found"));
+                });
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new RuntimeException("Account is inactive. Please contact an administrator.");
         }
 
+        // Always authenticate with the user's actual email
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
+                        user.getEmail(),
                         loginRequest.getPassword()
                 )
         );
