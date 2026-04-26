@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axiosInstance from '../api/axiosInstance';
 import { toast } from 'react-hot-toast';
 import AdminLayout from '../components/layout/AdminLayout';
+import { validateCategoryName } from '../utils/validation';
 
 export default function ManageCategories() {
   const [categories, setCategories] = useState([]);
@@ -10,6 +11,8 @@ export default function ManageCategories() {
   const [mainName, setMainName] = useState('');
   const [subName, setSubName] = useState('');
   const [parentId, setParentId] = useState(null);
+  const [mainError, setMainError] = useState('');
+  const [subError, setSubError] = useState('');
 
   async function fetchCategoriesWithChildren() {
     const parentResponse = await axiosInstance.get('/categories');
@@ -59,11 +62,19 @@ export default function ManageCategories() {
   }
 
   async function addMainCategory() {
+    const validationMessage = validateCategoryName(mainName, 'Main category');
+    setMainError(validationMessage);
+    if (validationMessage) {
+      toast.error('Please fix the category name before saving.');
+      return;
+    }
+
     try {
       await axiosInstance.post('/categories', { name: mainName });
       toast.success('Main category added');
       setShowMainModal(false);
       setMainName('');
+      setMainError('');
       await reloadCategories();
     } catch (e) {
       toast.error('Failed to add main category');
@@ -72,11 +83,19 @@ export default function ManageCategories() {
   }
 
   async function addSubCategory() {
+    const validationMessage = validateCategoryName(subName, 'Sub-category');
+    setSubError(validationMessage);
+    if (validationMessage) {
+      toast.error('Please fix the sub-category name before saving.');
+      return;
+    }
+
     try {
       await axiosInstance.post(`/categories/${parentId}/sub`, { name: subName });
       toast.success('Sub-category added');
       setShowSubModal(false);
       setSubName('');
+      setSubError('');
       await reloadCategories();
     } catch (e) {
       toast.error('Failed to add sub-category');
@@ -279,20 +298,21 @@ export default function ManageCategories() {
           <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-2xl w-full max-w-md border border-outline-variant/30">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-serif font-bold text-on-surface">Add Category</h2>
-              <button onClick={() => setShowMainModal(false)} className="text-outline hover:text-on-surface transition-colors">
+              <button onClick={() => { setShowMainModal(false); setMainError(''); }} className="text-outline hover:text-on-surface transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             <p className="text-sm text-on-surface-variant mb-6">Define a top-level classification for institutional grouping.</p>
             <input 
               value={mainName} 
-              onChange={e => setMainName(e.target.value)} 
+              onChange={e => { setMainName(e.target.value); setMainError(''); }} 
               className="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-xl mb-8 text-sm placeholder:opacity-50" 
               placeholder="e.g., Infrastructure, Symposium..." 
               autoFocus
             />
+            {mainError && <p className="-mt-5 mb-6 text-sm font-medium text-error">{mainError}</p>}
             <div className="flex justify-end gap-3">
-              <button className="px-6 py-2 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors" onClick={() => setShowMainModal(false)}>
+              <button className="px-6 py-2 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors" onClick={() => { setShowMainModal(false); setMainError(''); }}>
                 Cancel
               </button>
               <button className="px-6 py-2 rounded-xl text-sm font-bold bg-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-opacity" onClick={addMainCategory}>
@@ -310,20 +330,21 @@ export default function ManageCategories() {
             <div className="absolute top-0 w-full left-0 h-1 bg-primary"></div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-serif font-bold text-on-surface">Add Sub-category</h2>
-              <button onClick={() => setShowSubModal(false)} className="text-outline hover:text-on-surface transition-colors">
+              <button onClick={() => { setShowSubModal(false); setSubError(''); }} className="text-outline hover:text-on-surface transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             <p className="text-sm text-on-surface-variant mb-6">Create a granular classification belonging to the selected main bracket.</p>
             <input 
               value={subName} 
-              onChange={e => setSubName(e.target.value)} 
+              onChange={e => { setSubName(e.target.value); setSubError(''); }} 
               className="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-xl mb-8 text-sm placeholder:opacity-50" 
               placeholder="e.g., Cybersecurity, Open Mic..." 
               autoFocus
             />
+            {subError && <p className="-mt-5 mb-6 text-sm font-medium text-error">{subError}</p>}
             <div className="flex justify-end gap-3">
-              <button className="px-6 py-2 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors" onClick={() => setShowSubModal(false)}>
+              <button className="px-6 py-2 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors" onClick={() => { setShowSubModal(false); setSubError(''); }}>
                 Cancel
               </button>
               <button className="px-6 py-2 rounded-xl text-sm font-bold bg-on-surface text-surface shadow-md hover:opacity-90 transition-opacity" onClick={addSubCategory}>

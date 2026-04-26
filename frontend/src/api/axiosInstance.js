@@ -4,6 +4,10 @@ import { jwtDecode } from 'jwt-decode';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 const DEFAULT_TIMEOUT_MS = 10000;
 const FILE_UPLOAD_TIMEOUT_MS = 30000;
+const normalizeUserId = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -114,6 +118,7 @@ axiosInstance.interceptors.response.use(
                 'user',
                 JSON.stringify({
                   ...storedUser,
+                  id: normalizeUserId(decodedToken.userId ?? storedUser.id),
                   name: decodedToken.name,
                   email: email || decodedToken.sub,
                   role: role || storedUser.role,
@@ -137,11 +142,6 @@ axiosInstance.interceptors.response.use(
             isRefreshing = false;
           });
       });
-    }
-
-    if (error.response?.status === 403 && !originalRequest?._retry) {
-      clearStoredAuth();
-      window.location.href = '/login';
     }
 
     return Promise.reject(error);

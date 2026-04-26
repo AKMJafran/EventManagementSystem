@@ -6,7 +6,8 @@ import ClubTypeTag from '../components/ui/ClubTypeTag';
 import StatusBadge from '../components/ui/StatusBadge';
 import ModalPortal from '../components/ui/ModalPortal';
 import MemberRolePill from '../components/clubs/MemberRolePill';
-import { getExecutiveCommitteeEntries, getGeneralMembers, getRoleDisplayName } from '../utils/clubRoles';
+import { getGeneralMembers, getRoleDisplayName, getRoleRoster } from '../utils/clubRoles';
+import { validateReason } from '../utils/validation';
 
 function formatDate(value) {
   if (!value) {
@@ -30,9 +31,10 @@ export default function ManageClubs() {
   const [clubMembers, setClubMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [viewDetailsModal, setViewDetailsModal] = useState(null);
+  const [rejectError, setRejectError] = useState('');
 
   const executiveCommittee = useMemo(
-    () => getExecutiveCommitteeEntries(membersModal),
+    () => getRoleRoster(membersModal),
     [membersModal]
   );
 
@@ -74,8 +76,10 @@ export default function ManageClubs() {
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      toast.error('Please provide a reason');
+    const validationMessage = validateReason(rejectReason, 'Reason for rejection');
+    setRejectError(validationMessage);
+    if (validationMessage) {
+      toast.error('Please provide a clear rejection reason.');
       return;
     }
 
@@ -84,6 +88,7 @@ export default function ManageClubs() {
       toast.success('Club rejected');
       setRejectModal(null);
       setRejectReason('');
+      setRejectError('');
       await fetchClubs();
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to reject club');
@@ -199,6 +204,7 @@ export default function ManageClubs() {
                             onClick={() => {
                               setRejectModal(club);
                               setRejectReason('');
+                              setRejectError('');
                             }}
                             className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-200"
                           >
@@ -276,6 +282,7 @@ export default function ManageClubs() {
                       setViewDetailsModal(null);
                       setRejectModal(viewDetailsModal);
                       setRejectReason('');
+                      setRejectError('');
                     }}
                     className="rounded-xl bg-rose-100 px-5 py-2 font-semibold text-rose-700 hover:bg-rose-200"
                   >
@@ -310,10 +317,14 @@ export default function ManageClubs() {
                 <textarea
                   className="h-24 w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
                   value={rejectReason}
-                  onChange={(event) => setRejectReason(event.target.value)}
+                  onChange={(event) => {
+                    setRejectReason(event.target.value);
+                    setRejectError('');
+                  }}
                   placeholder="Provide a reason..."
                   required
                 />
+                {rejectError && <p className="mt-2 text-sm font-medium text-error">{rejectError}</p>}
               </label>
               <div className="flex justify-end gap-3">
                 <button
@@ -321,6 +332,7 @@ export default function ManageClubs() {
                   onClick={() => {
                     setRejectModal(null);
                     setRejectReason('');
+                    setRejectError('');
                   }}
                   className="rounded-xl border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
                 >
@@ -387,8 +399,12 @@ export default function ManageClubs() {
                               <MemberRolePill role={member.role} displayName={member.displayName} compact />
                             </td>
                             <td className="px-4 py-3 text-slate-700">{member.displayName || getRoleDisplayName(member.role)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{member.memberName || 'N/A'}</td>
-                            <td className="px-4 py-3 text-slate-600">{member.memberStudentNumber || 'N/A'}</td>
+                            <td className={`px-4 py-3 font-medium ${member.filled ? 'text-slate-900' : 'text-amber-700'}`}>
+                              {member.filled ? member.memberName : 'Vacant'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {member.filled ? member.memberStudentNumber || 'N/A' : 'Open position'}
+                            </td>
                           </tr>
                         ))}
                         {executiveCommittee.length === 0 && (

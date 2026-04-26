@@ -24,5 +24,7 @@ public interface ClubMembershipRepository extends JpaRepository<ClubMembership, 
 
     List<ClubMembership> findByClubIdOrderByJoinedAtAsc(Long clubId);
 
+    void deleteByClubIdAndUserId(Long clubId, Long userId);
+
     void deleteByClubIdAndMemberRoleIn(Long clubId, Collection<ClubMemberRole> memberRoles);
 }

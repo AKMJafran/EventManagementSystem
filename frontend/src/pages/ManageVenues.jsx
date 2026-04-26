@@ -3,14 +3,21 @@ import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
 import ModalPortal from '../components/ui/ModalPortal';
+import { normalizeEventCollection } from '../utils/eventData';
+import {
+  validateLocation,
+  validatePositiveInteger,
+  validateVenueName,
+} from '../utils/validation';
 
 const emptyForm = {
   name: '',
   capacity: '',
   location: '',
+  active: true,
 };
 
-const FILTER_OPTIONS = ['ALL', 'AVAILABLE', 'OCCUPIED'];
+const FILTER_OPTIONS = ['ALL', 'AVAILABLE', 'OCCUPIED', 'INACTIVE'];
 
 function formatDateTime(value) {
   if (!value) return 'No schedule';
@@ -49,23 +56,13 @@ function getVenueStatusMeta(venueName, approvedEvents) {
 }
 
 function validateVenueForm(formData) {
-  const errors = {};
+  const errors = {
+    name: validateVenueName(formData.name),
+    capacity: validatePositiveInteger(formData.capacity, 'Capacity'),
+    location: validateLocation(formData.location),
+  };
 
-  if (!formData.name.trim()) {
-    errors.name = 'Venue name is required.';
-  }
-
-  if (!String(formData.capacity).trim()) {
-    errors.capacity = 'Capacity is required.';
-  } else if (!Number.isInteger(Number(formData.capacity)) || Number(formData.capacity) <= 0) {
-    errors.capacity = 'Capacity must be a whole number greater than zero.';
-  }
-
-  if (!formData.location.trim()) {
-    errors.location = 'Location is required.';
-  }
-
-  return errors;
+  return Object.fromEntries(Object.entries(errors).filter(([, value]) => Boolean(value)));
 }
 
 function VenueSkeleton() {
@@ -198,6 +195,15 @@ function VenueDrawer({
                     {selectedVenue?.location}
                   </p>
                 </div>
+
+                <div className="rounded-[1.5rem] border border-outline-variant/20 bg-white p-5 shadow-sm sm:col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                    Booking Availability
+                  </p>
+                  <p className="mt-3 text-lg font-semibold text-on-surface">
+                    {selectedVenue?.active ? 'Active for booking' : 'Inactive'}
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
@@ -279,6 +285,21 @@ function VenueDrawer({
                   )}
                 </label>
               </div>
+
+              <label className="flex items-start gap-3 rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-low px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.active)}
+                  onChange={(event) => onChange('active', event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-on-surface">Active for booking</span>
+                  <span className="mt-1 block text-xs text-on-surface-variant">
+                    Inactive venues remain visible to admins but are blocked in event creation forms.
+                  </span>
+                </span>
+              </label>
             </form>
           )}
         </div>
@@ -380,7 +401,7 @@ export default function ManageVenues() {
       ]);
 
       setVenues(venueResponse.data || []);
-      setApprovedEvents(approvedEventsResponse.data || []);
+      setApprovedEvents(normalizeEventCollection(approvedEventsResponse.data));
     } catch (error) {
       toast.error('Failed to load venue workspace.');
       console.error(error);
@@ -396,6 +417,16 @@ export default function ManageVenues() {
   const venueRows = useMemo(
     () =>
       venues.map((venue) => {
+        if (!venue.active) {
+          return {
+            ...venue,
+            status: 'INACTIVE',
+            activeEvents: [],
+            upcomingEvents: [],
+            nextEvent: null,
+          };
+        }
+
         const meta = getVenueStatusMeta(venue.name, approvedEvents);
 
         return {
@@ -411,10 +442,12 @@ export default function ManageVenues() {
 
   const summary = useMemo(() => {
     const occupied = venueRows.filter((venue) => venue.status === 'OCCUPIED').length;
+    const inactive = venueRows.filter((venue) => venue.status === 'INACTIVE').length;
     return {
       total: venueRows.length,
       occupied,
-      available: venueRows.length - occupied,
+      inactive,
+      available: venueRows.length - occupied - inactive,
     };
   }, [venueRows]);
 
@@ -476,6 +509,7 @@ export default function ManageVenues() {
             name: venue.name || '',
             capacity: String(venue.capacity || ''),
             location: venue.location || '',
+            active: venue.active !== false,
           }
         : emptyForm
     );
@@ -510,6 +544,7 @@ export default function ManageVenues() {
       name: formData.name.trim(),
       capacity: Number(formData.capacity),
       location: formData.location.trim(),
+      active: Boolean(formData.active),
     };
 
     try {
@@ -577,7 +612,7 @@ export default function ManageVenues() {
           <VenueSkeleton />
         ) : (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
                 {
                   label: 'Total Venues',
@@ -599,6 +634,13 @@ export default function ManageVenues() {
                   detail: 'Venues currently in use by approved events.',
                   icon: 'meeting_room',
                   accent: 'text-tertiary',
+                },
+                {
+                  label: 'Inactive',
+                  value: summary.inactive,
+                  detail: 'Venues hidden from booking while retained in the directory.',
+                  icon: 'block',
+                  accent: 'text-slate-500',
                 },
               ].map((card) => (
                 <article
@@ -655,7 +697,11 @@ export default function ManageVenues() {
                       >
                         {FILTER_OPTIONS.map((option) => (
                           <option key={option} value={option}>
-                            {option === 'ALL' ? 'All statuses' : option.charAt(0) + option.slice(1).toLowerCase()}
+                            {option === 'ALL'
+                              ? 'All statuses'
+                              : option === 'INACTIVE'
+                                ? 'Inactive'
+                                : option.charAt(0) + option.slice(1).toLowerCase()}
                           </option>
                         ))}
                       </select>
@@ -738,7 +784,9 @@ export default function ManageVenues() {
                             <td className="px-6 py-5">
                               <span
                                 className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
-                                  venue.status === 'OCCUPIED'
+                                  venue.status === 'INACTIVE'
+                                    ? 'bg-slate-200 text-slate-700'
+                                    : venue.status === 'OCCUPIED'
                                     ? 'bg-tertiary-container/30 text-on-tertiary-container'
                                     : 'bg-secondary-container text-on-secondary-container'
                                 }`}
@@ -752,6 +800,8 @@ export default function ManageVenues() {
                                   <p className="font-medium text-on-surface">{venue.nextEvent.title}</p>
                                   <p className="mt-1">{formatDateTime(venue.nextEvent.startTime)}</p>
                                 </>
+                              ) : venue.status === 'INACTIVE' ? (
+                                'Inactive venues are blocked in booking forms.'
                               ) : (
                                 'No approved booking scheduled'
                               )}
@@ -800,7 +850,9 @@ export default function ManageVenues() {
                           </div>
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
-                              venue.status === 'OCCUPIED'
+                              venue.status === 'INACTIVE'
+                                ? 'bg-slate-200 text-slate-700'
+                                : venue.status === 'OCCUPIED'
                                 ? 'bg-tertiary-container/30 text-on-tertiary-container'
                                 : 'bg-secondary-container text-on-secondary-container'
                             }`}

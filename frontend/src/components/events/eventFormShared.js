@@ -17,6 +17,8 @@ const optionalNumberField = z.preprocess((value) => {
   return Number.isNaN(parsed) ? value : parsed;
 }, z.number().optional());
 
+const nameLikePattern = /^[A-Za-z0-9][A-Za-z0-9\s.,'()&:/-]*$/;
+
 export const EVENT_TYPE_OPTIONS = [
   { value: 'CULTURAL', label: 'Cultural' },
   { value: 'TECHNICAL', label: 'Technical' },
@@ -32,20 +34,23 @@ export const NON_URGENT_EVENT_TYPE_OPTIONS = EVENT_TYPE_OPTIONS.filter(
 const baseEventFields = {
   title: z
     .string()
+    .trim()
     .min(3, 'Title must be at least 3 characters')
-    .max(150, 'Title cannot exceed 150 characters'),
+    .max(150, 'Title cannot exceed 150 characters')
+    .refine((value) => nameLikePattern.test(value), 'Title contains unsupported characters'),
   description: z
     .string()
+    .trim()
     .min(20, 'Description must be at least 20 characters')
     .max(1000, 'Description cannot exceed 1000 characters'),
   categoryId: requiredNumberField('Please select a category'),
   subCategoryId: optionalNumberField,
-  venue: z.string().min(1, 'Please select a venue'),
+  venue: z.string().trim().min(1, 'Please select a venue'),
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
   isMultiDay: z.boolean().default(false),
   isPublic: z.boolean().default(false),
-  departmentName: z.string().optional(),
+  departmentName: z.string().trim().optional(),
   imageId: z.string().optional(),
 };
 
@@ -92,12 +97,19 @@ export function normalizeCategories(items = []) {
 export function normalizeVenues(items = []) {
   return items.map((venue) => ({
     ...venue,
+    name: venue.name || venue.venueName || venue.label || 'Venue',
     label:
       venue.label ||
       `${venue.name || venue.venueName || 'Venue'}${
         venue.capacity ? ` (Capacity: ${venue.capacity})` : ''
       }`,
     value: venue.name || venue.venueName || venue.label || '',
+    active: venue.active !== false,
+    available: venue.available !== false,
+    status:
+      venue.status ||
+      (venue.active === false ? 'INACTIVE' : venue.available === false ? 'RESERVED' : 'AVAILABLE'),
+    reservedEventTitle: venue.reservedEventTitle || '',
   }));
 }
 
@@ -110,6 +122,12 @@ export function toDateTimeLocalValue(dateString) {
   }
   const timezoneOffsetMs = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
+}
+
+export function getCurrentDateTimeLocalValue() {
+  const now = new Date();
+  const timezoneOffsetMs = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
 }
 
 export function formatEventDate(dateString) {

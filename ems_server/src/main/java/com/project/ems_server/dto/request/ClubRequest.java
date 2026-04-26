@@ -1,6 +1,7 @@
 package com.project.ems_server.dto.request;
 
 import com.project.ems_server.enums.ClubType;
+import com.project.ems_server.enums.ClubMemberRole;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -33,4 +34,7 @@ public class ClubRequest {
 
     @NotNull(message = "Student treasurer is required")
     private Long treasurerUserId;
+
+    @NotNull(message = "Creator position is required")
+    private ClubMemberRole creatorRole;
 }

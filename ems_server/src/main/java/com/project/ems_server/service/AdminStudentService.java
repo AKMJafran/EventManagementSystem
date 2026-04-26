@@ -137,6 +137,55 @@ public class AdminStudentService {
         return mapToResponse(user, profile);
     }
 
+    public AdminStudentResponse updateStudent(Long userId, AdminStudentCreateRequest request) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.STUDENT)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+        StudentProfile profile = studentProfileRepository.findByOfficialEmail(user.getEmail())
+                .orElseThrow(() -> new RuntimeException("Student profile not found"));
+
+        StudentSeedData data = normalizeStudentData(
+                request.getStudentNumber(),
+                request.getOfficialEmail(),
+                request.getFullName(),
+                request.getDepartment(),
+                request.getBatchYear(),
+                () -> "Invalid student request."
+        );
+
+        userRepository.findByEmail(data.officialEmail())
+                .filter(existing -> !existing.getId().equals(user.getId()))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("User already exists with email: " + data.officialEmail());
+                });
+
+        studentProfileRepository.findByStudentNumber(data.studentNumber())
+                .filter(existing -> !existing.getId().equals(profile.getId()))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Student number already exists: " + data.studentNumber());
+                });
+
+        studentProfileRepository.findByOfficialEmail(data.officialEmail())
+                .filter(existing -> !existing.getId().equals(profile.getId()))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Official email already exists: " + data.officialEmail());
+                });
+
+        user.setName(data.fullName());
+        user.setEmail(data.officialEmail());
+        userRepository.save(user);
+
+        profile.setStudentNumber(data.studentNumber());
+        profile.setOfficialEmail(data.officialEmail());
+        profile.setFullName(data.fullName());
+        profile.setDepartment(data.department());
+        profile.setBatchYear(data.batchYear());
+        studentProfileRepository.save(profile);
+
+        return mapToResponse(user, profile);
+    }
+
     public void deactivateStudent(Long userId) {
         User user = userRepository.findById(userId)
                 .filter(existing -> existing.getRole() == Role.STUDENT)
@@ -149,6 +198,22 @@ public class AdminStudentService {
         user.setIsActive(false);
         userRepository.save(user);
         refreshTokenRepository.deleteByUserId(user.getId());
+    }
+
+    public AdminStudentResponse setStudentActive(Long userId, boolean active) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.STUDENT)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+        user.setIsActive(active);
+        userRepository.save(user);
+
+        if (!active) {
+            refreshTokenRepository.deleteByUserId(user.getId());
+        }
+
+        StudentProfile profile = studentProfileRepository.findByOfficialEmail(user.getEmail()).orElse(null);
+        return mapToResponse(user, profile);
     }
 
     private AdminStudentResponse createStudentAccount(StudentSeedData data) {

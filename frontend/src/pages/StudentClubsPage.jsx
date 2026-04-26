@@ -21,17 +21,18 @@ import ModalPortal from '../components/ui/ModalPortal';
 import MemberRolePill from '../components/clubs/MemberRolePill';
 import useAuthStore from '../context/AuthContext';
 import {
-  getExecutiveCommitteeEntries,
   getGeneralMembers,
   getOpenRoleCount,
   getRoleDescription,
   getRoleDisplayName,
   getRoleIcon,
+  getRoleRoster,
+  getRolesForClubType,
 } from '../utils/clubRoles';
 
 const CLUB_TYPES = ['ACADEMIC', 'CULTURAL', 'SPORTS', 'TECHNICAL'];
 
-function buildClubSchema(currentUserId) {
+function buildClubSchema() {
   return z
     .object({
       name: z.string().min(3, 'Min 3 characters').max(100, 'Max 100 characters'),
@@ -45,15 +46,37 @@ function buildClubSchema(currentUserId) {
       seniorTreasurerLecturerId: z.number({
         required_error: 'Please select a Senior Treasurer',
       }),
-      secretaryUserId: z.number({
-        required_error: 'Please select a Secretary',
-      }),
-      treasurerUserId: z.number({
-        required_error: 'Please select a Student Treasurer',
-      }),
+      creatorRole: z.string().min(1, 'Please select your position'),
+      secretaryUserId: z.number().optional(),
+      treasurerUserId: z.number().optional(),
     })
     .superRefine((value, context) => {
-      if (value.secretaryUserId === value.treasurerUserId) {
+      const creatorRole = value.creatorRole;
+      const secretaryRequired = creatorRole !== 'SECRETARY';
+      const treasurerRequired = creatorRole !== 'TREASURER';
+
+      if (secretaryRequired && value.secretaryUserId == null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Please select a Secretary',
+          path: ['secretaryUserId'],
+        });
+      }
+
+      if (treasurerRequired && value.treasurerUserId == null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Please select a Student Treasurer',
+          path: ['treasurerUserId'],
+        });
+      }
+
+      if (
+        secretaryRequired &&
+        treasurerRequired &&
+        value.secretaryUserId != null &&
+        value.secretaryUserId === value.treasurerUserId
+      ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Secretary and Treasurer must be different students',
@@ -61,19 +84,19 @@ function buildClubSchema(currentUserId) {
         });
       }
 
-      if (currentUserId != null && value.secretaryUserId === currentUserId) {
+      if (creatorRole === 'SECRETARY' && value.treasurerUserId == null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'President and Secretary must be different students',
-          path: ['secretaryUserId'],
+          message: 'Please select a Student Treasurer',
+          path: ['treasurerUserId'],
         });
       }
 
-      if (currentUserId != null && value.treasurerUserId === currentUserId) {
+      if (creatorRole === 'TREASURER' && value.secretaryUserId == null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'President and Treasurer must be different students',
-          path: ['treasurerUserId'],
+          message: 'Please select a Secretary',
+          path: ['secretaryUserId'],
         });
       }
     });
@@ -83,6 +106,7 @@ const registrationDefaults = {
   name: '',
   type: 'ACADEMIC',
   description: '',
+  creatorRole: 'PRESIDENT',
   seniorTreasurerLecturerId: undefined,
   secretaryUserId: undefined,
   treasurerUserId: undefined,
@@ -234,17 +258,17 @@ function RegistrationModal({
   studentsError,
   onSubmit,
   submitting,
-  currentUserId,
   editingClub,
 }) {
   const isEditMode = !!editingClub;
-  const schema = useMemo(() => buildClubSchema(currentUserId), [currentUserId]);
+  const schema = useMemo(() => buildClubSchema(), []);
 
   const {
     control,
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -252,6 +276,14 @@ function RegistrationModal({
   });
 
   const description = useWatch({ control, name: 'description' }) || '';
+  const clubType = useWatch({ control, name: 'type' }) || 'ACADEMIC';
+  const creatorRole = useWatch({ control, name: 'creatorRole' }) || 'PRESIDENT';
+  const creatorRoleOptions = useMemo(
+    () => getRolesForClubType(clubType).filter((role) => role !== 'GENERAL_MEMBER'),
+    [clubType]
+  );
+  const secretaryHandledByCreator = creatorRole === 'SECRETARY';
+  const treasurerHandledByCreator = creatorRole === 'TREASURER';
 
   useEffect(() => {
     if (!open) {
@@ -261,12 +293,22 @@ function RegistrationModal({
         name: editingClub.name || '',
         type: editingClub.type || 'ACADEMIC',
         description: editingClub.description || '',
+        creatorRole: 'PRESIDENT',
         seniorTreasurerLecturerId: editingClub.seniorTreasurerLecturerId ?? undefined,
         secretaryUserId: editingClub.secretaryUserId ?? undefined,
         treasurerUserId: editingClub.studentTreasurerUserId ?? undefined,
       });
     }
   }, [open, reset, isEditMode, editingClub]);
+
+  useEffect(() => {
+    if (secretaryHandledByCreator) {
+      setValue('secretaryUserId', undefined, { shouldValidate: true });
+    }
+    if (treasurerHandledByCreator) {
+      setValue('treasurerUserId', undefined, { shouldValidate: true });
+    }
+  }, [secretaryHandledByCreator, setValue, treasurerHandledByCreator]);
 
   if (!open) {
     return null;
@@ -323,6 +365,26 @@ function RegistrationModal({
                     ))}
                   </select>
                   {errors.type && <p className="mt-1 text-sm text-rose-600">{errors.type.message}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-800">Your Position *</label>
+                  <select
+                    {...register('creatorRole')}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+                      errors.creatorRole ? 'border-rose-400 ring-1 ring-rose-100' : 'border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary'
+                    }`}
+                  >
+                    {creatorRoleOptions.map((role) => (
+                      <option key={role} value={role}>
+                        {getRoleDisplayName(role)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    This position is assigned to you when the club record is created.
+                  </p>
+                  {errors.creatorRole && <p className="mt-1 text-sm text-rose-600">{errors.creatorRole.message}</p>}
                 </div>
 
                 <div>
@@ -384,73 +446,87 @@ function RegistrationModal({
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">Secretary *</label>
-                    <Controller
-                      name="secretaryUserId"
-                      control={control}
-                      render={({ field }) => (
-                        <select
-                          name={field.name}
-                          ref={field.ref}
-                          value={field.value ?? ''}
-                          onBlur={field.onBlur}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            field.onChange(value ? Number(value) : undefined);
-                          }}
-                          disabled={studentsLoading || !!studentsError}
-                          className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
-                            errors.secretaryUserId
-                              ? 'border-rose-400 ring-1 ring-rose-100'
-                              : 'border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary'
-                          }`}
-                        >
-                          <option value="">{studentsLoading ? 'Loading students...' : 'Select a student'}</option>
-                          {students.map((student) => (
-                            <option key={student.id} value={student.id}>
-                              {student.fullName} - {student.studentNumber} ({student.department || 'Department N/A'})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    />
-                    {errors.secretaryUserId && <p className="mt-1 text-sm text-rose-600">{errors.secretaryUserId.message}</p>}
-                  </div>
+                  {secretaryHandledByCreator ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+                      <p className="font-semibold text-emerald-900">Secretary</p>
+                      <p className="mt-1">Assigned to you from the selected position.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-800">Secretary *</label>
+                      <Controller
+                        name="secretaryUserId"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            name={field.name}
+                            ref={field.ref}
+                            value={field.value ?? ''}
+                            onBlur={field.onBlur}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              field.onChange(value ? Number(value) : undefined);
+                            }}
+                            disabled={studentsLoading || !!studentsError}
+                            className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+                              errors.secretaryUserId
+                                ? 'border-rose-400 ring-1 ring-rose-100'
+                                : 'border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary'
+                            }`}
+                          >
+                            <option value="">{studentsLoading ? 'Loading students...' : 'Select a student'}</option>
+                            {students.map((student) => (
+                              <option key={student.id} value={student.id}>
+                                {student.fullName} - {student.studentNumber} ({student.department || 'Department N/A'})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+                      {errors.secretaryUserId && <p className="mt-1 text-sm text-rose-600">{errors.secretaryUserId.message}</p>}
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-800">Student Treasurer *</label>
-                    <Controller
-                      name="treasurerUserId"
-                      control={control}
-                      render={({ field }) => (
-                        <select
-                          name={field.name}
-                          ref={field.ref}
-                          value={field.value ?? ''}
-                          onBlur={field.onBlur}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            field.onChange(value ? Number(value) : undefined);
-                          }}
-                          disabled={studentsLoading || !!studentsError}
-                          className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
-                            errors.treasurerUserId
-                              ? 'border-rose-400 ring-1 ring-rose-100'
-                              : 'border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary'
-                          }`}
-                        >
-                          <option value="">{studentsLoading ? 'Loading students...' : 'Select a student'}</option>
-                          {students.map((student) => (
-                            <option key={student.id} value={student.id}>
-                              {student.fullName} - {student.studentNumber} ({student.department || 'Department N/A'})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    />
-                    {errors.treasurerUserId && <p className="mt-1 text-sm text-rose-600">{errors.treasurerUserId.message}</p>}
-                  </div>
+                  {treasurerHandledByCreator ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+                      <p className="font-semibold text-emerald-900">Student Treasurer</p>
+                      <p className="mt-1">Assigned to you from the selected position.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-800">Student Treasurer *</label>
+                      <Controller
+                        name="treasurerUserId"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            name={field.name}
+                            ref={field.ref}
+                            value={field.value ?? ''}
+                            onBlur={field.onBlur}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              field.onChange(value ? Number(value) : undefined);
+                            }}
+                            disabled={studentsLoading || !!studentsError}
+                            className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+                              errors.treasurerUserId
+                                ? 'border-rose-400 ring-1 ring-rose-100'
+                                : 'border-slate-300 focus:border-primary focus:ring-1 focus:ring-primary'
+                            }`}
+                          >
+                            <option value="">{studentsLoading ? 'Loading students...' : 'Select a student'}</option>
+                            {students.map((student) => (
+                              <option key={student.id} value={student.id}>
+                                {student.fullName} - {student.studentNumber} ({student.department || 'Department N/A'})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+                      {errors.treasurerUserId && <p className="mt-1 text-sm text-rose-600">{errors.treasurerUserId.message}</p>}
+                    </div>
+                  )}
                 </div>
 
                 {studentsError && (
@@ -485,14 +561,14 @@ function RegistrationModal({
                 {errors.description && <p className="mt-1 text-sm text-rose-600">{errors.description.message}</p>}
               </div>
 
-              <div className="rounded-2xl border border-sky-100 bg-sky-50 px-5 py-4">
-                <p className="text-sm font-semibold text-sky-900">Approval Process</p>
-                <div className="mt-2 space-y-1 text-sm text-sky-800">
-                  <p>1. Selected lecturer reviews and approves</p>
-                  <p>2. Dean gives final approval</p>
-                  <p>3. President role is activated automatically with the club</p>
+                <div className="rounded-2xl border border-sky-100 bg-sky-50 px-5 py-4">
+                  <p className="text-sm font-semibold text-sky-900">Approval Process</p>
+                  <div className="mt-2 space-y-1 text-sm text-sky-800">
+                    <p>1. Selected lecturer reviews and approves</p>
+                    <p>2. Dean gives final approval</p>
+                    <p>3. Your selected position is attached to the registration immediately</p>
+                  </div>
                 </div>
-              </div>
 
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
@@ -665,13 +741,13 @@ function JoinClubModal({
 }
 
 function ExecutiveCommitteeSection({ club }) {
-  const executiveCommittee = getExecutiveCommitteeEntries(club);
+  const executiveCommittee = getRoleRoster(club);
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
       <div className="mb-5">
         <h3 className="text-2xl font-bold text-slate-900">Executive Committee</h3>
-        <p className="mt-1 text-sm text-slate-500">Leadership snapshot for your active club.</p>
+        <p className="mt-1 text-sm text-slate-500">Leadership snapshot with filled and vacant positions for your club.</p>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -704,8 +780,12 @@ function ExecutiveCommitteeSection({ club }) {
                 </div>
               </div>
               <div className="text-left md:text-right">
-                <p className="font-semibold text-slate-900">{member.memberName || 'Not assigned'}</p>
-                <p className="text-sm text-slate-500">{member.memberStudentNumber || 'N/A'}</p>
+                <p className={`font-semibold ${member.filled ? 'text-slate-900' : 'text-amber-700'}`}>
+                  {member.filled ? member.memberName : 'Vacant'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {member.filled ? member.memberStudentNumber || 'N/A' : 'Open position'}
+                </p>
               </div>
             </div>
           ))}
@@ -719,6 +799,124 @@ function ExecutiveCommitteeSection({ club }) {
   );
 }
 
+function ClubMembersModal({ club, members, loading, onClose }) {
+  if (!club) {
+    return null;
+  }
+
+  const roleRoster = getRoleRoster(club);
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 backdrop-blur-sm">
+        <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/70 px-8 py-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl font-bold text-slate-900">{club.name} Members</h2>
+                <ClubTypeTag type={club.type} />
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                Review current members, role assignments, and positions that are still vacant.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm transition hover:text-slate-600"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+
+          <div className="space-y-8 overflow-y-auto px-8 py-8">
+            <section>
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Club Positions</h3>
+                <p className="mt-1 text-sm text-slate-500">Filled and unfilled positions are shown together for quick review.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Senior Treasurer</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{club.seniorTreasurerLecturerName || 'Not assigned'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{club.seniorTreasurerStaffId || '(Lecturer)'}</p>
+                </div>
+
+                {roleRoster.map((role) => (
+                  <div key={role.role} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{role.displayName}</p>
+                        <p className={`mt-2 text-sm font-semibold ${role.filled ? 'text-slate-900' : 'text-amber-700'}`}>
+                          {role.filled ? role.memberName : 'Vacant'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {role.filled ? role.memberStudentNumber || 'Student number N/A' : 'Waiting for assignment'}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
+                          role.filled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {role.filled ? 'Filled' : 'Vacant'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Member Roster</h3>
+                  <p className="mt-1 text-sm text-slate-500">All current members and their assigned roles.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {club.memberCount || members.length || 0} members
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="rounded-2xl bg-slate-50 py-12 text-center text-slate-500">Loading members...</div>
+              ) : members.length === 0 ? (
+                <div className="rounded-2xl bg-slate-50 py-12 text-center text-slate-500">No members available yet.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Name</th>
+                        <th className="px-4 py-3 font-medium">Student Number</th>
+                        <th className="px-4 py-3 font-medium">Role</th>
+                        <th className="px-4 py-3 font-medium">Joined Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {members.map((member) => (
+                        <tr key={member.id || member.userId} className="hover:bg-slate-50/70">
+                          <td className="px-4 py-3 font-medium text-slate-900">{member.fullName || member.userName || 'Unknown Member'}</td>
+                          <td className="px-4 py-3 text-slate-600">{member.studentNumber || member.userEmail || 'N/A'}</td>
+                          <td className="px-4 py-3">
+                            <MemberRolePill role={member.memberRole} displayName={member.displayName} />
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{formatDate(member.joinedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
+
 export default function StudentClubsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [clubs, setClubs] = useState([]);
@@ -727,6 +925,9 @@ export default function StudentClubsPage() {
   const [joinedClubIds, setJoinedClubIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersPreviewClub, setMembersPreviewClub] = useState(null);
+  const [membersPreview, setMembersPreview] = useState([]);
+  const [membersPreviewLoading, setMembersPreviewLoading] = useState(false);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [joinModalClub, setJoinModalClub] = useState(null);
   const [joinRoleOptions, setJoinRoleOptions] = useState([]);
@@ -745,10 +946,22 @@ export default function StudentClubsPage() {
   const { user } = useAuthStore();
 
   const currentUserId = user?.id != null ? Number(user.id) : null;
+  const currentUserEmail = user?.email?.toLowerCase() || '';
 
   const availableStudents = useMemo(
-    () => students.filter((student) => Number(student.id) !== currentUserId && student.isActive !== false),
-    [students, currentUserId]
+    () =>
+      students.filter((student) => {
+        if (student.isActive === false) {
+          return false;
+        }
+
+        if (currentUserId != null) {
+          return Number(student.id) !== currentUserId;
+        }
+
+        return String(student.officialEmail || '').toLowerCase() !== currentUserEmail;
+      }),
+    [students, currentUserEmail, currentUserId]
   );
 
   const canRegisterNewClub = !myClub || myClub.status === 'REJECTED' || myClub.status === 'INACTIVE';
@@ -790,7 +1003,7 @@ export default function StudentClubsPage() {
   }, [activeTab, myClub]);
 
   const fetchJoinedClubIds = useCallback(async (clubList) => {
-    if (!currentUserId || clubList.length === 0) {
+    if ((!currentUserId && !currentUserEmail) || clubList.length === 0) {
       return [];
     }
 
@@ -801,21 +1014,31 @@ export default function StudentClubsPage() {
 
     membershipResponses.forEach((result, index) => {
       const club = clubList[index];
-      if (club.presidentId === currentUserId) {
+      const isPresident =
+        (currentUserId != null && club.presidentId === currentUserId) ||
+        (currentUserEmail && String(club.presidentEmail || '').toLowerCase() === currentUserEmail);
+
+      if (isPresident) {
         memberIds.add(club.id);
         return;
       }
 
       if (result.status === 'fulfilled') {
         const members = result.value.data || [];
-        if (members.some((member) => Number(member.userId) === currentUserId)) {
+        if (
+          members.some(
+            (member) =>
+              (currentUserId != null && Number(member.userId) === currentUserId) ||
+              (currentUserEmail && String(member.userEmail || '').toLowerCase() === currentUserEmail)
+          )
+        ) {
           memberIds.add(club.id);
         }
       }
     });
 
     return [...memberIds];
-  }, [currentUserId]);
+  }, [currentUserEmail, currentUserId]);
 
   const fetchPageData = useCallback(async () => {
     setLoading(true);
@@ -935,11 +1158,29 @@ export default function StudentClubsPage() {
   };
 
   const openJoinClubModal = (club) => {
-    const isOwnClub = myClub?.id === club.id && myClub?.presidentId === currentUserId;
+    const isOwnClub =
+      myClub?.id === club.id &&
+      ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+        (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail));
     if (isOwnClub || joinedClubSet.has(club.id)) {
       return;
     }
     setJoinModalClub(club);
+  };
+
+  const openMembersModal = async (club) => {
+    setMembersPreviewClub(club);
+    setMembersPreviewLoading(true);
+
+    try {
+      const response = await getClubMembers(club.id);
+      setMembersPreview(response.data || []);
+    } catch (error) {
+      toast.error('Failed to load club members');
+      console.error(error);
+    } finally {
+      setMembersPreviewLoading(false);
+    }
   };
 
   const handleJoinClub = async () => {
@@ -948,11 +1189,22 @@ export default function StudentClubsPage() {
       return;
     }
 
+    if (
+      joinedClubSet.has(joinModalClub.id) ||
+      (myClub?.id === joinModalClub.id &&
+        ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+          (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail)))
+    ) {
+      toast.error('Your membership for this club is already active.');
+      setJoinModalClub(null);
+      return;
+    }
+
     setJoiningClubId(joinModalClub.id);
     try {
       await joinClubWithRole(joinModalClub.id, selectedJoinRole);
       const selectedRoleOption = joinRoleOptions.find((role) => role.role === selectedJoinRole);
-      toast.success(`You joined ${joinModalClub.name} as ${selectedRoleOption?.displayName || getRoleDisplayName(selectedJoinRole)}! 🎉`);
+      toast.success(`You joined ${joinModalClub.name} as ${selectedRoleOption?.displayName || getRoleDisplayName(selectedJoinRole)}.`);
       setJoinModalClub(null);
       await fetchPageData();
     } catch (error) {
@@ -1071,9 +1323,13 @@ export default function StudentClubsPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {clubs.map((club) => {
-              const isOwnClub = myClub?.id === club.id && myClub?.presidentId === currentUserId;
+              const isOwnClub =
+                myClub?.id === club.id &&
+                ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+                  (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail));
               const isJoined = joinedClubSet.has(club.id);
               const openRoles = getOpenRoleCount(club);
+              const isJoinDisabled = isOwnClub || isJoined;
 
               return (
                 <article key={club.id} className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1102,14 +1358,30 @@ export default function StudentClubsPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => openJoinClubModal(club)}
-                    disabled={isOwnClub || isJoined}
-                    className="rounded-2xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isOwnClub ? 'You lead this club' : isJoined ? 'Joined ✓' : 'Join Club'}
-                  </button>
+                  <div className="mt-auto flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openJoinClubModal(club)}
+                      disabled={isJoinDisabled}
+                      className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                        isJoinDisabled
+                          ? 'cursor-not-allowed bg-slate-100 text-slate-500 opacity-60'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                      }`}
+                    >
+                      {isOwnClub ? 'You Lead This Club' : isJoined ? 'Membership Active' : 'Join Club'}
+                    </button>
+
+                    {(isOwnClub || isJoined) && (
+                      <button
+                        type="button"
+                        onClick={() => void openMembersModal(club)}
+                        className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        View Members
+                      </button>
+                    )}
+                  </div>
                 </article>
               );
             })}
@@ -1270,7 +1542,6 @@ export default function StudentClubsPage() {
         studentsError={studentsError}
         onSubmit={handleRegistrationSubmit}
         submitting={submitting}
-        currentUserId={currentUserId}
         editingClub={editingClub}
       />
 
@@ -1289,6 +1560,16 @@ export default function StudentClubsPage() {
         }}
         onSelectRole={setSelectedJoinRole}
         onJoin={() => void handleJoinClub()}
+      />
+
+      <ClubMembersModal
+        club={membersPreviewClub}
+        members={membersPreview}
+        loading={membersPreviewLoading}
+        onClose={() => {
+          setMembersPreviewClub(null);
+          setMembersPreview([]);
+        }}
       />
     </StudentLayout>
   );

@@ -5,9 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../context/AuthContext';
+import { getProfileRoute } from '../utils/profileRoutes';
 
 const schema = z.object({
-  email: z.string().min(1, 'Email or Student ID is required'),
+  username: z.string().min(1, 'Email, student ID, or lecturer ID is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -21,11 +22,11 @@ export default function LoginPage() {
 
   const onSubmit = async (data) => {
     try {
-      const { role, mustChangePassword } = await login(data.email, data.password);
+      const { role, mustChangePassword } = await login(data.username, data.password);
       toast.success('Login successful!');
 
       if (mustChangePassword) {
-        navigate('/change-password');
+        navigate(`${getProfileRoute(role)}?tab=password&required=1`);
         return;
       }
 
@@ -84,26 +85,26 @@ export default function LoginPage() {
             <header className="mb-10 text-center md:text-left">
               <h2 className="text-3xl font-bold text-on-surface mb-2 tracking-tight">Institutional Login</h2>
               <p className="text-on-surface-variant font-body text-sm leading-relaxed">
-                Use your official account email and password to access the event management system.
+                Use your email, student ID, or lecturer ID together with your password to access the event management system.
               </p>
             </header>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant ml-1" htmlFor="email">
-                  Email or Student ID
+                <label className="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant ml-1" htmlFor="username">
+                  Email, Student ID, or Lecturer ID
                 </label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-0 bottom-2.5 text-outline text-lg">person</span>
                   <input
-                    id="email"
-                    {...register('email')}
-                    className={`w-full pl-8 py-3 bg-surface-container-high border-0 border-b-2 focus:ring-0 transition-all text-on-surface placeholder:text-outline/50 ${errors.email ? 'border-error focus:border-error' : 'border-transparent focus:border-primary'}`}
-                    placeholder="Enter your email or student ID"
+                    id="username"
+                    {...register('username')}
+                    className={`w-full pl-8 py-3 bg-surface-container-high border-0 border-b-2 focus:ring-0 transition-all text-on-surface placeholder:text-outline/50 ${errors.username ? 'border-error focus:border-error' : 'border-transparent focus:border-primary'}`}
+                    placeholder="Enter your email, student ID, or lecturer ID"
                     type="text"
                   />
                 </div>
-                {errors.email && <p className="text-error text-xs font-medium mt-1">{errors.email.message}</p>}
+                {errors.username && <p className="text-error text-xs font-medium mt-1">{errors.username.message}</p>}
               </div>
 
               <div className="space-y-2">

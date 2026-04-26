@@ -3,6 +3,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
+import ModalPortal from '../components/ui/ModalPortal';
+import { validateRequiredText } from '../utils/validation';
 
 const typeOptions = ['GENERAL', 'EVENT_APPROVED', 'EVENT_REJECTED', 'CONFLICT', 'REMINDER'];
 const audienceOptions = [
@@ -36,6 +38,7 @@ export default function NotificationManagerPage() {
     targetAudience: 'ALL_USERS',
     userId: '',
   });
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
     loadData();
@@ -90,13 +93,25 @@ export default function NotificationManagerPage() {
 
   const handleInputChange = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+    setFormErrors((current) => ({ ...current, [field]: '' }));
   };
 
   const submitNotification = async (event) => {
     event.preventDefault();
 
-    if (form.targetAudience === 'SPECIFIC_USER' && !form.userId) {
-      toast.error('Please select a recipient');
+    const nextErrors = {
+      title: validateRequiredText(form.title, 'Title', { min: 3, max: 120 }),
+      message: validateRequiredText(form.message, 'Message', { min: 10, max: 1000 }),
+      userId:
+        form.targetAudience === 'SPECIFIC_USER' && !form.userId
+          ? 'Please select a recipient.'
+          : '',
+    };
+
+    setFormErrors(nextErrors);
+
+    if (Object.values(nextErrors).some(Boolean)) {
+      toast.error('Please fix the highlighted notification fields.');
       return;
     }
 
@@ -116,6 +131,7 @@ export default function NotificationManagerPage() {
         targetAudience: 'ALL_USERS',
         userId: '',
       });
+      setFormErrors({});
       await loadData();
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to send notification');
@@ -289,9 +305,12 @@ export default function NotificationManagerPage() {
                     type="text"
                     value={form.title}
                     onChange={(event) => handleInputChange('title', event.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-200"
+                    className={`w-full px-4 py-3 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-teal-200 ${
+                      formErrors.title ? 'border-rose-300' : 'border-slate-200'
+                    }`}
                     placeholder="Enter a short notification title"
                   />
+                  {formErrors.title && <p className="mt-2 text-sm font-medium text-rose-600">{formErrors.title}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -332,7 +351,9 @@ export default function NotificationManagerPage() {
                     <select
                       value={form.userId}
                       onChange={(event) => handleInputChange('userId', event.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:outline-none"
+                      className={`w-full px-4 py-3 rounded-xl border bg-white focus:outline-none ${
+                        formErrors.userId ? 'border-rose-300' : 'border-slate-200'
+                      }`}
                     >
                       <option value="">Select a person</option>
                       {users.map((user) => (
@@ -341,6 +362,7 @@ export default function NotificationManagerPage() {
                         </option>
                       ))}
                     </select>
+                    {formErrors.userId && <p className="mt-2 text-sm font-medium text-rose-600">{formErrors.userId}</p>}
                   </div>
                 )}
 
@@ -349,9 +371,12 @@ export default function NotificationManagerPage() {
                   <textarea
                     value={form.message}
                     onChange={(event) => handleInputChange('message', event.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-200 min-h-40 resize-none"
+                    className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-teal-200 min-h-40 resize-none ${
+                      formErrors.message ? 'border-rose-300' : 'border-slate-200'
+                    }`}
                     placeholder="Write the full notification content here"
                   />
+                  {formErrors.message && <p className="mt-2 text-sm font-medium text-rose-600">{formErrors.message}</p>}
                 </div>
               </div>
 
@@ -384,48 +409,50 @@ export default function NotificationManagerPage() {
       </div>
 
       {selectedNotification && (
-        <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">
-                  {selectedNotification.type}
-                </p>
-                <h2 className="text-3xl font-serif font-bold text-slate-900 mt-2">
-                  {selectedNotification.title || 'Notification'}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedNotification(null)}
-                className="text-slate-500 hover:text-slate-900"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="px-6 py-6 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="bg-slate-50 rounded-2xl p-4">
-                  <p className="text-slate-500">Recipient</p>
-                  <p className="font-semibold text-slate-900 mt-1">{selectedNotification.recipientName}</p>
-                  <p className="text-slate-600">{selectedNotification.recipientEmail}</p>
-                  <p className="text-xs text-slate-400 mt-1">{selectedNotification.recipientRole}</p>
+        <ModalPortal>
+          <div className="fixed inset-0 z-[105] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    {selectedNotification.type}
+                  </p>
+                  <h2 className="mt-2 text-3xl font-serif font-bold text-slate-900">
+                    {selectedNotification.title || 'Notification'}
+                  </h2>
                 </div>
-                <div className="bg-slate-50 rounded-2xl p-4">
-                  <p className="text-slate-500">Delivery State</p>
-                  <p className="font-semibold text-slate-900 mt-1">{selectedNotification.isRead ? 'Read' : 'New'}</p>
-                  <p className="text-slate-600">{new Date(selectedNotification.createdAt).toLocaleString()}</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedNotification(null)}
+                  className="text-slate-500 hover:text-slate-900"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
 
-              <div>
-                <p className="text-sm font-semibold text-slate-700 mb-2">Full Message</p>
-                <p className="text-slate-700 leading-7 whitespace-pre-wrap">{selectedNotification.message}</p>
+              <div className="space-y-5 px-6 py-6">
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-slate-500">Recipient</p>
+                    <p className="mt-1 font-semibold text-slate-900">{selectedNotification.recipientName}</p>
+                    <p className="text-slate-600">{selectedNotification.recipientEmail}</p>
+                    <p className="mt-1 text-xs text-slate-400">{selectedNotification.recipientRole}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-slate-500">Delivery State</p>
+                    <p className="mt-1 font-semibold text-slate-900">{selectedNotification.isRead ? 'Read' : 'New'}</p>
+                    <p className="text-slate-600">{new Date(selectedNotification.createdAt).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-700">Full Message</p>
+                  <p className="whitespace-pre-wrap leading-7 text-slate-700">{selectedNotification.message}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </AdminLayout>
   );

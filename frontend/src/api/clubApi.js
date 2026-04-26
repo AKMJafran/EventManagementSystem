@@ -8,6 +8,7 @@ export const submitClubRegistration = (data) =>
     seniorTreasurerLecturerId: data.seniorTreasurerLecturerId,
     secretaryUserId: data.secretaryUserId,
     treasurerUserId: data.treasurerUserId,
+    creatorRole: data.creatorRole,
   });
 
 export const updateClub = (id, data) =>
@@ -18,6 +19,7 @@ export const updateClub = (id, data) =>
     seniorTreasurerLecturerId: data.seniorTreasurerLecturerId,
     secretaryUserId: data.secretaryUserId,
     treasurerUserId: data.treasurerUserId,
+    creatorRole: data.creatorRole,
   });
 
 export const getAllClubs = () => 

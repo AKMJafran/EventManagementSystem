@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import axiosInstance from '../api/axiosInstance';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
-import EventImage from '../components/EventImage';
+import DashboardEventCard from '../components/events/DashboardEventCard';
+import DashboardEventCardSkeleton from '../components/events/DashboardEventCardSkeleton';
+import EmptyStatePanel from '../components/ui/EmptyStatePanel';
+import { normalizeEventCollection } from '../utils/eventData';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, conflicts: 0 });
@@ -20,10 +23,8 @@ export default function AdminDashboard() {
     async function fetchStats() {
       try {
         const eventsRes = await axiosInstance.get('/events');
-        const allEvents = eventsRes.data.content || eventsRes.data || [];
-        const total = allEvents.length;
-        const pendingEvents = allEvents.filter(e => e.status === 'PENDING');
-        
+        const allEvents = normalizeEventCollection(eventsRes.data);
+        const pendingEvents = allEvents.filter((event) => event.status === 'PENDING');
         const conflictsRes = await axiosInstance.get('/events/admin/conflicts').catch(() => ({ data: [] }));
 
         const today = new Date();
@@ -32,250 +33,225 @@ export default function AdminDashboard() {
         const analyticsRes = await axiosInstance.get('/events/reports/analytics', {
           params: { from, to },
         }).catch(() => ({ data: {} }));
-        
-        setStats({ total, pending: pendingEvents.length, conflicts: conflictsRes.data?.length || 0 });
+
+        setStats({
+          total: allEvents.length,
+          pending: pendingEvents.length,
+          conflicts: conflictsRes.data?.length || 0,
+        });
         setReportStats({
           approvalRate: analyticsRes.data?.approvalRate || 0,
           upcoming: analyticsRes.data?.upcomingEvents || 0,
           completed: analyticsRes.data?.completedEvents || 0,
           registrations: analyticsRes.data?.totalRegistrations || 0,
         });
-        setPendingApprovals(pendingEvents);
-      } catch (e) {
+        setPendingApprovals(pendingEvents.slice(0, 3));
+      } catch (error) {
         toast.error('Failed to load admin stats');
-        console.error(e);
+        console.error(error);
       } finally {
         setLoading(false);
       }
     }
+
     fetchStats();
   }, []);
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
     <AdminLayout>
-      {/* Editorial Header */}
-      <header className="mb-16">
-        <div className="flex justify-between items-end">
-          <div className="max-w-2xl">
-            <h2 className="text-5xl font-bold tracking-tight text-primary mb-4 serif-heading">Institutional Overview</h2>
-            <p className="text-on-surface-variant text-lg leading-relaxed font-light">
-              Welcome back, Dean. Here is the pulse of the faculty activities for the week. 
-              You have <span className="font-semibold text-tertiary">{stats.pending} events</span> requiring immediate academic review.
+      <div className="space-y-10">
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">Admin Overview</p>
+            <h1 className="mt-3 text-5xl font-bold tracking-tight text-primary serif-heading">Institutional Overview</h1>
+            <p className="mt-4 text-lg leading-relaxed text-on-surface-variant">
+              Welcome back. You currently have <span className="font-semibold text-tertiary">{stats.pending}</span> event requests waiting for academic review.
             </p>
           </div>
-          <div className="hidden lg:block">
-            <div className="bg-surface-container-low px-6 py-3 rounded-xl flex items-center gap-4">
-              <span className="material-symbols-outlined text-primary">calendar_today</span>
-              <div className="text-right">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Today's Date</p>
-                <p className="text-sm font-bold">{today}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
 
-      {/* Bento Grid Statistics */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <div className="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between group hover:bg-primary transition-all duration-300 shadow-sm border border-outline-variant/10">
-          <span className="material-symbols-outlined text-primary group-hover:text-white text-3xl mb-4">hub</span>
-          <div>
-            <p className="text-4xl font-bold group-hover:text-white">{stats.total}</p>
-            <p className="text-sm font-medium text-on-surface-variant group-hover:text-primary-fixed-dim tracking-wide">Total Events</p>
+          <div className="rounded-[1.5rem] border border-outline-variant/20 bg-white px-5 py-4 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-on-surface-variant">Today</p>
+            <p className="mt-2 text-lg font-semibold text-on-surface">{today}</p>
           </div>
-        </div>
-        <div className="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between group hover:bg-tertiary transition-all duration-300 shadow-sm border border-outline-variant/10">
-          <span className="material-symbols-outlined text-tertiary group-hover:text-white text-3xl mb-4">pending_actions</span>
-          <div>
-            <p className="text-4xl font-bold group-hover:text-white">{stats.pending}</p>
-            <p className="text-sm font-medium text-on-surface-variant group-hover:text-tertiary-fixed tracking-wide">Pending Approvals</p>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between group hover:bg-primary transition-all duration-300 shadow-sm border border-outline-variant/10">
-          <span className="material-symbols-outlined text-primary group-hover:text-white text-3xl mb-4">gavel</span>
-          <div>
-            <p className="text-4xl font-bold group-hover:text-white">{stats.conflicts}</p>
-            <p className="text-sm font-medium text-on-surface-variant group-hover:text-primary-fixed-dim tracking-wide">Reported Conflicts</p>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between group hover:bg-secondary transition-all duration-300 shadow-sm border border-outline-variant/10">
-          <span className="material-symbols-outlined text-secondary group-hover:text-white text-3xl mb-4">leaderboard</span>
-          <div>
-            <p className="text-4xl font-bold group-hover:text-white">{reportStats.approvalRate}%</p>
-            <p className="text-sm font-medium text-on-surface-variant group-hover:text-secondary-fixed tracking-wide">Approval Rate (Month)</p>
-          </div>
-        </div>
-      </section>
+        </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
-          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Upcoming Events</p>
-          <p className="text-3xl font-bold text-teal-900">{reportStats.upcoming}</p>
-          <p className="text-sm text-on-surface-variant mt-2">Approved events scheduled ahead.</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
-          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Completed Events</p>
-          <p className="text-3xl font-bold text-teal-900">{reportStats.completed}</p>
-          <p className="text-sm text-on-surface-variant mt-2">Approved events that already finished.</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-outline-variant/10 shadow-sm">
-          <p className="text-xs uppercase tracking-widest font-bold text-on-surface-variant mb-2">Registrations</p>
-          <p className="text-3xl font-bold text-teal-900">{reportStats.registrations}</p>
-          <p className="text-sm text-on-surface-variant mt-2">Participation proxy for this month.</p>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Pending Approvals - Main Content Area */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-2xl font-bold serif-heading">Pending Approvals</h3>
-            <Link to="/manage-events" className="text-primary text-sm font-bold flex items-center gap-1 hover:underline">
-              View All Requests <span className="material-symbols-outlined text-sm">arrow_forward</span>
-            </Link>
-          </div>
-          
-          <div className="space-y-4">
-            {loading ? (
-              <p className="text-on-surface-variant italic">Loading...</p>
-            ) : pendingApprovals.length === 0 ? (
-              <p className="text-on-surface-variant italic">No pending approvals right now.</p>
-            ) : (
-              pendingApprovals.slice(0, 3).map(event => (
-                <div key={event.id} className="bg-surface-container-low p-6 rounded-xl flex items-center justify-between transition-transform hover:-translate-y-1">
-                  <div className="flex items-center gap-6">
-                    <div className="h-20 w-24 overflow-hidden rounded-2xl bg-surface-container-high">
-                      <EventImage
-                        src={event.imageUrl}
-                        alt={event.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="w-1 bg-tertiary h-12 rounded-full"></div>
-                    <div>
-                      <h4 className="font-bold text-lg">{event.title}</h4>
-                      <p className="text-sm text-on-surface-variant">by {event.creator?.name || 'User'} • {new Date(event.date || event.startTime).toLocaleDateString()}</p>
-                      <div className="mt-2 flex gap-2">
-                        <span className="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full uppercase tracking-wider">{event.category?.name || 'Event'}</span>
-                        <span className="px-3 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold rounded-full uppercase tracking-wider">{event.venue}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Link to={`/manage-events`} className="px-4 py-2 text-primary font-bold text-sm hover:bg-primary-fixed-dim rounded-lg transition-colors">Review</Link>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Quick Actions Layout */}
-          <div className="pt-8">
-            <h3 className="text-xl font-bold serif-heading mb-6">Administrative Quick Actions</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Link to="/manage-categories" className="flex items-center gap-4 p-6 bg-white border border-outline-variant/10 rounded-xl hover:shadow-xl hover:shadow-primary/5 transition-all text-left">
-                <div className="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">category</span>
-                </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: 'Total Events',
+              value: stats.total,
+              detail: 'All event records currently in the system.',
+              icon: 'hub',
+              accent: 'text-primary',
+            },
+            {
+              label: 'Pending Approvals',
+              value: stats.pending,
+              detail: 'Requests that still need an admin decision.',
+              icon: 'pending_actions',
+              accent: 'text-tertiary',
+            },
+            {
+              label: 'Reported Conflicts',
+              value: stats.conflicts,
+              detail: 'Requests with unresolved venue or schedule issues.',
+              icon: 'gavel',
+              accent: 'text-primary',
+            },
+            {
+              label: 'Approval Rate',
+              value: `${reportStats.approvalRate}%`,
+              detail: 'Current monthly approval rate.',
+              icon: 'leaderboard',
+              accent: 'text-secondary',
+            },
+          ].map((card) => (
+            <article key={card.label} className="rounded-[1.75rem] border border-outline-variant/15 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-bold">Edit Categories</p>
-                  <p className="text-xs text-on-surface-variant">Update faculty event types</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">{card.label}</p>
+                  <p className="mt-4 text-4xl font-bold text-on-surface">{card.value}</p>
+                  <p className="mt-3 text-sm leading-6 text-on-surface-variant">{card.detail}</p>
                 </div>
-              </Link>
-              <Link to="/admin/reports/monthly" className="flex items-center gap-4 p-6 bg-white border border-outline-variant/10 rounded-xl hover:shadow-xl hover:shadow-primary/5 transition-all text-left">
-                <div className="w-12 h-12 rounded-full bg-secondary-fixed flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">file_download</span>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-container-low ${card.accent}`}>
+                  <span className="material-symbols-outlined">{card.icon}</span>
                 </div>
-                <div>
-                  <p className="font-bold">Generate Reports</p>
-                  <p className="text-xs text-on-surface-variant">Monthly utilization & engagement</p>
-                </div>
-              </Link>
-              <Link to="/admin/reports/analytics" className="flex items-center gap-4 p-6 bg-white border border-outline-variant/10 rounded-xl hover:shadow-xl hover:shadow-primary/5 transition-all text-left">
-                <div className="w-12 h-12 rounded-full bg-primary-fixed-dim flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">query_stats</span>
-                </div>
-                <div>
-                  <p className="font-bold">Analytics Hub</p>
-                  <p className="text-xs text-on-surface-variant">Range analytics and drill-down exports</p>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
+              </div>
+            </article>
+          ))}
+        </section>
 
-        {/* Calendar Sidebar Widget */}
-        <div className="space-y-8">
-          <div className="bg-surface-container-lowest rounded-2xl shadow-2xl shadow-primary/5 overflow-hidden border border-outline-variant/10">
-            <div className="bg-teal-gradient p-8 text-white">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Academic Calendar</h3>
-                <span className="material-symbols-outlined">more_vert</span>
+        <section className="grid gap-4 md:grid-cols-3">
+          {[
+            { label: 'Upcoming Events', value: reportStats.upcoming, detail: 'Approved events scheduled ahead.' },
+            { label: 'Completed Events', value: reportStats.completed, detail: 'Approved events that already finished.' },
+            { label: 'Registrations', value: reportStats.registrations, detail: 'Participation across this month.' },
+          ].map((card) => (
+            <article key={card.label} className="rounded-[1.75rem] border border-outline-variant/15 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">{card.label}</p>
+              <p className="mt-3 text-3xl font-bold text-on-surface">{card.value}</p>
+              <p className="mt-2 text-sm text-on-surface-variant">{card.detail}</p>
+            </article>
+          ))}
+        </section>
+
+        <div className="grid gap-10 lg:grid-cols-[1.4fr_0.9fr]">
+          <section className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-on-surface serif-heading">Pending Approvals</h2>
+                <p className="mt-2 text-sm text-on-surface-variant">Recent requests waiting for review with images, schedule, and venue details intact.</p>
               </div>
-              <div className="grid grid-cols-7 gap-2 text-center text-[10px] font-bold opacity-70 uppercase tracking-widest mb-4">
-                <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-              </div>
-              <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium">
-                <span className="opacity-30">12</span>
-                <span className="opacity-30">13</span>
-                <span className="bg-white text-primary w-8 h-8 flex items-center justify-center rounded-full mx-auto font-bold shadow-lg">14</span>
-                <span>15</span>
-                <span>16</span>
-                <span className="relative">17<div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-tertiary-fixed rounded-full"></div></span>
-                <span>18</span>
-                <span>19</span>
-                <span>20</span>
-                <span className="relative">21<div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-tertiary-fixed rounded-full"></div></span>
-                <span>22</span>
-                <span>23</span>
-                <span>24</span>
-                <span>25</span>
-              </div>
-            </div>
-            
-            <div className="p-8 space-y-6">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Today's Schedule</p>
-              <div className="space-y-6 relative">
-                <div className="flex gap-4">
-                  <div className="text-right w-12 pt-1">
-                    <p className="text-[10px] font-bold text-primary">09:00</p>
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <p className="text-sm font-bold">Board of Regents Meeting</p>
-                    <p className="text-xs text-on-surface-variant">Executive Suite • Room 101</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="text-right w-12 pt-1">
-                    <p className="text-[10px] font-bold text-primary">12:30</p>
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <p className="text-sm font-bold">Lunch with Alumni Assoc.</p>
-                    <p className="text-xs text-on-surface-variant">University Dining Hall</p>
-                  </div>
-                </div>
-              </div>
-              <Link to="/student/calendar" className="block text-center w-full py-3 border border-outline-variant rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors">
-                Full Calendar View
+              <Link to="/manage-events" className="text-sm font-semibold text-primary hover:underline">
+                View all requests
               </Link>
             </div>
-          </div>
 
-          {/* Featured Venue Card */}
-          <div className="relative h-48 rounded-2xl overflow-hidden group">
-            <img 
-              alt="University Hallway" 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQPupxUnyGvXxMtbSGsPk-6TixkAN5pQxdZBGGy1TsSeazi6G9BayZHEdydTq41ZZpJ0qDGLGNunabob74sPyi6FdoLfYw0f2GUFaH8fK8rdfMKpjuvS-7jypog1_Rjrc_cuSHXT1YD65G7Qim8x8wj9mAm7KFlaG6gHjSFAvLTnGsu6UCLfs_pHAZkFLeqLYnAuWNci5FvsprERp52XRhprGsZZe9wZjuA2lOdmf8j3ZH5rini0R3SsXWc58lOH9QauOhtk5us9UR"
-            />
-            <div className="absolute inset-0 bg-linear-to-t from-teal-900/90 to-transparent p-6 flex flex-col justify-end">
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Venue Highlight</p>
-              <h4 className="text-white font-bold text-lg">Main Auditorium</h4>
-              <p className="text-white/80 text-xs">Currently: Open for Bookings</p>
+            <div className="space-y-4">
+              {loading ? (
+                <>
+                  <DashboardEventCardSkeleton />
+                  <DashboardEventCardSkeleton />
+                </>
+              ) : pendingApprovals.length === 0 ? (
+                <EmptyStatePanel
+                  icon="task_alt"
+                  title="No pending approvals"
+                  message="New student requests will appear here as soon as they enter the review queue."
+                />
+              ) : (
+                pendingApprovals.map((event) => (
+                  <DashboardEventCard
+                    key={event.id}
+                    event={event}
+                    to="/manage-events"
+                    badgeLabel="PENDING"
+                    badgeClassName="bg-amber-100 text-amber-800"
+                    supportingText={`${event.createdByName || 'Organizer'} • ${event.categoryName || 'Event'}`}
+                  />
+                ))
+              )}
             </div>
-          </div>
+
+            <div className="pt-4">
+              <h3 className="mb-5 text-xl font-bold text-on-surface serif-heading">Administrative Quick Actions</h3>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Link to="/manage-categories" className="flex items-center gap-4 rounded-[1.5rem] border border-outline-variant/15 bg-white p-6 shadow-sm transition hover:shadow-lg">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <span className="material-symbols-outlined">category</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-on-surface">Edit Categories</p>
+                    <p className="text-xs text-on-surface-variant">Maintain event classification.</p>
+                  </div>
+                </Link>
+                <Link to="/admin/reports/monthly" className="flex items-center gap-4 rounded-[1.5rem] border border-outline-variant/15 bg-white p-6 shadow-sm transition hover:shadow-lg">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+                    <span className="material-symbols-outlined">file_download</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-on-surface">Generate Reports</p>
+                    <p className="text-xs text-on-surface-variant">Monthly utilization and exports.</p>
+                  </div>
+                </Link>
+                <Link to="/admin/reports/analytics" className="flex items-center gap-4 rounded-[1.5rem] border border-outline-variant/15 bg-white p-6 shadow-sm transition hover:shadow-lg">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-low text-primary">
+                    <span className="material-symbols-outlined">query_stats</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-on-surface">Analytics Hub</p>
+                    <p className="text-xs text-on-surface-variant">Dive into trends and performance.</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <aside className="space-y-6">
+            <section className="overflow-hidden rounded-[2rem] border border-outline-variant/15 bg-white shadow-sm">
+              <div className="bg-teal-gradient px-6 py-8 text-white">
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/70">Calendar Snapshot</p>
+                <h3 className="mt-3 text-2xl font-bold">This Month at a Glance</h3>
+                <p className="mt-2 text-sm text-white/80">Use the full calendar to inspect venue usage and approved activity timing.</p>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label) => (
+                    <div key={label} className="rounded-xl bg-surface-container-low py-3">{label}</div>
+                  ))}
+                </div>
+                <Link
+                  to="/admin/calendar"
+                  className="mt-6 inline-flex w-full items-center justify-center rounded-2xl border border-outline-variant/20 px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
+                >
+                  Open Full Calendar
+                </Link>
+              </div>
+            </section>
+
+            <section className="relative overflow-hidden rounded-[2rem] border border-outline-variant/15 bg-white shadow-sm">
+              <img
+                alt="Main Auditorium"
+                className="h-52 w-full object-cover"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQPupxUnyGvXxMtbSGsPk-6TixkAN5pQxdZBGGy1TsSeazi6G9BayZHEdydTq41ZZpJ0qDGLGNunabob74sPyi6FdoLfYw0f2GUFaH8fK8rdfMKpjuvS-7jypog1_Rjrc_cuSHXT1YD65G7Qim8x8wj9mAm7KFlaG6gHjSFAvLTnGsu6UCLfs_pHAZkFLeqLYnAuWNci5FvsprERp52XRhprGsZZe9wZjuA2lOdmf8j3ZH5rini0R3SsXWc58lOH9QauOhtk5us9UR"
+              />
+              <div className="space-y-2 p-6">
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">Venue Highlight</p>
+                <h3 className="text-2xl font-bold text-on-surface serif-heading">Main Auditorium</h3>
+                <p className="text-sm text-on-surface-variant">Keep the venue directory current so bookings, approvals, and dashboard venue states stay reliable.</p>
+                <Link to="/manage-venues" className="inline-flex text-sm font-semibold text-primary hover:underline">
+                  Manage venues
+                </Link>
+              </div>
+            </section>
+          </aside>
         </div>
       </div>
     </AdminLayout>

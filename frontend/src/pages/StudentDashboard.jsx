@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
+import DashboardEventCard from '../components/events/DashboardEventCard';
 import StudentLayout from '../components/layout/StudentLayout';
+import EmptyStatePanel from '../components/ui/EmptyStatePanel';
+import { normalizeEventCollection } from '../utils/eventData';
 
 function buildMonthGrid(baseDate) {
   const firstDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
@@ -81,8 +84,8 @@ export default function StudentDashboard() {
           axiosInstance.get('/events/student/calendar-feed', { params: { start: firstDay, end: lastDay } }),
         ]);
 
-        const approvedData = approvedRes.data.content || approvedRes.data || [];
-        const myData = myRes.data.content || myRes.data || [];
+        const approvedData = normalizeEventCollection(approvedRes.data);
+        const myData = normalizeEventCollection(myRes.data);
         setApprovedEvents(approvedData.slice(0, 3));
         setMyEvents(myData.slice(0, 4));
         setCalendarFeed(calendarRes.data || { events: [], reminders: [], overlapAlerts: [] });
@@ -221,20 +224,20 @@ export default function StudentDashboard() {
           </div>
           <div className="space-y-4">
             {approvedEvents.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">No approved events this month.</p>
+              <EmptyStatePanel
+                icon="event_busy"
+                title="No approved events yet"
+                message="Approved events for this month will appear here once the schedule is finalized."
+              />
             ) : (
               approvedEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="block rounded-2xl bg-surface-container-low p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-on-surface">{event.title}</h3>
-                      <p className="mt-1 text-xs text-on-surface-variant">{formatDateRange(event)}</p>
-                    </div>
-                    <span className="rounded-full bg-secondary-container px-3 py-1 text-[10px] font-bold uppercase text-on-secondary-container">
-                      {event.calendarLabel || 'APPROVED'}
-                    </span>
-                  </div>
-                </Link>
+                <DashboardEventCard
+                  key={event.id}
+                  event={event}
+                  to={`/events/${event.id}`}
+                  badgeLabel={event.calendarLabel || 'APPROVED'}
+                  supportingText={event.categoryName || 'Faculty event'}
+                />
               ))
             )}
           </div>
@@ -247,23 +250,21 @@ export default function StudentDashboard() {
           </div>
           <div className="space-y-4">
             {myEvents.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">No requests yet.</p>
+              <EmptyStatePanel
+                icon="note_add"
+                title="No requests yet"
+                message="Create your first event request to start tracking reviews, conflicts, and approvals here."
+              />
             ) : (
               myEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="block rounded-2xl bg-surface-container-low p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-on-surface">{event.title}</h3>
-                      <p className="mt-1 text-xs text-on-surface-variant">{formatDateRange(event)}</p>
-                      {event.conflictDetails?.[0] && (
-                        <p className="mt-2 text-xs text-on-surface-variant">{event.conflictDetails[0].summary}</p>
-                      )}
-                    </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase ${statusTone(event.status)}`}>
-                      {event.status}
-                    </span>
-                  </div>
-                </Link>
+                <DashboardEventCard
+                  key={event.id}
+                  event={event}
+                  to={`/events/${event.id}`}
+                  badgeLabel={event.status}
+                  badgeClassName={statusTone(event.status)}
+                  supportingText={event.conflictDetails?.[0]?.summary || event.categoryName || 'Event request'}
+                />
               ))
             )}
           </div>

@@ -45,14 +45,13 @@ public class ClubService {
     public ClubResponse createClub(ClubRequest request, Long presidentId) {
         User president = getUserById(presidentId);
         validateStudentPresident(president);
+        validateCreatorRole(request);
 
         User lecturer = getUserById(request.getSeniorTreasurerLecturerId());
         validateLecturerTreasurer(lecturer);
-        User secretary = getUserById(request.getSecretaryUserId());
-        validateExecutiveStudent(secretary, "Secretary");
-        User studentTreasurer = getUserById(request.getTreasurerUserId());
-        validateExecutiveStudent(studentTreasurer, "Student treasurer");
-        validateExecutiveAssignments(presidentId, secretary.getId(), studentTreasurer.getId());
+        User secretary = resolveSecretaryUser(request, president);
+        User studentTreasurer = resolveTreasurerUser(request, president);
+        validateExecutiveAssignments(presidentId, secretary.getId(), studentTreasurer.getId(), request.getCreatorRole());
 
         String clubName = request.getName().trim();
         if (clubRepository.existsByNameIgnoreCase(clubName)) {
@@ -77,8 +76,13 @@ public class ClubService {
 
         Club savedClub = clubRepository.save(club);
 
-        saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
-        saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
+        saveMembership(savedClub.getId(), president.getId(), request.getCreatorRole());
+        if (request.getCreatorRole() != ClubMemberRole.SECRETARY) {
+            saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
+        }
+        if (request.getCreatorRole() != ClubMemberRole.TREASURER) {
+            saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
+        }
 
         notificationService.createNotification(
                 lecturer.getId(),
@@ -106,13 +110,13 @@ public class ClubService {
             throw new RuntimeException("Club can only be edited while in pending approval state");
         }
 
+        validateCreatorRole(request);
         User lecturer = getUserById(request.getSeniorTreasurerLecturerId());
         validateLecturerTreasurer(lecturer);
-        User secretary = getUserById(request.getSecretaryUserId());
-        validateExecutiveStudent(secretary, "Secretary");
-        User studentTreasurer = getUserById(request.getTreasurerUserId());
-        validateExecutiveStudent(studentTreasurer, "Student treasurer");
-        validateExecutiveAssignments(presidentId, secretary.getId(), studentTreasurer.getId());
+        User president = getUserById(presidentId);
+        User secretary = resolveSecretaryUser(request, president);
+        User studentTreasurer = resolveTreasurerUser(request, president);
+        validateExecutiveAssignments(presidentId, secretary.getId(), studentTreasurer.getId(), request.getCreatorRole());
 
         String clubName = request.getName().trim();
         if (!club.getName().equalsIgnoreCase(clubName) && clubRepository.existsByNameIgnoreCaseAndIdNot(clubName, clubId)) {
@@ -128,15 +132,19 @@ public class ClubService {
 
         Club savedClub = clubRepository.save(club);
 
+        clubMembershipRepository.deleteByClubIdAndUserId(savedClub.getId(), presidentId);
         clubMembershipRepository.deleteByClubIdAndMemberRoleIn(
                 savedClub.getId(),
                 List.of(ClubMemberRole.SECRETARY, ClubMemberRole.TREASURER)
         );
 
-        saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
-        saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
-
-        User president = getUserById(presidentId);
+        saveMembership(savedClub.getId(), presidentId, request.getCreatorRole());
+        if (request.getCreatorRole() != ClubMemberRole.SECRETARY) {
+            saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
+        }
+        if (request.getCreatorRole() != ClubMemberRole.TREASURER) {
+            saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
+        }
         notificationService.createNotification(
                 lecturer.getId(),
                 "Club Registration Updated — Awaiting Treasurer Approval",
@@ -433,9 +441,44 @@ public class ClubService {
         }
     }
 
-    private void validateExecutiveAssignments(Long presidentId, Long secretaryUserId, Long treasurerUserId) {
-        if (presidentId.equals(secretaryUserId) || presidentId.equals(treasurerUserId)) {
-            throw new RuntimeException("President, Secretary, and Treasurer must be different students");
+    private void validateCreatorRole(ClubRequest request) {
+        ClubMemberRole creatorRole = request.getCreatorRole();
+        if (creatorRole == null || creatorRole == ClubMemberRole.GENERAL_MEMBER) {
+            throw new RuntimeException("Club creator must select a valid leadership position");
+        }
+
+        if (!getAvailableRolesForClubType(request.getType()).contains(creatorRole)) {
+            throw new RuntimeException("Selected creator role is not available for this club type");
+        }
+    }
+
+    private User resolveSecretaryUser(ClubRequest request, User president) {
+        if (request.getCreatorRole() == ClubMemberRole.SECRETARY) {
+            return president;
+        }
+
+        User secretary = getUserById(request.getSecretaryUserId());
+        validateExecutiveStudent(secretary, "Secretary");
+        return secretary;
+    }
+
+    private User resolveTreasurerUser(ClubRequest request, User president) {
+        if (request.getCreatorRole() == ClubMemberRole.TREASURER) {
+            return president;
+        }
+
+        User studentTreasurer = getUserById(request.getTreasurerUserId());
+        validateExecutiveStudent(studentTreasurer, "Student treasurer");
+        return studentTreasurer;
+    }
+
+    private void validateExecutiveAssignments(Long presidentId, Long secretaryUserId, Long treasurerUserId, ClubMemberRole creatorRole) {
+        if (creatorRole != ClubMemberRole.SECRETARY && presidentId.equals(secretaryUserId)) {
+            throw new RuntimeException("President and Secretary must be different students");
+        }
+
+        if (creatorRole != ClubMemberRole.TREASURER && presidentId.equals(treasurerUserId)) {
+            throw new RuntimeException("President and Treasurer must be different students");
         }
 
         if (secretaryUserId.equals(treasurerUserId)) {
@@ -466,7 +509,11 @@ public class ClubService {
     }
 
     private List<ClubMemberRole> getAvailableRolesForClub(Club club) {
-        if (club == null || club.getType() == null) {
+        return getAvailableRolesForClubType(club != null ? club.getType() : null);
+    }
+
+    private List<ClubMemberRole> getAvailableRolesForClubType(com.project.ems_server.enums.ClubType clubType) {
+        if (clubType == null) {
             return List.of(
                     ClubMemberRole.PRESIDENT,
                     ClubMemberRole.VICE_PRESIDENT,
@@ -477,7 +524,7 @@ public class ClubService {
             );
         }
 
-        return ClubRoleConfig.getAvailableRoles(club.getType());
+        return ClubRoleConfig.getAvailableRoles(clubType);
     }
 
     private ClubResponse mapToResponse(Club club) {
@@ -514,8 +561,9 @@ public class ClubService {
         User studentTreasurer = treasurerMembership != null ? usersById.get(treasurerMembership.getUserId()) : null;
         StudentProfile secretaryProfile = secretaryMembership != null ? studentProfilesByUserId.get(secretaryMembership.getUserId()) : null;
         StudentProfile studentTreasurerProfile = treasurerMembership != null ? studentProfilesByUserId.get(treasurerMembership.getUserId()) : null;
-        boolean hasPresidentMembership = membershipsByRole.containsKey(ClubMemberRole.PRESIDENT);
-        long displayedMemberCount = memberships.size() + (!hasPresidentMembership && club.getPresidentId() != null ? 1 : 0);
+        boolean presidentAlreadyCounted = memberships.stream()
+                .anyMatch(membership -> club.getPresidentId() != null && club.getPresidentId().equals(membership.getUserId()));
+        long displayedMemberCount = memberships.size() + (!presidentAlreadyCounted && club.getPresidentId() != null ? 1 : 0);
 
         return ClubResponse.builder()
                 .id(club.getId())

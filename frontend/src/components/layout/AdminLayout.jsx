@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import AdminSidebar from './AdminSidebar';
+import useAuthStore from '../../context/AuthContext';
 import NotificationBell from '../NotificationBell';
+import AdminSidebar from './AdminSidebar';
+import ProfileShortcut from './ProfileShortcut';
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
@@ -31,6 +34,7 @@ export default function AdminLayout({ children }) {
               <div className="rounded-2xl border border-outline-variant/30 bg-white/80 p-2 shadow-sm">
                 <NotificationBell />
               </div>
+              <ProfileShortcut user={user} />
             </div>
           </div>
         </div>

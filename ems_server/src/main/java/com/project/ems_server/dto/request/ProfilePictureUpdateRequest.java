@@ -10,11 +10,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginRequest {
-    
-    @NotBlank(message = "Email, student ID, or lecturer ID is required")
-    private String email;
-    
-    @NotBlank(message = "Password is required")
-    private String password;
+public class ProfilePictureUpdateRequest {
+
+    @NotBlank(message = "fileId is required")
+    private String fileId;
 }
