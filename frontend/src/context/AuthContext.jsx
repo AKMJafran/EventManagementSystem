@@ -36,6 +36,22 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  markPasswordChanged: () => {
+    set((state) => {
+      const updatedUser = { ...state.user, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
+  },
+
+  skipPasswordChange: () => {
+    set((state) => {
+      const updatedUser = { ...state.user, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
+  },
+
   logout: () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
