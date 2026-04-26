@@ -10,6 +10,7 @@ export default function StudentSidebar() {
     { to: "/student", icon: "dashboard", label: "Dashboard" },
     { to: "/student/my-events", icon: "event_note", label: "Event Requests" },
     { to: "/student/calendar", icon: "meeting_room", label: "Venue Booking" },
+    { to: "/student/clubs", icon: "account_balance", label: "Clubs" },
   ];
 
   return (

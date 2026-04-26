@@ -27,6 +27,8 @@ import LecturerEventsPage from './pages/LecturerEventsPage';
 import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
 import LecturerPendingApprovalsPage from './pages/LecturerPendingApprovalsPage';
 import LecturerProfilePage from './pages/LecturerProfilePage';
+import StudentClubsPage from './pages/StudentClubsPage';
+import ManageClubs from './pages/ManageClubs';
 
 const Home = () => {
   const { isAuthenticated, user } = useAuthStore.getState();
@@ -75,6 +77,7 @@ function App() {
         <Route path="/student/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
+        <Route path="/student/clubs" element={<StudentClubsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
@@ -84,6 +87,7 @@ function App() {
         <Route path="/admin/reports/analytics" element={<AnalyticsPage />} />
         <Route path="/manage-categories" element={<ManageCategories />} />
         <Route path="/manage-events" element={<ManageEvents />} />
+        <Route path="/admin/manage-clubs" element={<ManageClubs />} />
         <Route path="/manage-students" element={<ManageStudents />} />
         <Route path="/manage-lecturers" element={<ManageLecturers />} />
         <Route path="/manage-venues" element={<ManageVenues />} />

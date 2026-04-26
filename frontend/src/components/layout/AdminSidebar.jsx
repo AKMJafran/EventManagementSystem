@@ -9,6 +9,7 @@ export default function AdminSidebar() {
   const navLinks = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: 'dashboard' },
     { name: 'Manage Events', path: '/manage-events', icon: 'event_note' },
+    { name: 'Manage Clubs', path: '/admin/manage-clubs', icon: 'account_balance' },
     { name: 'Manage Categories', path: '/manage-categories', icon: 'category' },
     { name: 'Manage Students', path: '/manage-students', icon: 'people' },
     { name: 'Manage Lecturers', path: '/manage-lecturers', icon: 'supervisor_account' },
