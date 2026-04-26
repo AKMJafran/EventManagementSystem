@@ -49,7 +49,7 @@ public class AuthService {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         resolvedEmail,
-                        loginRequest.getPassword()));
+                        loginRequest.getPassword() != null ? loginRequest.getPassword().trim() : ""));
 
         if (!Boolean.TRUE.equals(user.getIsVerified())) {
             throw new RuntimeException("User email not verified. Please verify your email first.");
