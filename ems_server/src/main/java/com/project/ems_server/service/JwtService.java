@@ -14,7 +14,7 @@ public class JwtService {
     private String SECRET_KEY="verysecretvalue12345678901234567890";
 
    
-    private long ACCESS_TOKEN_EXPIRY=900000;//15 minutes
+    private long ACCESS_TOKEN_EXPIRY = 86400000; // 1 day
 
    
     private long REFRESH_TOKEN_EXPIRY=604800000;//7 days
