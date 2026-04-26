@@ -225,6 +225,12 @@ export default function MyEventsPage() {
                       </p>
                     )}
 
+                    {event.status === 'CANCELLED' && event.rejectReason && (
+                      <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 ring-1 ring-slate-200">
+                        Removal reason: {event.rejectReason}
+                      </p>
+                    )}
+
                     <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
                       {canEditStudentEvent(event) && (
                         <button

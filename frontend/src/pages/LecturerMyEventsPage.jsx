@@ -147,6 +147,12 @@ export default function LecturerMyEventsPage() {
                           Rejected: {event.rejectReason}
                         </p>
                       )}
+
+                      {event.status === 'CANCELLED' && event.rejectReason && (
+                        <p className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 ring-1 ring-slate-200">
+                          Removal reason: {event.rejectReason}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-3">

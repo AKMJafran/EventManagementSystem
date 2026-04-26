@@ -24,6 +24,8 @@ public class EventResponse {
     private String imageContentType;
     private LocalDateTime imageUploadedAt;
     private String imageChecksum;
+
+    private LocalDateTime createdAt;
     
     private String title;
     

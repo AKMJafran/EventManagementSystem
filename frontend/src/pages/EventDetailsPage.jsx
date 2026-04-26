@@ -100,6 +100,73 @@ function EventDetailsContent({ event, loading, role }) {
         </aside>
       </section>
 
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-on-surface serif-heading">Status History</h3>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            A quick audit trail of the request lifecycle and any admin decision notes.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            <div className="rounded-2xl bg-surface-container-low p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">Submitted</p>
+              <p className="mt-2 font-semibold text-on-surface">
+                {event.createdAt ? new Date(event.createdAt).toLocaleString() : 'Submission timestamp unavailable'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-surface-container-low p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">Current Status</p>
+              <p className="mt-2 font-semibold text-on-surface">{event.status}</p>
+            </div>
+
+            {event.rejectReason && (
+              <div className="rounded-2xl bg-surface-container-low p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
+                  {event.status === 'CANCELLED' ? 'Removal Reason' : 'Decision Reason'}
+                </p>
+                <p className="mt-2 text-sm leading-7 text-on-surface">
+                  {event.rejectReason}
+                </p>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-on-surface serif-heading">Admin Notes</h3>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Context shown here reflects the latest review outcome recorded for this event.
+          </p>
+
+          <div className="mt-6 rounded-2xl bg-surface-container-low p-4">
+            {event.status === 'APPROVED' && (
+              <p className="text-sm leading-7 text-on-surface">
+                This event is approved and active on the schedule.
+              </p>
+            )}
+
+            {event.status === 'PENDING' && (
+              <p className="text-sm leading-7 text-on-surface">
+                This request is still waiting for admin review.
+              </p>
+            )}
+
+            {event.status === 'REJECTED' && (
+              <p className="text-sm leading-7 text-on-surface">
+                The request was rejected. Review the decision reason for the most recent admin feedback.
+              </p>
+            )}
+
+            {event.status === 'CANCELLED' && (
+              <p className="text-sm leading-7 text-on-surface">
+                This event was removed from the active schedule. If a removal reason is available, it appears in the status history.
+              </p>
+            )}
+          </div>
+        </article>
+      </section>
+
       {event.conflictDetails?.length > 0 && (
         <section className="rounded-2xl bg-surface-container-lowest p-6 shadow-sm">
           <h3 className="text-lg font-bold text-on-surface serif-heading">Conflict Review</h3>

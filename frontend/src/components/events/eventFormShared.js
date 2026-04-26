@@ -210,7 +210,7 @@ export function getApprovalStageMeta(event = {}) {
   if (status === 'CANCELLED') {
     return {
       label: 'Cancelled',
-      detail: 'Cancelled',
+      detail: event.rejectReason ? `Cancelled: ${event.rejectReason}` : 'Cancelled',
       pillClass: 'bg-slate-200 text-slate-700 border border-slate-300',
       icon: 'event_busy',
     };

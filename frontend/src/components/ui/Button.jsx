@@ -3,21 +3,21 @@ import React from "react";
 export const Button = React.forwardRef(
   ({ className, variant = "primary", size = "default", children, isLoading, ...props }, ref) => {
     const baseStyle =
-      "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:pointer-events-none disabled:opacity-50";
+      "inline-flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none";
 
     const variants = {
-      primary: "bg-primary-600 text-white hover:bg-primary-700 shadow-sm",
-      secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200",
-      outline: "border border-gray-300 bg-transparent hover:bg-gray-100 text-gray-900",
-      ghost: "bg-transparent hover:bg-gray-100 text-gray-900",
-      danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
-      success: "bg-green-600 text-white hover:bg-green-700 shadow-sm",
+      primary: "bg-primary text-white shadow-sm hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/15",
+      secondary: "bg-secondary text-white shadow-sm hover:bg-secondary/90 hover:shadow-lg hover:shadow-secondary/15",
+      outline: "border border-outline-variant/60 bg-white text-on-surface hover:bg-surface-container-low hover:shadow-md",
+      ghost: "bg-transparent text-on-surface hover:bg-surface-container-low",
+      danger: "bg-error text-white shadow-sm hover:bg-error/90 hover:shadow-lg hover:shadow-error/10",
+      success: "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/15",
     };
 
     const sizes = {
       default: "h-10 px-4 py-2",
-      sm: "h-9 rounded-md px-3",
-      lg: "h-11 rounded-md px-8",
+      sm: "h-9 px-3",
+      lg: "h-11 px-8",
       icon: "h-10 w-10",
     };
 

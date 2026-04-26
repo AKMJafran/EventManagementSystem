@@ -618,6 +618,24 @@ public class EventService {
         conflictService.refreshConflictRecords(event, false);
     }
 
+    @Transactional
+    public void removeApprovedEvent(Long eventId, String reason, Long adminId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        if (event.getStatus() != EventStatus.APPROVED) {
+            throw new RuntimeException("Only approved events can be removed");
+        }
+
+        String normalizedReason = normalizeDecisionReason(reason);
+
+        event.setStatus(EventStatus.CANCELLED);
+        event.setRejectReason(normalizedReason);
+        eventRepository.save(event);
+        conflictService.refreshConflictRecords(event, false);
+        notifyStudentOfApprovedRemoval(event, normalizedReason);
+    }
+
     /**
      * Gets all conflicts
      */
@@ -920,6 +938,19 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         );
     }
 
+    private void notifyStudentOfApprovedRemoval(Event event, String reason) {
+        notificationService.createNotification(
+                event.getUserId(),
+                "Approved Event Removed",
+                String.format(
+                        "Your approved event '%s' was removed by the admin. Reason: %s",
+                        event.getTitle(),
+                        reason
+                ),
+                NotificationType.GENERAL
+        );
+    }
+
     private void applyEventImage(Event event, EventRequest eventRequest, boolean preserveExistingWhenMissing) {
         if (Boolean.TRUE.equals(eventRequest.getRemoveImage())) {
             event.setImageId(null);
@@ -978,6 +1009,7 @@ public List<EventResponse> getEventsByUserId(Long userId) {
                 .imageContentType(event.getImageContentType())
                 .imageUploadedAt(event.getImageUploadedAt())
                 .imageChecksum(event.getImageChecksum())
+                .createdAt(event.getCreatedAt())
                 .title(event.getTitle())
                 .description(event.getDescription())
                 .imageUrl(imageUrl)

@@ -225,6 +225,23 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/remove-approved")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> removeApprovedEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) EventDecisionRequest request,
+            Authentication authentication) {
+
+        String reason = request != null ? request.getReason() : null;
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Reason is required");
+        }
+
+        Long adminId = extractUserIdFromAuthentication(authentication);
+        eventService.removeApprovedEvent(id, reason.trim(), adminId);
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * Gets all conflicts (admin only)
      * GET /admin/conflicts
