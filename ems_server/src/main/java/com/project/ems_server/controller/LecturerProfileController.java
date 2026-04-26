@@ -1,11 +1,13 @@
 package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.LecturerProfileUpdateRequest;
+import com.project.ems_server.dto.response.ClubResponse;
 import com.project.ems_server.dto.response.LecturerProfileResponse;
 import com.project.ems_server.entity.LecturerProfile;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.repository.LecturerProfileRepository;
 import com.project.ems_server.repository.UserRepository;
+import com.project.ems_server.service.ClubService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +31,7 @@ public class LecturerProfileController {
 
     private final UserRepository userRepository;
     private final LecturerProfileRepository lecturerProfileRepository;
+    private final ClubService clubService;
 
     /**
      * GET /lecturer/profile — lecturer views their own profile
@@ -83,8 +86,9 @@ public class LecturerProfileController {
      * Returns empty list until Club entity is implemented.
      */
     @GetMapping("/clubs")
-    public ResponseEntity<List<Map<String, Object>>> getMyClubs() {
-        return ResponseEntity.ok(Collections.emptyList());
+    public ResponseEntity<List<ClubResponse>> getMyClubs(Authentication authentication) {
+        User user = resolveUser(authentication);
+        return ResponseEntity.ok(clubService.getClubsByTreasurer(user.getId()));
     }
 
     /**

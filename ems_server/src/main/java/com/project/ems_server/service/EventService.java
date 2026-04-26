@@ -58,11 +58,13 @@ public class EventService {
     private final EventAbstractFactory eventAbstractFactory;
     private final FileServerService fileServerService;
     private final NotificationService notificationService;
+    private final ClubService clubService;
 
     /**
      * Creates a new event with PENDING status and records conflicts for admin review.
      */
     public EventResponse createEvent(EventRequest eventRequest, Long userId) {
+        clubService.ensureUserCanOrganizeEvents(userId);
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
         Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
@@ -117,6 +119,7 @@ public class EventService {
      * Updates an existing pending event belonging to the requesting student.
      */
     public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
+        clubService.ensureUserCanOrganizeEvents(userId);
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
         Event event = eventRepository.findById(eventId)
