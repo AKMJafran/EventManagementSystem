@@ -74,7 +74,6 @@ public class EventService {
             throw new RuntimeException("You are not allowed to create events");
         }
 
-        clubService.ensureUserCanOrganizeEvents(userId);
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
         Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
@@ -163,8 +162,6 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
         if (requesterRole == Role.STUDENT) {
-            clubService.ensureUserCanOrganizeEvents(userId);
-
             if (!event.getUserId().equals(userId)) {
                 throw new RuntimeException("You are not allowed to edit this event");
             }
@@ -734,6 +731,25 @@ public class EventService {
                 .build();
 
         eventAttendeeRepository.save(attendee);
+    }
+
+    @Transactional
+    public void cancelEvent(Long eventId, Long requesterId, Role requesterRole) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
+
+        boolean isAdmin = requesterRole == Role.ADMIN;
+        if (!isAdmin && !event.getUserId().equals(requesterId)) {
+            throw new RuntimeException("You are not allowed to cancel this event");
+        }
+
+        if (event.getStatus() != EventStatus.PENDING && event.getStatus() != EventStatus.APPROVED) {
+            throw new RuntimeException("Only pending or approved events can be cancelled");
+        }
+
+        event.setStatus(EventStatus.CANCELLED);
+        eventRepository.save(event);
+        conflictService.refreshConflictRecords(event, false);
     }
 
     /**

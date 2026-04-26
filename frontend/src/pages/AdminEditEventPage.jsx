@@ -7,7 +7,6 @@ import {
   baseEventSchema,
   getApprovalStageMeta,
   getOrganizerTypeMeta,
-  NON_URGENT_EVENT_TYPE_OPTIONS,
 } from '../components/events/eventFormShared';
 import { getEventById, updateEvent as updateEventRequest } from '../api/eventApi';
 
@@ -68,13 +67,10 @@ export default function AdminEditEventPage() {
 
   const organizerMeta = getOrganizerTypeMeta(event);
   const approvalMeta = getApprovalStageMeta(event);
-  const allowedEventTypes =
-    event.organizerType === 'DEPARTMENTAL' ? NON_URGENT_EVENT_TYPE_OPTIONS : undefined;
 
   return (
     <AdminLayout>
       <EventFormShell
-        allowedEventTypes={allowedEventTypes}
         conflictMessage="Venue conflict detected. Please choose a different venue or time."
         generalErrorMessage="Failed to update event."
         headerContent={
@@ -139,7 +135,6 @@ export default function AdminEditEventPage() {
             description: payload.description,
             categoryId: payload.categoryId,
             subCategoryId: payload.subCategoryId || null,
-            eventType: payload.eventType,
             venue: payload.venue,
             startTime: payload.startTime,
             endTime: payload.endTime,

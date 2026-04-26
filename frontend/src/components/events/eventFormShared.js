@@ -40,9 +40,6 @@ const baseEventFields = {
     .max(1000, 'Description cannot exceed 1000 characters'),
   categoryId: requiredNumberField('Please select a category'),
   subCategoryId: optionalNumberField,
-  eventType: z.enum(['CULTURAL', 'TECHNICAL', 'ACADEMIC', 'SPORTS', 'URGENT'], {
-    required_error: 'Please select an event type',
-  }),
   venue: z.string().min(1, 'Please select a venue'),
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
@@ -72,30 +69,18 @@ export const clubEventSchema = withDateValidation(baseEventObject.extend({
   clubId: requiredNumberField('Club is required'),
 }));
 
-export const departmentalEventSchema = withDateValidation(
-  baseEventObject
-  .extend({
-    organizerType: z.literal('DEPARTMENTAL'),
-    departmentName: z.string().min(2, 'Department name required'),
-  })
-  .omit({ eventType: true })
-  .extend({
-    eventType: z.enum(['CULTURAL', 'TECHNICAL', 'ACADEMIC', 'SPORTS']),
-  })
-);
+export const departmentalEventSchema = withDateValidation(baseEventObject.extend({
+  organizerType: z.literal('DEPARTMENTAL'),
+  departmentName: z.string().min(2, 'Department name required'),
+}));
 
 export const facultyOfficialEventSchema = withDateValidation(baseEventObject.extend({
   organizerType: z.literal('FACULTY_OFFICIAL'),
 }));
 
-export const departmentalEditSchema = withDateValidation(
-  baseEventObject
-  .omit({ eventType: true })
-  .extend({
-    departmentName: z.string().min(2, 'Department name required'),
-    eventType: z.enum(['CULTURAL', 'TECHNICAL', 'ACADEMIC', 'SPORTS']),
-  })
-);
+export const departmentalEditSchema = withDateValidation(baseEventObject.extend({
+  departmentName: z.string().min(2, 'Department name required'),
+}));
 
 export function normalizeCategories(items = []) {
   return items.map((item) => ({
@@ -137,7 +122,7 @@ export function formatEventDate(dateString) {
 }
 
 export function getOrganizerTypeMeta(event = {}) {
-  const organizerType = event.organizerType || 'INDIVIDUAL_STUDENT';
+  const organizerType = event.organizerType || null;
   if (organizerType === 'CLUB_EVENT') {
     return {
       icon: 'account_balance',
@@ -167,8 +152,8 @@ export function getOrganizerTypeMeta(event = {}) {
 
   return {
     icon: 'person',
-    label: 'Personal Event',
-    shortLabel: 'Personal',
+    label: 'Event Request',
+    shortLabel: 'Event',
     badgeClass: 'bg-sky-100 text-sky-800 border border-sky-200',
   };
 }
@@ -240,14 +225,11 @@ export function getApprovalStageMeta(event = {}) {
 }
 
 export function canEditStudentEvent(event = {}) {
-  return (
-    event.status === 'PENDING' &&
-    ['PENDING_DEAN', 'PENDING_TREASURER'].includes(event.approvalStage)
-  );
+  return event.status === 'PENDING';
 }
 
 export function canEditLecturerEvent(event = {}) {
-  return event.status === 'PENDING' && event.approvalStage === 'PENDING_DEAN';
+  return event.status === 'PENDING';
 }
 
 export function extractReadableErrorMessage(error, fallbackMessage) {
@@ -276,8 +258,8 @@ export function eventBelongsToCurrentUser(event, user) {
   if (event?.ownedByCurrentUser === true) return true;
   if (event?.ownedByCurrentUser === false) return false;
   const currentUserId = Number(user?.id);
-  if (!Number.isNaN(currentUserId) && event?.userId != null) {
-    return currentUserId === Number(event.userId);
+  if (Number.isNaN(currentUserId) || event?.userId == null) {
+    return false;
   }
-  return true;
+  return currentUserId === Number(event.userId);
 }

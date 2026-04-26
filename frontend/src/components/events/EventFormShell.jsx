@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../../api/axiosInstance';
 import {
-  EVENT_TYPE_OPTIONS,
   extractReadableErrorMessage,
   isVenueConflictError,
   normalizeCategories,
@@ -50,7 +49,6 @@ export default function EventFormShell({
   onCancel,
   submitRequest,
   onSuccess,
-  allowedEventTypes = EVENT_TYPE_OPTIONS,
   showDepartmentField = false,
   departmentReadOnly = false,
   departmentHelperText = '',
@@ -86,7 +84,6 @@ export default function EventFormShell({
       description: '',
       categoryId: '',
       subCategoryId: '',
-      eventType: '',
       venue: '',
       startTime: '',
       endTime: '',
@@ -139,11 +136,11 @@ export default function EventFormShell({
     reader.readAsDataURL(file);
   }
 
-  async function loadSubCategories(parentId) {
+  const loadSubCategories = useCallback(async (parentId) => {
     if (!parentId) return [];
     const response = await axiosInstance.get(`/categories/${parentId}/sub`);
     return normalizeCategories(response.data);
-  }
+  }, []);
 
   async function retryVenueLoad() {
     setVenuesLoading(true);
@@ -162,7 +159,7 @@ export default function EventFormShell({
     }
   }
 
-  async function resolveCategorySelection(categoryId, parentCategories) {
+  const resolveCategorySelection = useCallback(async (categoryId, parentCategories) => {
     const normalizedCategoryId = categoryId?.toString();
     if (!normalizedCategoryId) {
       return { categoryId: '', subCategoryId: '', subCategories: [] };
@@ -195,7 +192,7 @@ export default function EventFormShell({
     }
 
     return { categoryId: normalizedCategoryId, subCategoryId: '', subCategories: [] };
-  }
+  }, [loadSubCategories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,7 +266,6 @@ export default function EventFormShell({
           description: initialEvent.description || '',
           categoryId: categorySelection.categoryId,
           subCategoryId: categorySelection.subCategoryId,
-          eventType: initialEvent.eventType || '',
           venue: initialEvent.venue || '',
           startTime: toDateTimeLocalValue(initialEvent.startTime),
           endTime: toDateTimeLocalValue(initialEvent.endTime),
@@ -294,7 +290,7 @@ export default function EventFormShell({
     return () => {
       cancelled = true;
     };
-  }, [categories, categoriesLoading, defaultValues?.departmentName, hiddenFields, initialEvent, reset]);
+  }, [categories, categoriesLoading, defaultValues?.departmentName, hiddenFields, initialEvent, reset, resolveCategorySelection]);
 
   useEffect(() => {
     let cancelled = false;
@@ -342,7 +338,7 @@ export default function EventFormShell({
     return () => {
       cancelled = true;
     };
-  }, [getValues, selectedCategory, setValue]);
+  }, [getValues, loadSubCategories, selectedCategory, setValue]);
 
   useEffect(() => {
     if (hasVenueConflict) {
@@ -523,26 +519,6 @@ export default function EventFormShell({
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-on-surface">Event Type *</label>
-                  <select {...register('eventType')} className={fieldClass(Boolean(errors.eventType))}>
-                    <option value="">Select an event type</option>
-                    {allowedEventTypes.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.eventType && (
-                    <p className="mt-2 text-sm font-medium text-red-600">{errors.eventType.message}</p>
-                  )}
-                  <p className="mt-2 text-xs text-on-surface-variant">
-                    {allowedEventTypes.some((option) => option.value === 'URGENT')
-                      ? 'URGENT events will be highlighted with an [URGENT] prefix.'
-                      : 'Choose the event type that best matches the activity.'}
-                  </p>
                 </div>
 
                 {showDepartmentField && (

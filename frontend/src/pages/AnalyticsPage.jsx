@@ -210,7 +210,28 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    fetchReport();
+    async function fetchInitialReport() {
+      const initialFrom = getMonthStartISO();
+      const initialTo = getTodayISO();
+
+      setLoading(true);
+      try {
+        const response = await axiosInstance.get('/events/reports/analytics', {
+          params: {
+            from: initialFrom,
+            to: initialTo,
+          },
+        });
+        setReport(response.data);
+      } catch (error) {
+        toast.error('Failed to load analytics report');
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void fetchInitialReport();
   }, []);
 
   const visibleRows = useMemo(() => {

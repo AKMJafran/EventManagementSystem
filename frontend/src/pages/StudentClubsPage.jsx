@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -789,35 +789,7 @@ export default function StudentClubsPage() {
     }
   }, [activeTab, myClub]);
 
-  const fetchPageData = async () => {
-    setLoading(true);
-    try {
-      const [clubsResponse, myClubResponse] = await Promise.all([getAllClubs(), loadMyClub()]);
-      const nextClubs = clubsResponse.data || [];
-      setClubs(nextClubs);
-      setMyClub(myClubResponse);
-
-      const memberClubIds = await fetchJoinedClubIds(nextClubs);
-      setJoinedClubIds(memberClubIds);
-
-      if (myClubResponse?.status === 'ACTIVE') {
-        await fetchMyClubMembers(myClubResponse.id);
-      } else {
-        setMyClubMembers([]);
-      }
-    } catch (error) {
-      toast.error('Failed to load clubs');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void fetchPageData();
-  }, []);
-
-  const fetchJoinedClubIds = async (clubList) => {
+  const fetchJoinedClubIds = useCallback(async (clubList) => {
     if (!currentUserId || clubList.length === 0) {
       return [];
     }
@@ -843,7 +815,35 @@ export default function StudentClubsPage() {
     });
 
     return [...memberIds];
-  };
+  }, [currentUserId]);
+
+  const fetchPageData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [clubsResponse, myClubResponse] = await Promise.all([getAllClubs(), loadMyClub()]);
+      const nextClubs = clubsResponse.data || [];
+      setClubs(nextClubs);
+      setMyClub(myClubResponse);
+
+      const memberClubIds = await fetchJoinedClubIds(nextClubs);
+      setJoinedClubIds(memberClubIds);
+
+      if (myClubResponse?.status === 'ACTIVE') {
+        await fetchMyClubMembers(myClubResponse.id);
+      } else {
+        setMyClubMembers([]);
+      }
+    } catch (error) {
+      toast.error('Failed to load clubs');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchJoinedClubIds]);
+
+  useEffect(() => {
+    void fetchPageData();
+  }, [fetchPageData]);
 
   const loadMyClub = async () => {
     try {

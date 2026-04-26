@@ -166,7 +166,7 @@ public class EventController {
  * GET /events/user/my-events
  */
 @GetMapping("/user/my-events")
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
 public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentication) {
     Long userId = extractUserIdFromAuthentication(authentication);
     List<EventResponse> events = eventService.getEventsByUserId(userId);
@@ -265,6 +265,17 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
         Long userId = extractUserIdFromAuthentication(authentication);
         eventService.attendEvent(id, userId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
+    public ResponseEntity<Void> cancelEvent(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        User user = extractUserFromAuthentication(authentication);
+        eventService.cancelEvent(id, user.getId(), user.getRole());
+        return ResponseEntity.noContent().build();
     }
 
     /**

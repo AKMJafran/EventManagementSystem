@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { deanApproveClub, deanRejectClub, getAllClubsForAdmin, getClubMembers } from '../api/clubApi';
 import AdminLayout from '../components/layout/AdminLayout';
@@ -41,7 +41,7 @@ export default function ManageClubs() {
     [clubMembers]
   );
 
-  const fetchClubs = async () => {
+  const fetchClubs = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getAllClubsForAdmin();
@@ -57,11 +57,11 @@ export default function ManageClubs() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     void fetchClubs();
-  }, [activeTab]);
+  }, [fetchClubs]);
 
   const handleApprove = async (clubId) => {
     try {

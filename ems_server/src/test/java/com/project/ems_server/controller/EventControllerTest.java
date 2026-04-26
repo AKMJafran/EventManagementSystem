@@ -3,6 +3,8 @@ package com.project.ems_server.controller;
 import com.project.ems_server.dto.request.EventDecisionRequest;
 import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.EventResponse;
+import com.project.ems_server.entity.User;
+import com.project.ems_server.enums.Role;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
 import org.junit.jupiter.api.Test;
@@ -142,5 +144,27 @@ class EventControllerTest {
         );
 
         assertEquals("Reason is required", exception.getMessage());
+    }
+
+    @Test
+    void cancelEventDelegatesUsingAuthenticatedUser() {
+        EventService eventService = mock(EventService.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        EventController controller = new EventController(eventService, userRepository);
+        Authentication authentication = mock(Authentication.class);
+
+        when(authentication.getName()).thenReturn("student@example.com");
+        when(userRepository.findByEmail("student@example.com")).thenReturn(java.util.Optional.of(
+                User.builder()
+                        .id(11L)
+                        .email("student@example.com")
+                        .role(Role.STUDENT)
+                        .build()
+        ));
+
+        var response = controller.cancelEvent(9L, authentication);
+
+        assertEquals(204, response.getStatusCode().value());
+        verify(eventService).cancelEvent(9L, 11L, Role.STUDENT);
     }
 }

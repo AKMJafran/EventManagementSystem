@@ -164,7 +164,6 @@ export default function EditEventPage() {
             description: payload.description,
             categoryId: payload.categoryId,
             subCategoryId: payload.subCategoryId || null,
-            eventType: payload.eventType,
             venue: payload.venue,
             startTime: payload.startTime,
             endTime: payload.endTime,

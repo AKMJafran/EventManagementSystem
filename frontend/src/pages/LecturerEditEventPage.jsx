@@ -8,7 +8,6 @@ import {
   departmentalEditSchema,
   eventBelongsToCurrentUser,
   getApprovalStageMeta,
-  NON_URGENT_EVENT_TYPE_OPTIONS,
 } from '../components/events/eventFormShared';
 import { getEventById, updateEvent as updateEventRequest } from '../api/eventApi';
 import useAuthStore from '../context/AuthContext';
@@ -98,7 +97,6 @@ export default function LecturerEditEventPage() {
   return (
     <LecturerLayout>
       <EventFormShell
-        allowedEventTypes={NON_URGENT_EVENT_TYPE_OPTIONS}
         conflictMessage="Venue conflict detected. Please choose a different venue or time."
         generalErrorMessage="Failed to update departmental event."
         headerContent={
@@ -143,7 +141,6 @@ export default function LecturerEditEventPage() {
             description: payload.description,
             categoryId: payload.categoryId,
             subCategoryId: payload.subCategoryId || null,
-            eventType: payload.eventType,
             venue: payload.venue,
             startTime: payload.startTime,
             endTime: payload.endTime,
