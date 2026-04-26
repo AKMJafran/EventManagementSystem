@@ -27,11 +27,24 @@ public class JwtService {
      * Generates an access token (15 min expiry) with email, role, name and profile picture as claims
      */
     public String generateAccessToken(String email, String role, String name, String profilePictureUrl) {
-        return Jwts.builder()
+        return generateAccessToken(email, role, name, profilePictureUrl, null);
+    }
+
+    /**
+     * Generates an access token (15 min expiry) with email, role, name, profile picture, and optional department as claims
+     */
+    public String generateAccessToken(String email, String role, String name, String profilePictureUrl, String department) {
+        var builder = Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
                 .claim("name", name)
-                .claim("profilePictureUrl", profilePictureUrl)
+                .claim("profilePictureUrl", profilePictureUrl);
+
+        if (department != null) {
+            builder.claim("department", department);
+        }
+
+        return builder
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)

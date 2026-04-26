@@ -9,7 +9,9 @@ const getDefaultRoute = (user) => {
   if (user.mustChangePassword) {
     return '/change-password';
   }
-  return user.role === 'ADMIN' ? '/admin/dashboard' : '/student/dashboard';
+  if (user.role === 'ADMIN') return '/admin/dashboard';
+  if (user.role === 'LECTURER') return '/lecturer/dashboard';
+  return '/student/dashboard';
 };
 
 const ProtectedRoute = ({ requiredRole }) => {

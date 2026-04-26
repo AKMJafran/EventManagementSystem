@@ -1,9 +1,12 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.request.AdminLecturerCreateRequest;
 import com.project.ems_server.dto.request.AdminStudentCreateRequest;
 import com.project.ems_server.dto.request.StudentProfileBulkItemRequest;
+import com.project.ems_server.dto.response.AdminLecturerResponse;
 import com.project.ems_server.dto.response.AdminStudentResponse;
 import com.project.ems_server.dto.response.BulkStudentImportResponse;
+import com.project.ems_server.service.AdminLecturerService;
 import com.project.ems_server.service.AdminStudentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ import java.util.List;
 public class AdminController {
 
     private final AdminStudentService adminStudentService;
+    private final AdminLecturerService adminLecturerService;
 
     @PostMapping("/students")
     @PreAuthorize("hasRole('ADMIN')")
@@ -56,5 +60,17 @@ public class AdminController {
     public ResponseEntity<Void> deactivateStudent(@PathVariable Long id) {
         adminStudentService.deactivateStudent(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/lecturers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminLecturerResponse> createLecturer(@Valid @RequestBody AdminLecturerCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminLecturerService.createLecturer(request));
+    }
+
+    @GetMapping("/lecturers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<AdminLecturerResponse>> getAllLecturers() {
+        return ResponseEntity.ok(adminLecturerService.getAllLecturers());
     }
 }

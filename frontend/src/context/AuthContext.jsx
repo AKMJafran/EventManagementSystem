@@ -21,6 +21,7 @@ const useAuthStore = create((set) => ({
         email: decodedToken.email,
         role: role,
         profilePictureUrl: decodedToken.profilePictureUrl,
+        department: decodedToken.department || null,
         mustChangePassword: !!mustChangePassword,
       };
 

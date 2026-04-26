@@ -72,6 +72,7 @@ public class SecurityConfig {
                 "/auth/reset-password"
         ).permitAll()
         .requestMatchers(HttpMethod.GET, "/files/content/**").permitAll()
+        .requestMatchers("/lecturer/**").hasRole("LECTURER")
         .anyRequest().authenticated()
     )
     

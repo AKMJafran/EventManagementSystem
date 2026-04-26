@@ -4,9 +4,12 @@ import com.project.ems_server.dto.request.ChangePasswordRequest;
 import com.project.ems_server.dto.request.LoginRequest;
 import com.project.ems_server.dto.request.ResetPasswordRequest;
 import com.project.ems_server.dto.response.AuthResponse;
+import com.project.ems_server.entity.LecturerProfile;
 import com.project.ems_server.entity.RefreshToken;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.OtpType;
+import com.project.ems_server.enums.Role;
+import com.project.ems_server.repository.LecturerProfileRepository;
 import com.project.ems_server.repository.RefreshTokenRepository;
 import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final LecturerProfileRepository lecturerProfileRepository;
     private final OtpService otpService;
     private final EmailService emailService;
     private final JwtService jwtService;
@@ -52,11 +56,13 @@ public class AuthService {
         String profileUrl = user.getProfilePictureId() != null
                 ? fileServerService.buildFileAccessUrl(user.getProfilePictureId())
                 : null;
+        String department = resolveLecturerDepartment(user);
         String accessToken = jwtService.generateAccessToken(
                 user.getEmail(),
                 user.getRole().name(),
                 user.getName(),
-                profileUrl);
+                profileUrl,
+                department);
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         refreshTokenRepository.save(RefreshToken.builder()
@@ -99,11 +105,13 @@ public class AuthService {
         String profileUrl = user.getProfilePictureId() != null
                 ? fileServerService.buildFileAccessUrl(user.getProfilePictureId())
                 : null;
+        String department = resolveLecturerDepartment(user);
         String newAccessToken = jwtService.generateAccessToken(
                 user.getEmail(),
                 user.getRole().name(),
                 user.getName(),
-                profileUrl);
+                profileUrl,
+                department);
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
@@ -158,5 +166,14 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(changePasswordRequest.getNewPassword()));
         user.setIsFirstLogin(false);
         userRepository.save(user);
+    }
+
+    private String resolveLecturerDepartment(User user) {
+        if (user.getRole() != Role.LECTURER) {
+            return null;
+        }
+        return lecturerProfileRepository.findByUserId(user.getId())
+                .map(LecturerProfile::getDepartment)
+                .orElse(null);
     }
 }
