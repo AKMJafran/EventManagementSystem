@@ -18,4 +18,6 @@ public class ConflictResolutionRequest {
     private LocalDateTime startTime;
 
     private LocalDateTime endTime;
+
+    private String adminMessage;
 }

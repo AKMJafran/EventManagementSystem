@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
@@ -35,6 +36,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                                 @Param("statuses") Collection<EventStatus> statuses,
                                                 @Param("excludeId") Long excludeId);
 
+    @Query("SELECT e FROM Event e WHERE e.status IN :statuses " +
+           "AND e.startTime < :rangeEnd AND e.endTime > :rangeStart")
+    List<Event> findByStatusInAndTimeRangeOverlap(@Param("statuses") Collection<EventStatus> statuses,
+                                                  @Param("rangeStart") LocalDateTime rangeStart,
+                                                  @Param("rangeEnd") LocalDateTime rangeEnd);
+
     @Query("SELECT e FROM Event e WHERE LOWER(e.venue) = LOWER(:venue) " +
            "AND e.status IN :statuses " +
            "AND e.startTime < :dayEnd AND e.endTime > :dayStart " +
@@ -51,4 +58,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                            @Param("oneHourLater") LocalDateTime oneHourLater);
 
     List<Event> findByStartTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
+
+    Optional<Event> findTopByImageChecksumAndImageIdIsNotNull(String imageChecksum);
 }

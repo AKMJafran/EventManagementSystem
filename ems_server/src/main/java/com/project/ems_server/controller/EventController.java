@@ -2,9 +2,11 @@ package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.ConflictResolutionRequest;
 import com.project.ems_server.dto.request.EventRequest;
+import com.project.ems_server.dto.response.AnalyticsReportResponse;
+import com.project.ems_server.dto.response.EventConflictAnalysisResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
-import com.project.ems_server.entity.EventConflict;
+import com.project.ems_server.dto.response.StudentCalendarFeedResponse;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
@@ -60,13 +62,15 @@ public class EventController {
     }
 
     /**
-     * Gets events with optional status and category filters
-     * GET /events?status=APPROVED&categoryId=1
+         * Gets events with optional status, category, and date filters
+         * GET /events?status=APPROVED&categoryId=1&startDate=2026-04-01&endDate=2026-04-30
      */
     @GetMapping
     public ResponseEntity<List<EventResponse>> getEvents(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Long categoryId) {
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         
         EventStatus eventStatus = null;
         if (status != null && !status.isEmpty()) {
@@ -77,7 +81,11 @@ public class EventController {
             }
         }
 
-        List<EventResponse> events = eventService.getEvents(eventStatus, categoryId);
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new RuntimeException("Invalid date range: endDate must be on or after startDate");
+        }
+
+        List<EventResponse> events = eventService.getEvents(eventStatus, categoryId, startDate, endDate);
         return ResponseEntity.ok(events);
     }
 
@@ -95,6 +103,20 @@ public class EventController {
         return ResponseEntity.ok(events);
     }
 
+    @GetMapping("/student/calendar-feed")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<StudentCalendarFeedResponse> getStudentCalendarFeed(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            Authentication authentication) {
+        if (end.isBefore(start)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = extractUserIdFromAuthentication(authentication);
+        return ResponseEntity.ok(eventService.getStudentCalendarFeed(userId, start, end));
+    }
+
     /**
      * Gets monthly event report.
      */
@@ -108,6 +130,34 @@ public class EventController {
         }
         MonthlyReportResponse report = eventService.getMonthlyReport(year, month);
         return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Gets analytics report with optional filters.
+     */
+    @GetMapping("/reports/analytics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AnalyticsReportResponse> getAnalyticsReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String venue,
+            @RequestParam(required = false) String organizerName) {
+
+        if (to.isBefore(from)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            AnalyticsReportResponse report = eventService.getAnalyticsReport(
+                    from, to, status, eventType, categoryId, venue, organizerName
+            );
+            return ResponseEntity.ok(report);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**
@@ -130,6 +180,12 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
     public ResponseEntity<EventResponse> getEventById(@PathVariable Long id) {
         EventResponse event = eventService.getEventById(id);
         return ResponseEntity.ok(event);
+    }
+
+    @GetMapping("/{id}/approval-check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EventConflictAnalysisResponse> getApprovalCheck(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.getApprovalCheck(id));
     }
 
     /**
@@ -174,8 +230,8 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
      */
     @GetMapping("/admin/conflicts")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<EventConflict>> getConflicts() {
-        List<EventConflict> conflicts = eventService.getConflicts();
+    public ResponseEntity<List<EventConflictAnalysisResponse>> getConflicts() {
+        List<EventConflictAnalysisResponse> conflicts = eventService.getConflicts();
         return ResponseEntity.ok(conflicts);
     }
 

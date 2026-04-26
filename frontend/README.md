@@ -13,7 +13,7 @@ This is the React frontend for the Faculty Event Management System, built with V
 1. Ensure backend is running on `http://localhost:8081`
 2. Create `.env` file:
    ```
-   VITE_API_BASE_URL=http://localhost:8081/api
+   VITE_API_BASE_URL=http://localhost:8081
    ```
 3. Install dependencies: `npm install`
 4. Run development server: `npm run dev`

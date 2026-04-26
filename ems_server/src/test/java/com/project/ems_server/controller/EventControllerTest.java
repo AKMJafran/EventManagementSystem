@@ -1,5 +1,6 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
@@ -57,5 +58,44 @@ class EventControllerTest {
 
         assertEquals(400, response.getStatusCode().value());
         assertTrue(response.getBody() == null || response.getBody().isEmpty());
+    }
+
+    @Test
+    void getAnalyticsReportReturnsOkWithValidRange() {
+        EventService eventService = mock(EventService.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        EventController controller = new EventController(eventService, userRepository);
+
+        LocalDate from = LocalDate.of(2026, 4, 1);
+        LocalDate to = LocalDate.of(2026, 4, 30);
+
+        AnalyticsReportResponse report = AnalyticsReportResponse.builder()
+                .periodStart(from)
+                .periodEnd(to)
+                .totalEvents(12)
+                .approvedEvents(8)
+                .build();
+
+        when(eventService.getAnalyticsReport(from, to, "APPROVED", "TECHNICAL", null, null, null)).thenReturn(report);
+
+        var response = controller.getAnalyticsReport(from, to, "APPROVED", "TECHNICAL", null, null, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(12, response.getBody().getTotalEvents());
+        assertEquals(8, response.getBody().getApprovedEvents());
+    }
+
+    @Test
+    void getAnalyticsReportReturnsBadRequestWhenEndBeforeStart() {
+        EventService eventService = mock(EventService.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        EventController controller = new EventController(eventService, userRepository);
+
+        LocalDate from = LocalDate.of(2026, 4, 30);
+        LocalDate to = LocalDate.of(2026, 4, 1);
+
+        var response = controller.getAnalyticsReport(from, to, null, null, null, null, null);
+
+        assertEquals(400, response.getStatusCode().value());
     }
 }

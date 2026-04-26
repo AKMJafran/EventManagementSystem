@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -19,6 +20,10 @@ public class EventResponse {
     private Long userId;
     private Long categoryId;
     private String imageId;
+    private String imageOriginalFilename;
+    private String imageContentType;
+    private LocalDateTime imageUploadedAt;
+    private String imageChecksum;
     
     private String title;
     
@@ -45,4 +50,14 @@ public class EventResponse {
     private String createdByName;
     
     private String rejectReason;
+
+    private String conflictStatus;
+
+    private List<ConflictDetailResponse> conflictDetails;
+
+    private String calendarLabel;
+
+    private boolean ownedByCurrentUser;
+
+    private boolean attending;
 }

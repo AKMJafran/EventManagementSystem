@@ -1,6 +1,5 @@
 package com.project.ems_server.dto.request;
 
-import com.project.ems_server.enums.EventType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -33,8 +32,10 @@ public class EventRequest {
     @NotNull(message = "End time is required")
     private LocalDateTime endTime;
     
-    @NotNull(message = "Event type is required")
-    private EventType eventType;
-
     private String imageId;
+    private String imageOriginalFilename;
+    private String imageContentType;
+    private LocalDateTime imageUploadedAt;
+    private String imageChecksum;
+    private Boolean removeImage;
 }

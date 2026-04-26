@@ -1,106 +1,137 @@
 # Faculty Event Management System
 
-## 🎯 Project Overview
+This repository contains:
 
-This is a comprehensive **Faculty Event Management System** for the University of Ruhuna's Faculty of Technology, designed to manage student-organized events, club activities, and academic gatherings. Built with **Spring Boot** (backend) and **React** (frontend), it incorporates **advanced Java concepts** to demonstrate academic excellence.
+- `frontend/`: React + Vite client
+- `ems_server/`: Spring Boot backend
 
-### Key Features
-- **User Roles**: Students (create events), Admins/Deans (approve/reject).
-- **Event Management**: Create, approve, and track events with categories (Cultural, Sports, Technical, Academic).
-- **Conflict Detection**: Automatic venue/time conflict alerts with notifications.
-- **Notifications**: In-app and email alerts for approvals, conflicts, and reminders.
-- **Advanced Java Highlights**:
-  - OOP: Abstraction, Inheritance, Polymorphism (Event hierarchy).
-  - Design Patterns: Factory (event creation), Singleton (approval service), Observer (notifications), DAO (data access).
-  - Features: Streams API, Lambdas, Multithreading (@Scheduled), Custom Exceptions, File Handling.
-- **Demo-Attractive Elements**: Clean UI, real-time conflict resolution, calendar views, and viva-ready explanations.
+## Current Setup
 
-### Vision Alignment
-Based on faculty activities (e.g., HackTrail, Technospirits), this system handles diverse events with multi-level approvals and advanced architecture.
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8081`
+- Database: MySQL
+- Image storage: Cloudinary
 
-## 👥 Team Plan & Roles
-- **Team Lead**: Oversee integration and demo preparation.
-- **Backend Developer**: Enhance advanced Java concepts (patterns, multithreading).
-- **Frontend Developer**: Improve UI/UX (add calendar, real-time updates).
-- **Tester/Documenter**: Write tests, update docs, prepare viva notes.
-- **Milestones**:
-  1. Week 1: Analyze gaps and refactor for advanced concepts.
-  2. Week 2: Implement missing features (e.g., Event subclasses, Factory pattern).
-  3. Week 3: Testing, UI polish, and demo rehearsal.
-  4. Week 4: Final demo with Q&A on advanced Java.
+The app no longer uses the old external file server on `localhost:8080`.
 
-## 🚀 How to Run the Project
+## Image Upload Architecture
 
-### Prerequisites
-- **Java 17** or higher
-- **Node.js 18+** and npm
-- **MySQL** (or PostgreSQL) database
-- **Maven** for backend
-- **Git** for cloning
+Image upload still goes through the backend route:
 
-### Backend Setup (Spring Boot)
-1. Clone the repo: `git clone <repo-url>`
-2. Navigate to `ems_server/`: `cd ems_server`
-3. DataSource configuration uses Spring singleton `@Bean` in `src/main/java/com/project/ems_server/config/DataSourceConfig.java`:
-   - `@Configuration`
-   - `@Bean` with `DataSourceProperties.initializeDataSourceBuilder().build()`
-   - This keeps exactly one `DataSource` instance in the Spring context (singleton scope)
+- `POST /files/upload`
 
-4. Create `src/main/resources/application.properties` (copy from `application-template.properties`):
-   ```
-   # Database
-   spring.datasource.url=jdbc:mysql://localhost:3306/event_db
-   spring.datasource.username=your_mysql_username
-   spring.datasource.password=your_mysql_password
+Flow:
 
-   # For local tests with H2 (optional)
-   # spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+1. frontend sends the selected image to the Spring backend
+2. backend validates file type and size
+3. backend uploads the image directly to Cloudinary
+4. backend stores the returned Cloudinary URL as the image ID
+5. event and profile image URLs are built from that stored value
 
-   # JPA
-   spring.jpa.hibernate.ddl-auto=update
-   spring.jpa.show-sql=true
+## Prerequisites
 
-   # JWT Secret (generate a secure key)
-   jwt.secret=your_secure_jwt_secret_here
+- Java 17+
+- Node.js 18+
+- MySQL
+- Cloudinary account
 
-   # Email (for notifications)
-   spring.mail.host=localhost
-   spring.mail.port=25
-   spring.mail.username=your_email@gmail.com
-   spring.mail.password=your_app_password
-   spring.mail.properties.mail.smtp.auth=false
-   spring.mail.properties.mail.smtp.starttls.enable=false
-   ```
-   **Security Note**: `application.properties` is gitignored. Never commit real secrets!
-5. Install dependencies: `mvn clean install`
-6. Run the app: `mvn spring-boot:run`
-7. API available at `http://localhost:8081`
+## Backend Configuration
 
-### Frontend Setup (React)
-1. Navigate to `frontend/`: `cd frontend`
-2. Create `.env` file (if not present):
-   ```
-   VITE_API_BASE_URL=http://localhost:8081/api
-   ```
-3. Install dependencies: `npm install`
-4. Run the app: `npm run dev`
-5. Open `http://localhost:5173` in browser
+Local backend config lives in:
 
-### Testing
-- Use Postman for API testing (import collection from `Details/` if available).
-- Test user flows: Register → Login → Create Event → Admin Approve → Check Notifications.
-- Verify conflicts: Create overlapping events and check alerts.
+- `ems_server/src/main/resources/application.properties`
 
-## 🎓 Academic Demo Highlights
-- **Showcase Advanced Java**: Explain patterns (e.g., "Factory creates events polymorphically") with code snippets.
-- **Live Demo**: Create an event, trigger conflict, approve via admin, receive email.
-- **Viva Prep**: Be ready to discuss why Singleton for approval, Observer for notifications, etc.
-- **Attractiveness**: Simple UI, real-world relevance (faculty events), and technical depth.
+That file is gitignored. Use [application-template.properties](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1) as the template.
 
-## 📚 Additional Resources
-- [Details/](Details/) for requirements and roadmap.
-- [Spring Boot Docs](https://spring.io/projects/spring-boot) for backend.
-- [React Docs](https://react.dev/) for frontend.
-- Contact team lead for questions.
+Required properties:
 
-Let's build an outstanding system! 🚀
+```properties
+server.port=8081
+
+spring.datasource.url=jdbc:mysql://localhost:3306/ems_database?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=your_mysql_username
+spring.datasource.password=your_mysql_password
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+
+jwt.secret=your_jwt_secret
+
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
+
+cloudinary.cloud-name=your_cloudinary_cloud_name
+cloudinary.api-key=your_cloudinary_api_key
+cloudinary.api-secret=your_cloudinary_api_secret
+cloudinary.folder=ems
+cloudinary.connect-timeout-ms=5000
+cloudinary.read-timeout-ms=15000
+cloudinary.images.max-size=5MB
+```
+
+Optional but currently used locally:
+
+- SMTP settings for email notifications
+
+## Frontend Configuration
+
+Create `frontend/.env` if needed:
+
+```env
+VITE_API_BASE_URL=http://localhost:8081
+```
+
+## Run The Project
+
+### 1. Start MySQL
+
+Make sure the `ems_database` database exists and the configured credentials are correct.
+
+### 2. Start the backend
+
+From `ems_server/`:
+
+```powershell
+./mvnw.cmd spring-boot:run
+```
+
+If Maven is installed globally:
+
+```powershell
+mvn spring-boot:run
+```
+
+### 3. Start the frontend
+
+From `frontend/`:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open:
+
+- `http://localhost:5173`
+
+## Important Notes
+
+- After backend code changes, restart the Spring Boot server before testing again.
+- Existing records that were saved during the earlier local-fallback phase may still contain old values like `local-...png`.
+- Those old records should no longer crash event pages, but that specific old image may not render correctly until it is uploaded again through the Cloudinary-based uploader.
+
+## Relevant Files
+
+- [CreateEventPage.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/CreateEventPage.jsx:1)
+- [ManageEvents.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/pages/ManageEvents.jsx:1)
+- [StudentHeader.jsx](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/frontend/src/components/layout/StudentHeader.jsx:1)
+- [FileController.java](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/controller/FileController.java:1)
+- [FileServerService.java](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/java/com/project/ems_server/service/FileServerService.java:1)
+- [application-template.properties](C:/Level%203%20Semester%201/Advanced%20Programming/EventManagementSystem/ems_server/src/main/resources/application-template.properties:1)
+
+## Current Status
+
+The uploader is now designed around Cloudinary instead of the previous file-server integration.

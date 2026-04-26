@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -30,23 +31,20 @@ public class EventReminderScheduler {
     private final EmailService emailService;
 
     /**
-     * Scheduled task that runs every 15 minutes (900000 ms)
-     * Finds events starting within the next 1 hour and sends reminders to attendees
+     * Scheduled task that runs every 15 minutes and sends reminder notifications
+     * for approved events starting within the next 24 hours.
      */
     @Scheduled(fixedRate = 900000)
     public void sendEventReminders() {
         try {
             log.info("Starting event reminder scheduler task...");
 
-            // Get current time and time 1 hour from now
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime oneHourLater = now.plusHours(1);
+            LocalDateTime oneDayLater = now.plusDays(1);
 
-            // Find all APPROVED events starting within the next hour
-            List<Event> upcomingEvents = eventRepository.findUpcomingApprovedEvents(now, oneHourLater);
+            List<Event> upcomingEvents = eventRepository.findUpcomingApprovedEvents(now, oneDayLater);
             log.info("Found {} upcoming events", upcomingEvents.size());
 
-            // Process each upcoming event
             for (Event event : upcomingEvents) {
                 sendRemindersForEvent(event);
             }
@@ -57,18 +55,15 @@ public class EventReminderScheduler {
         }
     }
 
-    /**
-     * Sends reminders to all attendees of a specific event
-     */
     private void sendRemindersForEvent(Event event) {
         try {
             log.info("Processing reminders for event: {} (ID: {})", event.getTitle(), event.getId());
 
-            // Get all attendees for this event
             List<EventAttendee> attendees = eventAttendeeRepository.findByEventId(event.getId());
             log.info("Found {} attendees for event {}", attendees.size(), event.getId());
 
-            // Send reminder to each attendee
+            sendReminderToOrganizer(event);
+
             for (EventAttendee attendee : attendees) {
                 sendReminderToAttendee(event, attendee);
             }
@@ -77,34 +72,17 @@ public class EventReminderScheduler {
         }
     }
 
-    /**
-     * Sends reminder to a single attendee
-     */
     private void sendReminderToAttendee(Event event, EventAttendee attendee) {
         try {
-            // Get attendee user details
-            User user = userRepository.findById(attendee.getUserId())
-                    .orElse(null);
-
+            User user = userRepository.findById(attendee.getUserId()).orElse(null);
             if (user == null) {
                 log.warn("User not found for attendee ID: {}", attendee.getUserId());
                 return;
             }
 
-            // Create in-app notification message
+            String title = buildReminderTitle(event);
             String notificationMessage = buildReminderNotificationMessage(event);
-
-            // Save in-app notification
-            Notification notification = Notification.builder()
-                    .userId(user.getId())
-                    .message(notificationMessage)
-                    .type(NotificationType.REMINDER)
-                    .isRead(false)
-                    .createdAt(LocalDateTime.now())
-                    .build();
-            notificationRepository.save(notification);
-
-            // Send email reminder
+            saveReminderNotification(user.getId(), title, notificationMessage);
             emailService.sendEventReminderEmail(user.getEmail(), event.getTitle(), event.getStartTime());
 
             log.info("Reminder sent to user {} for event {}", user.getEmail(), event.getId());
@@ -113,15 +91,49 @@ public class EventReminderScheduler {
         }
     }
 
-    /**
-     * Builds notification message for event reminder
-     */
+    private void sendReminderToOrganizer(Event event) {
+        userRepository.findById(event.getUserId()).ifPresent(user -> {
+            String title = buildReminderTitle(event);
+            String notificationMessage = buildReminderNotificationMessage(event);
+            saveReminderNotification(user.getId(), title, notificationMessage);
+            emailService.sendEventReminderEmail(user.getEmail(), event.getTitle(), event.getStartTime());
+        });
+    }
+
+    private void saveReminderNotification(Long userId, String title, String notificationMessage) {
+        if (notificationRepository.existsByUserIdAndTypeAndTitleAndMessage(
+                userId,
+                NotificationType.REMINDER,
+                title,
+                notificationMessage
+        )) {
+            return;
+        }
+
+        Notification notification = Notification.builder()
+                .userId(userId)
+                .title(title)
+                .message(notificationMessage)
+                .type(NotificationType.REMINDER)
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        notificationRepository.save(notification);
+    }
+
+    private String buildReminderTitle(Event event) {
+        long hoursUntilStart = Duration.between(LocalDateTime.now(), event.getStartTime()).toHours();
+        return hoursUntilStart <= 1 ? "Event Starts Soon" : "Event Reminder";
+    }
+
     private String buildReminderNotificationMessage(Event event) {
+        long hoursUntilStart = Duration.between(LocalDateTime.now(), event.getStartTime()).toHours();
+        String reminderWindow = hoursUntilStart <= 1 ? "within the next hour" : "within the next day";
+
         return String.format(
-                "🔔 REMINDER: Event '%s' is happening soon!\n\n" +
-                "Venue: %s\n" +
-                "Time: %s",
+                "REMINDER: Event '%s' is happening %s.%n%nVenue: %s%nTime: %s",
                 event.getTitle(),
+                reminderWindow,
                 event.getVenue(),
                 event.getStartTime()
         );

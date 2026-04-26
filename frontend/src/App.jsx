@@ -1,37 +1,50 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import useAuthStore from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './pages/Unauthorized';
-
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import VerifyOtpPage from './pages/VerifyOtpPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import StudentDashboard from './pages/StudentDashboard';
 import CreateEventPage from './pages/CreateEventPage';
 import MyEventsPage from './pages/MyEventsPage';
 import AdminDashboard from './pages/AdminDashboard';
 import CalendarPage from './pages/CalendarPage';
 import MonthlyReportPage from './pages/MonthlyReportPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import ManageStudents from './pages/ManageStudents';
+import ManageLecturers from './pages/ManageLecturers';
 import ManageVenues from './pages/ManageVenues';
 import LandingPage from './pages/LandingPage';
 import ManageCategories from './pages/ManageCategories';
 import ManageEvents from './pages/ManageEvents';
 import ConflictsPage from './pages/ConflictsPage';
 import NotificationManagerPage from './pages/NotificationManagerPage';
+import EventDetailsPage from './pages/EventDetailsPage';
+import LecturerDashboard from './pages/LecturerDashboard';
+import LecturerEventsPage from './pages/LecturerEventsPage';
+import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
+import LecturerPendingApprovalsPage from './pages/LecturerPendingApprovalsPage';
+import LecturerProfilePage from './pages/LecturerProfilePage';
+
 const Home = () => {
   const { isAuthenticated, user } = useAuthStore.getState();
-  if (isAuthenticated) {
-    return user.role === 'ADMIN' ? <Navigate to="/admin/dashboard" /> : <Navigate to="/student/dashboard" />;
+  if (!isAuthenticated || !user) {
+    return <LandingPage />;
   }
-  return <LandingPage />;
+  if (user.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+  return user.role === 'ADMIN'
+    ? <Navigate to="/admin/dashboard" replace />
+    : user.role === 'LECTURER'
+    ? <Navigate to="/lecturer/dashboard" replace />
+    : <Navigate to="/student/dashboard" replace />;
 };
 
-
 function App() {
-  const { loadFromStorage, authLoaded } = useAuthStore();
+  const { loadFromStorage, authLoaded, user } = useAuthStore();
 
   useEffect(() => {
     loadFromStorage();
@@ -43,17 +56,22 @@ function App() {
 
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/verify-otp" element={<VerifyOtpPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
-      {/* Protected Routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route
+          path="/create-event"
+          element={<Navigate to={user?.role === 'ADMIN' ? '/admin/create-event' : '/student/create-event'} replace />}
+        />
+        <Route path="/events/:id" element={<EventDetailsPage />} />
+      </Route>
+
       <Route element={<ProtectedRoute requiredRole="STUDENT" />}>
         <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/create-event" element={<CreateEventPage />} />
+        <Route path="/student/create-event" element={<CreateEventPage />} />
         <Route path="/student/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
@@ -63,20 +81,29 @@ function App() {
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/calendar" element={<CalendarPage />} />
         <Route path="/admin/reports/monthly" element={<MonthlyReportPage />} />
+        <Route path="/admin/reports/analytics" element={<AnalyticsPage />} />
         <Route path="/manage-categories" element={<ManageCategories />} />
         <Route path="/manage-events" element={<ManageEvents />} />
         <Route path="/manage-students" element={<ManageStudents />} />
+        <Route path="/manage-lecturers" element={<ManageLecturers />} />
         <Route path="/manage-venues" element={<ManageVenues />} />
-        <Route path="/create-event" element={<CreateEventPage />} />
+        <Route path="/admin/create-event" element={<CreateEventPage />} />
+        <Route path="/admin/edit-event/:id" element={<CreateEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
         <Route path="/admin/notifications" element={<NotificationManagerPage />} />
       </Route>
 
-      {/* Default Route */}
+      <Route element={<ProtectedRoute requiredRole="LECTURER" />}>
+        <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
+        <Route path="/lecturer/events" element={<LecturerEventsPage />} />
+        <Route path="/lecturer/my-clubs" element={<LecturerMyClubsPage />} />
+        <Route path="/lecturer/pending-approvals" element={<LecturerPendingApprovalsPage />} />
+        <Route path="/lecturer/calendar" element={<CalendarPage />} />
+        <Route path="/lecturer/profile" element={<LecturerProfilePage />} />
+      </Route>
+
       <Route path="/" element={<Home />} />
-      
-      {/* Fallback for any other route */}
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,9 +39,11 @@ public class CategoryService {
      * Creates a sub-category under a parent category
      */
     public CategoryResponse createSubCategory(CategoryRequest categoryRequest, Long parentId, Long adminId) {
-        // Verify parent category exists
-     if(!categoryRepository.existsById(parentId)) {
-            throw new RuntimeException("Parent category not found with id: " + parentId);
+        Category parentCategory = categoryRepository.findById(parentId)
+                .orElseThrow(() -> new RuntimeException("Parent category not found with id: " + parentId));
+
+        if (parentCategory.getParentId() != null) {
+            throw new RuntimeException("Cannot create a sub-category under another sub-category");
         }
 
         Category subCategory = Category.builder()
@@ -55,12 +58,15 @@ public class CategoryService {
     }
 
     /**
-     * Gets all main categories with their nested sub-categories
+     * Gets only top-level parent categories.
      */
     public List<CategoryResponse> getAllMainCategories() {
-        List<Category> mainCategories = categoryRepository.findByParentIdIsNull();
+        List<Category> mainCategories = categoryRepository.findByParentIdIsNull().stream()
+                .sorted(Comparator.comparing(Category::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.toList());
+
         return mainCategories.stream()
-                .map(this::mapToResponseWithSubCategories)
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -68,7 +74,17 @@ public class CategoryService {
      * Gets all sub-categories of a parent category
      */
     public List<CategoryResponse> getSubCategories(Long parentId) {
-        List<Category> subCategories = categoryRepository.findByParentId(parentId);
+        Category parentCategory = categoryRepository.findById(parentId)
+                .orElseThrow(() -> new RuntimeException("Parent category not found with id: " + parentId));
+
+        if (parentCategory.getParentId() != null) {
+            throw new RuntimeException("Category with id " + parentId + " is not a parent category");
+        }
+
+        List<Category> subCategories = categoryRepository.findByParentId(parentId).stream()
+                .sorted(Comparator.comparing(Category::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.toList());
+
         return subCategories.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -107,24 +123,6 @@ public class CategoryService {
         }
 
         categoryRepository.delete(category);
-    }
-
-    /**
-     * Maps Category entity to CategoryResponse with sub-categories
-     */
-    private CategoryResponse mapToResponseWithSubCategories(Category category) {
-        List<CategoryResponse> subCategories = category.getSubCategories() != null
-                ? category.getSubCategories().stream()
-                    .map(this::mapToResponse)
-                    .collect(Collectors.toList())
-                : List.of();
-
-        return CategoryResponse.builder()
-                .id(category.getId())
-                .name(category.getName())
-                .parentId(category.getParentId())
-                .subCategories(subCategories)
-                .build();
     }
 
     /**
