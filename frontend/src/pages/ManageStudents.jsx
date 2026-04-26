@@ -4,6 +4,13 @@ import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
 import ModalPortal from '../components/ui/ModalPortal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import {
+  validateBatchYear,
+  validateDepartment,
+  validateEmail,
+  validateName,
+  validateStudentId,
+} from '../utils/validation';
 
 const emptyForm = {
   fullName: '',
@@ -46,7 +53,7 @@ const parseCsv = (text) => {
   });
 };
 
-function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }) {
+function StudentFormModal({ student, form, formErrors, saving, onClose, onChange, onSubmit }) {
   if (!student) {
     return null;
   }
@@ -81,6 +88,7 @@ function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }
                 onChange={onChange}
                 required
               />
+              {formErrors.fullName && <p className="mt-2 text-sm font-medium text-error">{formErrors.fullName}</p>}
             </label>
 
             <label className="block">
@@ -93,6 +101,7 @@ function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }
                 onChange={onChange}
                 required
               />
+              {formErrors.officialEmail && <p className="mt-2 text-sm font-medium text-error">{formErrors.officialEmail}</p>}
             </label>
 
             <label className="block">
@@ -104,6 +113,7 @@ function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }
                 onChange={onChange}
                 required
               />
+              {formErrors.studentNumber && <p className="mt-2 text-sm font-medium text-error">{formErrors.studentNumber}</p>}
             </label>
 
             <label className="block">
@@ -118,6 +128,7 @@ function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }
                 <option value="ET">ET</option>
                 <option value="BST">BST</option>
               </select>
+              {formErrors.department && <p className="mt-2 text-sm font-medium text-error">{formErrors.department}</p>}
             </label>
 
             <label className="block md:col-span-2">
@@ -132,6 +143,7 @@ function StudentFormModal({ student, form, saving, onClose, onChange, onSubmit }
                 onChange={onChange}
                 required
               />
+              {formErrors.batchYear && <p className="mt-2 text-sm font-medium text-error">{formErrors.batchYear}</p>}
             </label>
 
             <div className="md:col-span-2 flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
@@ -164,6 +176,7 @@ export default function ManageStudents() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [statusLoadingId, setStatusLoadingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState({});
   const [editingStudent, setEditingStudent] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [importSummary, setImportSummary] = useState(null);
@@ -207,8 +220,21 @@ export default function ManageStudents() {
     }
   };
 
+  const validateStudentForm = (data) => {
+    const errors = {
+      fullName: validateName(data.fullName, 'Full name'),
+      officialEmail: validateEmail(data.officialEmail, 'Official email'),
+      studentNumber: validateStudentId(data.studentNumber, 'Student number'),
+      department: validateDepartment(data.department),
+      batchYear: validateBatchYear(data.batchYear),
+    };
+
+    return Object.fromEntries(Object.entries(errors).filter(([, value]) => Boolean(value)));
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
+    setFormErrors((current) => ({ ...current, [name]: '' }));
     setForm((current) => ({
       ...current,
       [name]: name === 'batchYear' ? Number(value) : value,
@@ -217,6 +243,7 @@ export default function ManageStudents() {
 
   const openEditModal = (student) => {
     setEditingStudent(student);
+    setFormErrors({});
     setForm({
       fullName: student.fullName || '',
       officialEmail: student.officialEmail || '',
@@ -229,10 +256,17 @@ export default function ManageStudents() {
   const closeEditModal = () => {
     setEditingStudent(null);
     setForm(emptyForm);
+    setFormErrors({});
   };
 
   const handleCreateStudent = async (event) => {
     event.preventDefault();
+    const errors = validateStudentForm(form);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the highlighted student fields.');
+      return;
+    }
     setSaving(true);
 
     try {
@@ -250,6 +284,13 @@ export default function ManageStudents() {
   const handleUpdateStudent = async (event) => {
     event.preventDefault();
     if (!editingStudent) {
+      return;
+    }
+
+    const errors = validateStudentForm(form);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the highlighted student fields.');
       return;
     }
 
@@ -373,6 +414,7 @@ export default function ManageStudents() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.fullName && <p className="mt-2 text-sm font-medium text-error">{formErrors.fullName}</p>}
               </label>
 
               <label className="block">
@@ -385,6 +427,7 @@ export default function ManageStudents() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.officialEmail && <p className="mt-2 text-sm font-medium text-error">{formErrors.officialEmail}</p>}
               </label>
 
               <label className="block">
@@ -396,6 +439,7 @@ export default function ManageStudents() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.studentNumber && <p className="mt-2 text-sm font-medium text-error">{formErrors.studentNumber}</p>}
               </label>
 
               <label className="block">
@@ -410,6 +454,7 @@ export default function ManageStudents() {
                   <option value="ET">ET</option>
                   <option value="BST">BST</option>
                 </select>
+                {formErrors.department && <p className="mt-2 text-sm font-medium text-error">{formErrors.department}</p>}
               </label>
 
               <label className="block md:col-span-2">
@@ -424,6 +469,7 @@ export default function ManageStudents() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.batchYear && <p className="mt-2 text-sm font-medium text-error">{formErrors.batchYear}</p>}
               </label>
 
               <div className="md:col-span-2 flex justify-end">
@@ -603,6 +649,7 @@ export default function ManageStudents() {
       <StudentFormModal
         student={editingStudent}
         form={form}
+        formErrors={formErrors}
         saving={saving}
         onClose={closeEditModal}
         onChange={handleChange}

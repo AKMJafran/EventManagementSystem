@@ -32,7 +32,7 @@ export default function LecturerEditEventPage() {
 
         if (!eventBelongsToCurrentUser(eventData, user)) {
           toast.error('You are not allowed to edit this event.');
-          navigate('/lecturer/my-events', { replace: true });
+          navigate('/lecturer/events', { replace: true });
           return;
         }
 
@@ -82,10 +82,10 @@ export default function LecturerEditEventPage() {
           </p>
           <button
             className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            onClick={() => navigate('/lecturer/my-events')}
+            onClick={() => navigate('/lecturer/events')}
             type="button"
           >
-            Back to My Events
+            Back to Events
           </button>
         </section>
       </LecturerLayout>
@@ -116,19 +116,19 @@ export default function LecturerEditEventPage() {
               </div>
               <button
                 className="text-sm font-semibold text-slate-600 transition hover:text-slate-900"
-                onClick={() => navigate('/lecturer/my-events')}
+                onClick={() => navigate('/lecturer/events')}
                 type="button"
               >
-                Back to My Events
+                Back to Events
               </button>
             </div>
           </section>
         }
         initialEvent={event}
-        onCancel={() => navigate('/lecturer/my-events')}
+        onCancel={() => navigate('/lecturer/events')}
         onSuccess={() => {
           toast.success('Event updated successfully!');
-          navigate('/lecturer/my-events');
+          navigate('/lecturer/events');
         }}
         pageDescription="Update the departmental event details while the request is still pending Dean review."
         pageTitle="Edit Departmental Event"

@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
+import DashboardEventCard from '../components/events/DashboardEventCard';
 import LecturerLayout from '../components/layout/LecturerLayout';
+import EmptyStatePanel from '../components/ui/EmptyStatePanel';
+import { normalizeEventCollection } from '../utils/eventData';
 
 function formatDateRange(event) {
   const start = new Date(event.startTime);
@@ -37,7 +40,7 @@ export default function LecturerDashboard() {
 
         setClubs(clubsRes.data || []);
         setPendingApprovals(pendingRes.data || []);
-        const eventsData = eventsRes.data?.content || eventsRes.data || [];
+        const eventsData = normalizeEventCollection(eventsRes.data);
         setUpcomingEvents(eventsData.slice(0, 5));
       } catch (error) {
         toast.error('Failed to load dashboard data');
@@ -114,10 +117,11 @@ export default function LecturerDashboard() {
           </div>
           <div className="space-y-3">
             {pendingApprovals.length === 0 ? (
-              <div className="rounded-2xl bg-surface-container-low p-6 text-center">
-                <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">task_alt</span>
-                <p className="text-sm text-on-surface-variant">No events pending your approval.</p>
-              </div>
+              <EmptyStatePanel
+                icon="task_alt"
+                title="Nothing pending right now"
+                message="Club event approvals assigned to you will appear here when they need review."
+              />
             ) : (
               pendingApprovals.slice(0, 4).map((event) => (
                 <div key={event.id} className="rounded-2xl bg-surface-container-low p-4">
@@ -143,10 +147,11 @@ export default function LecturerDashboard() {
           </div>
           <div className="space-y-3">
             {clubs.length === 0 ? (
-              <div className="rounded-2xl bg-surface-container-low p-6 text-center">
-                <span className="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-3">group_off</span>
-                <p className="text-sm text-on-surface-variant">You are not assigned as Senior Treasurer to any clubs yet.</p>
-              </div>
+              <EmptyStatePanel
+                icon="group_off"
+                title="No club assignments yet"
+                message="Once you are assigned as a Senior Treasurer, your clubs will be listed here."
+              />
             ) : (
               clubs.slice(0, 4).map((club) => (
                 <div key={club.id} className="rounded-2xl bg-surface-container-low p-4">
@@ -167,22 +172,23 @@ export default function LecturerDashboard() {
         </div>
         <div className="space-y-3">
           {upcomingEvents.length === 0 ? (
-            <p className="text-sm text-on-surface-variant">No approved events in the next 7 days.</p>
+            <EmptyStatePanel
+              icon="event_available"
+              title="No approved events in the next 7 days"
+              message="Upcoming faculty events will appear here once new approved schedules are available."
+            />
           ) : (
-            upcomingEvents.map((event) => (
-              <Link key={event.id} to={`/events/${event.id}`} className="block rounded-2xl bg-surface-container-low p-4 hover:bg-surface-container-high transition-colors">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-on-surface">{event.title}</h3>
-                    <p className="mt-1 text-xs text-on-surface-variant">{formatDateRange(event)}</p>
-                    <p className="mt-1 text-xs text-on-surface-variant">{event.venue}</p>
-                  </div>
-                  <span className="rounded-full bg-secondary-container px-3 py-1 text-[10px] font-bold uppercase text-on-secondary-container">
-                    Approved
-                  </span>
-                </div>
-              </Link>
-            ))
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {upcomingEvents.map((event) => (
+                <DashboardEventCard
+                  key={event.id}
+                  event={event}
+                  to={`/events/${event.id}`}
+                  badgeLabel="APPROVED"
+                  supportingText={event.createdByName || event.categoryName || 'Faculty event'}
+                />
+              ))}
+            </div>
           )}
         </div>
       </section>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
@@ -6,6 +6,7 @@ import axiosInstance from '../../api/axiosInstance';
 import EventImage from '../EventImage';
 import {
   extractReadableErrorMessage,
+  getCurrentDateTimeLocalValue,
   isVenueConflictError,
   normalizeCategories,
   normalizeVenues,
@@ -69,6 +70,7 @@ export default function EventFormShell({
   const [imageError, setImageError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hasVenueConflict, setHasVenueConflict] = useState(false);
+  const [venueSearch, setVenueSearch] = useState('');
   const fileInputRef = useRef(null);
 
   const {
@@ -76,8 +78,10 @@ export default function EventFormShell({
     handleSubmit,
     watch,
     reset,
+    setError,
     setValue,
     getValues,
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -103,6 +107,22 @@ export default function EventFormShell({
   const watchedVenue = watch('venue');
   const watchedStart = watch('startTime');
   const watchedEnd = watch('endTime');
+  const deferredVenueSearch = useDeferredValue(venueSearch);
+
+  const filteredVenues = venues.filter((venue) => {
+    const query = deferredVenueSearch.trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+
+    return (
+      venue.name?.toLowerCase().includes(query) ||
+      venue.location?.toLowerCase().includes(query) ||
+      String(venue.capacity || '').includes(query)
+    );
+  });
+
+  const selectedVenueOption = venues.find((venue) => venue.value === watchedVenue);
 
   function processSelectedFile(file) {
     if (!file) {
@@ -144,12 +164,19 @@ export default function EventFormShell({
     return normalizeCategories(response.data);
   }, []);
 
-  async function retryVenueLoad() {
+  async function loadVenues() {
     setVenuesLoading(true);
     setVenuesError('');
 
     try {
-      const response = await axiosInstance.get('/venues');
+      const hasSchedule =
+        watchedStart &&
+        watchedEnd &&
+        new Date(watchedEnd).getTime() > new Date(watchedStart).getTime();
+      const params = hasSchedule
+        ? { startTime: watchedStart, endTime: watchedEnd, excludeEventId: initialEvent?.id || undefined }
+        : {};
+      const response = await axiosInstance.get('/venues/availability', { params });
       setVenues(normalizeVenues(response.data));
     } catch (error) {
       setVenues([]);
@@ -159,6 +186,10 @@ export default function EventFormShell({
     } finally {
       setVenuesLoading(false);
     }
+  }
+
+  async function retryVenueLoad() {
+    await loadVenues();
   }
 
   const resolveCategorySelection = useCallback(async (categoryId, parentCategories) => {
@@ -217,29 +248,7 @@ export default function EventFormShell({
       }
     }
 
-    async function fetchVenues() {
-      try {
-        const response = await axiosInstance.get('/venues');
-        if (!cancelled) {
-          setVenuesError('');
-          setVenues(normalizeVenues(response.data));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setVenues([]);
-          setVenuesError(extractReadableErrorMessage(error, 'Failed to load venues.'));
-          toast.error('Failed to load venues');
-          console.error(error);
-        }
-      } finally {
-        if (!cancelled) {
-          setVenuesLoading(false);
-        }
-      }
-    }
-
     fetchCategories();
-    fetchVenues();
 
     return () => {
       cancelled = true;
@@ -348,6 +357,33 @@ export default function EventFormShell({
     }
   }, [hasVenueConflict, watchedVenue, watchedStart, watchedEnd]);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      void loadVenues();
+    }, 200);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [initialEvent?.id, watchedEnd, watchedStart]);
+
+  useEffect(() => {
+    if (!watchedVenue) {
+      return;
+    }
+
+    const matchingVenue = venues.find((venue) => venue.value === watchedVenue);
+    if (matchingVenue) {
+      clearErrors('venue');
+      return;
+    }
+
+    setError('venue', {
+      type: 'validate',
+      message: 'Please select a valid venue from the approved venue list.',
+    });
+  }, [clearErrors, setError, venues, watchedVenue]);
+
   async function uploadImageIfNeeded() {
     let imageId = initialEvent?.imageId || null;
 
@@ -380,6 +416,41 @@ export default function EventFormShell({
   }
 
   async function onSubmit(formData) {
+    const selectedVenue = venues.find((venue) => venue.value === formData.venue);
+    if (!selectedVenue) {
+      setError('venue', {
+        type: 'validate',
+        message: 'Please select a valid venue from the approved venue list.',
+      });
+      return;
+    }
+
+    if (!selectedVenue.active) {
+      setError('venue', {
+        type: 'validate',
+        message: 'This venue is inactive and cannot be booked.',
+      });
+      return;
+    }
+
+    if (watchedStart && watchedEnd && selectedVenue.status === 'RESERVED') {
+      setError('venue', {
+        type: 'validate',
+        message: selectedVenue.reservedEventTitle
+          ? `"${selectedVenue.name}" is already reserved for "${selectedVenue.reservedEventTitle}" during this time.`
+          : 'This venue is already reserved during the selected time.',
+      });
+      return;
+    }
+
+    if (!initialEvent && new Date(formData.startTime) < new Date()) {
+      setError('startTime', {
+        type: 'validate',
+        message: 'Start time cannot be in the past.',
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -428,6 +499,7 @@ export default function EventFormShell({
 
       <section className="rounded-3xl border border-outline-variant/10 bg-white p-6 shadow-sm md:p-8">
         <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
+          <input type="hidden" {...register('venue')} />
           {Object.entries(hiddenFields).map(([field]) => (
             <input key={field} type="hidden" {...register(field)} />
           ))}
@@ -557,18 +629,97 @@ export default function EventFormShell({
                     <label className="block text-sm font-semibold text-on-surface">Venue *</label>
                     {venuesLoading && <Spinner label="Loading venues" />}
                   </div>
-                  <select
-                    {...register('venue')}
-                    className={fieldClass(Boolean(errors.venue) || hasVenueConflict)}
-                    disabled={venuesLoading || venues.length === 0}
-                  >
-                    <option value="">{venuesLoading ? 'Loading venues...' : 'Select a venue'}</option>
-                    {venues.map((venue) => (
-                      <option key={venue.id || venue.value} value={venue.value}>
-                        {venue.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className={`rounded-[1.75rem] border bg-surface-container-low/40 p-4 ${Boolean(errors.venue) || hasVenueConflict ? 'border-error/50' : 'border-outline-variant/20'}`}>
+                    <label className="relative block">
+                      <span className="sr-only">Search venues</span>
+                      <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        value={venueSearch}
+                        onChange={(event) => setVenueSearch(event.target.value)}
+                        className="w-full rounded-2xl border border-outline-variant/25 bg-white py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                        placeholder="Search venues by name, location, or capacity"
+                      />
+                    </label>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {selectedVenueOption ? (
+                        <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+                          <span className="material-symbols-outlined text-base">location_on</span>
+                          {selectedVenueOption.name}
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-on-surface-variant ring-1 ring-outline-variant/15">
+                          Select one approved venue to continue
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid max-h-80 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
+                      {filteredVenues.map((venue) => {
+                        const isSelected = watchedVenue === venue.value;
+                        const isDisabled =
+                          !venue.active || (Boolean(watchedStart && watchedEnd) && venue.status === 'RESERVED');
+
+                        return (
+                          <button
+                            key={venue.id || venue.value}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              setValue('venue', venue.value, { shouldDirty: true, shouldValidate: true });
+                              clearErrors('venue');
+                              setHasVenueConflict(false);
+                            }}
+                            className={[
+                              'rounded-[1.5rem] border px-4 py-4 text-left transition',
+                              isSelected
+                                ? 'border-primary bg-primary/8 shadow-sm'
+                                : 'border-outline-variant/20 bg-white hover:border-primary/30 hover:bg-primary/5',
+                              isDisabled ? 'cursor-not-allowed opacity-60 hover:border-outline-variant/20 hover:bg-white' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-on-surface">{venue.name}</p>
+                                <p className="mt-1 text-xs text-on-surface-variant">{venue.location}</p>
+                              </div>
+                              <span
+                                className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                                  venue.status === 'INACTIVE'
+                                    ? 'bg-slate-200 text-slate-700'
+                                    : venue.status === 'RESERVED'
+                                      ? 'bg-error-container text-on-error-container'
+                                      : 'bg-secondary-container text-on-secondary-container'
+                                }`}
+                              >
+                                {venue.status}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-on-surface-variant">
+                              <span className="rounded-full bg-surface-container-low px-3 py-1">
+                                Capacity: {venue.capacity || 'N/A'}
+                              </span>
+                            </div>
+                            {venue.status === 'RESERVED' && venue.reservedEventTitle && (
+                              <p className="mt-3 text-xs font-medium text-error">
+                                Reserved for: {venue.reservedEventTitle}
+                              </p>
+                            )}
+                            {venue.status === 'INACTIVE' && (
+                              <p className="mt-3 text-xs font-medium text-slate-600">
+                                This venue is inactive and cannot be booked right now.
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   {errors.venue && <p className="mt-2 text-sm font-medium text-red-600">{errors.venue.message}</p>}
                   {!errors.venue && venuesError && (
                     <div className="mt-3 rounded-2xl border border-error-container bg-error-container/50 px-4 py-3 text-sm text-on-error-container">
@@ -587,6 +738,11 @@ export default function EventFormShell({
                       No venues are available yet. Ask an administrator to add one first.
                     </p>
                   )}
+                  {!errors.venue && !venuesError && !venuesLoading && venues.length > 0 && filteredVenues.length === 0 && (
+                    <p className="mt-2 text-xs text-on-surface-variant">
+                      No venues match the current search. Try a different keyword.
+                    </p>
+                  )}
                   {!errors.venue && (
                     <p
                       className={`mt-2 text-xs ${
@@ -595,7 +751,9 @@ export default function EventFormShell({
                     >
                       {hasVenueConflict
                         ? 'Please adjust the venue or event timing before submitting again.'
-                        : 'Venue availability is checked automatically.'}
+                        : watchedStart && watchedEnd
+                          ? 'Venue availability is checked automatically for the selected schedule.'
+                          : 'Select the schedule to see live venue reservation status.'}
                     </p>
                   )}
                 </div>
@@ -606,6 +764,7 @@ export default function EventFormShell({
                     <input
                       {...register('startTime')}
                       className={fieldClass(Boolean(errors.startTime) || hasVenueConflict)}
+                      min={!initialEvent ? getCurrentDateTimeLocalValue() : undefined}
                       type="datetime-local"
                     />
                     {errors.startTime && (
@@ -618,6 +777,7 @@ export default function EventFormShell({
                     <input
                       {...register('endTime')}
                       className={fieldClass(Boolean(errors.endTime) || hasVenueConflict)}
+                      min={watchedStart || (!initialEvent ? getCurrentDateTimeLocalValue() : undefined)}
                       type="datetime-local"
                     />
                     {errors.endTime && (

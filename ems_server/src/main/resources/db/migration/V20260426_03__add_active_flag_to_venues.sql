@@ -1,0 +1,6 @@
+ALTER TABLE venues
+ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+UPDATE venues
+SET active = TRUE
+WHERE active IS NULL;

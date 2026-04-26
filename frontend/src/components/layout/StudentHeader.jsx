@@ -1,6 +1,6 @@
 import React from 'react';
 import NotificationBell from '../NotificationBell';
-import ProfileAvatarUploader from '../ProfileAvatarUploader';
+import ProfileShortcut from './ProfileShortcut';
 
 export default function StudentHeader({ user, onOpenSidebar }) {
   return (
@@ -26,14 +26,7 @@ export default function StudentHeader({ user, onOpenSidebar }) {
           <div className="rounded-2xl border border-outline-variant/30 bg-white/80 p-2 shadow-sm">
             <NotificationBell />
           </div>
-
-          <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/30 bg-white/80 px-3 py-2 shadow-sm">
-            <div className="text-right">
-              <p className="text-xs font-bold leading-none text-on-surface">{user?.name || 'Student'}</p>
-              <p className="text-[10px] text-on-surface-variant">Student Portal</p>
-            </div>
-            <ProfileAvatarUploader user={user} />
-          </div>
+          <ProfileShortcut user={user} />
         </div>
       </div>
     </header>

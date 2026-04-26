@@ -60,6 +60,7 @@ public class EventService {
     private final FileServerService fileServerService;
     private final NotificationService notificationService;
     private final ClubService clubService;
+    private final VenueService venueService;
 
     /**
      * Creates a new event with PENDING status and records conflicts for admin review.
@@ -75,6 +76,7 @@ public class EventService {
         }
 
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+        String normalizedVenueName = validateVenueSelection(eventRequest.getVenue());
 
         Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + eventRequest.getCategoryId()));
@@ -87,7 +89,7 @@ public class EventService {
                 eventRequest.getDescription(),
                 userId,
                 eventRequest.getCategoryId(),
-                eventRequest.getVenue(),
+                normalizedVenueName,
                 eventRequest.getImageId(),
                 eventRequest.getStartTime(),
                 eventRequest.getEndTime(),
@@ -103,6 +105,7 @@ public class EventService {
 
     private EventResponse createAdminEvent(EventRequest eventRequest, Long userId) {
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+        String normalizedVenueName = validateVenueSelection(eventRequest.getVenue());
 
         Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + eventRequest.getCategoryId()));
@@ -114,7 +117,7 @@ public class EventService {
                 eventRequest.getDescription(),
                 userId,
                 eventRequest.getCategoryId(),
-                eventRequest.getVenue(),
+                normalizedVenueName,
                 eventRequest.getImageId(),
                 eventRequest.getStartTime(),
                 eventRequest.getEndTime(),
@@ -157,6 +160,7 @@ public class EventService {
     @Transactional
     public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId, Role requesterRole) {
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+        String normalizedVenueName = validateVenueSelection(eventRequest.getVenue());
 
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
@@ -184,7 +188,7 @@ public class EventService {
         event.setTitle(eventRequest.getTitle());
         event.setDescription(eventRequest.getDescription());
         event.setCategoryId(eventRequest.getCategoryId());
-        event.setVenue(eventRequest.getVenue());
+        event.setVenue(normalizedVenueName);
         event.setStartTime(eventRequest.getStartTime());
         event.setEndTime(eventRequest.getEndTime());
         event.setEventType(derivedEventType);
@@ -666,7 +670,7 @@ public class EventService {
 
         String newVenue = (request.getVenue() == null || request.getVenue().isBlank())
                 ? event.getVenue()
-                : request.getVenue().trim();
+                : validateVenueSelection(request.getVenue());
 
         if ((request.getStartTime() == null) != (request.getEndTime() == null)) {
             throw new RuntimeException("Both startTime and endTime are required when changing the date or time");
@@ -821,6 +825,14 @@ public List<EventResponse> getEventsByUserId(Long userId) {
         if (!endTime.isAfter(startTime)) {
             throw new RuntimeException("End time must be after start time");
         }
+    }
+
+    private String validateVenueSelection(String venueName) {
+        Venue venue = venueService.requireVenueByName(venueName);
+        if (!Boolean.TRUE.equals(venue.getActive())) {
+            throw new RuntimeException("Selected venue is inactive");
+        }
+        return venue.getName();
     }
 
     private EventType deriveEventTypeFromCategory(Category category) {

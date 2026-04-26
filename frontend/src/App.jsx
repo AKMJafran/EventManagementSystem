@@ -29,11 +29,10 @@ import LecturerDashboard from './pages/LecturerDashboard';
 import LecturerEditEventPage from './pages/LecturerEditEventPage';
 import LecturerEventsPage from './pages/LecturerEventsPage';
 import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
-import LecturerMyEventsPage from './pages/LecturerMyEventsPage';
 import LecturerPendingApprovalsPage from './pages/LecturerPendingApprovalsPage';
-import LecturerProfilePage from './pages/LecturerProfilePage';
 import StudentClubsPage from './pages/StudentClubsPage';
 import ManageClubs from './pages/ManageClubs';
+import ProfilePage from './pages/ProfilePage';
 
 const Home = () => {
   const { isAuthenticated, user } = useAuthStore.getState();
@@ -79,6 +78,7 @@ function App() {
         <Route path="/student/my-events" element={<MyEventsPage />} />
         <Route path="/student/calendar" element={<CalendarPage />} />
         <Route path="/student/clubs" element={<StudentClubsPage />} />
+        <Route path="/student/profile" element={<ProfilePage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
@@ -96,6 +96,7 @@ function App() {
         <Route path="/admin/edit-event/:id" element={<AdminEditEventPage />} />
         <Route path="/conflicts" element={<ConflictsPage />} />
         <Route path="/admin/notifications" element={<NotificationManagerPage />} />
+        <Route path="/admin/profile" element={<ProfilePage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="LECTURER" />}>
@@ -103,10 +104,9 @@ function App() {
         <Route path="/lecturer/edit-event/:id" element={<LecturerEditEventPage />} />
         <Route path="/lecturer/events" element={<LecturerEventsPage />} />
         <Route path="/lecturer/my-clubs" element={<LecturerMyClubsPage />} />
-        <Route path="/lecturer/my-events" element={<LecturerMyEventsPage />} />
         <Route path="/lecturer/pending-approvals" element={<LecturerPendingApprovalsPage />} />
         <Route path="/lecturer/calendar" element={<CalendarPage />} />
-        <Route path="/lecturer/profile" element={<LecturerProfilePage />} />
+        <Route path="/lecturer/profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="/" element={<Home />} />

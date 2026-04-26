@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import useAuthStore from '../../context/AuthContext';
 import NotificationBell from '../NotificationBell';
-import ProfileAvatarUploader from '../ProfileAvatarUploader';
 import LecturerSidebar from './LecturerSidebar';
+import ProfileShortcut from './ProfileShortcut';
 
 export default function LecturerLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,15 +35,7 @@ export default function LecturerLayout({ children }) {
               <div className="rounded-2xl border border-outline-variant/30 bg-white/80 p-2 shadow-sm">
                 <NotificationBell />
               </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/30 bg-white/80 px-3 py-2 shadow-sm">
-                <div className="text-right">
-                  <p className="text-xs font-bold leading-none text-on-surface">{user?.name || 'Lecturer'}</p>
-                  <p className="text-[10px] text-on-surface-variant">
-                    {user?.department ? `${user.department} Department` : 'Lecturer Portal'}
-                  </p>
-                </div>
-                <ProfileAvatarUploader user={user} />
-              </div>
+              <ProfileShortcut user={user} />
             </div>
           </div>
         </header>

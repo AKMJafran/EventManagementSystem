@@ -8,7 +8,6 @@ export default function LecturerSidebar({ isOpen = false, onClose = () => {} }) 
 
   const links = [
     { to: '/lecturer/dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { to: '/lecturer/my-events', icon: 'event_note', label: 'My Events' },
     { to: '/lecturer/events', icon: 'event', label: 'Events' },
     { to: '/lecturer/my-clubs', icon: 'groups', label: 'My Clubs' },
     { to: '/lecturer/pending-approvals', icon: 'pending_actions', label: 'Pending Approvals' },

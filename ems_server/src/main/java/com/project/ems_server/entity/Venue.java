@@ -26,4 +26,14 @@ public class Venue {
 
     @Column(nullable = false)
     private String location;
+
+    @Column(nullable = false)
+    private Boolean active;
+
+    @PrePersist
+    protected void onCreate() {
+        if (active == null) {
+            active = true;
+        }
+    }
 }

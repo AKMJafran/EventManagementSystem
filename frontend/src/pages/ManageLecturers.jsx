@@ -4,6 +4,13 @@ import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
 import ModalPortal from '../components/ui/ModalPortal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import {
+  validateDepartment,
+  validateEmail,
+  validateName,
+  validateRequiredText,
+  validateStaffId,
+} from '../utils/validation';
 
 const emptyForm = {
   name: '',
@@ -46,7 +53,7 @@ const parseCsv = (text) => {
   });
 };
 
-function LecturerFormModal({ lecturer, form, saving, onClose, onChange, onSubmit }) {
+function LecturerFormModal({ lecturer, form, formErrors, saving, onClose, onChange, onSubmit }) {
   if (!lecturer) {
     return null;
   }
@@ -81,6 +88,7 @@ function LecturerFormModal({ lecturer, form, saving, onClose, onChange, onSubmit
                 onChange={onChange}
                 required
               />
+              {formErrors.name && <p className="mt-2 text-sm font-medium text-error">{formErrors.name}</p>}
             </label>
 
             <label className="block">
@@ -116,6 +124,7 @@ function LecturerFormModal({ lecturer, form, saving, onClose, onChange, onSubmit
                 <option value="ET">ET</option>
                 <option value="BST">BST</option>
               </select>
+              {formErrors.department && <p className="mt-2 text-sm font-medium text-error">{formErrors.department}</p>}
             </label>
 
             <label className="block md:col-span-2">
@@ -127,6 +136,7 @@ function LecturerFormModal({ lecturer, form, saving, onClose, onChange, onSubmit
                 onChange={onChange}
                 required
               />
+              {formErrors.designation && <p className="mt-2 text-sm font-medium text-error">{formErrors.designation}</p>}
             </label>
 
             <div className="md:col-span-2 flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
@@ -161,6 +171,7 @@ export default function ManageLecturers() {
   const [editingLecturer, setEditingLecturer] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState({});
   const [importSummary, setImportSummary] = useState(null);
 
   const activeCount = useMemo(
@@ -202,13 +213,27 @@ export default function ManageLecturers() {
     }
   };
 
+  const validateLecturerForm = (data, { emailRequired = true, staffIdRequired = true } = {}) => {
+    const errors = {
+      name: validateName(data.name, 'Full name'),
+      email: emailRequired ? validateEmail(data.email, 'Official email') : '',
+      staffId: staffIdRequired ? validateStaffId(data.staffId, 'Staff ID') : '',
+      department: validateDepartment(data.department),
+      designation: validateRequiredText(data.designation, 'Designation', { min: 2, max: 120 }),
+    };
+
+    return Object.fromEntries(Object.entries(errors).filter(([, value]) => Boolean(value)));
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
+    setFormErrors((current) => ({ ...current, [name]: '' }));
     setForm((current) => ({ ...current, [name]: value }));
   };
 
   const openEditModal = (lecturer) => {
     setEditingLecturer(lecturer);
+    setFormErrors({});
     setForm({
       name: lecturer.name || '',
       email: lecturer.email || '',
@@ -221,10 +246,17 @@ export default function ManageLecturers() {
   const closeEditModal = () => {
     setEditingLecturer(null);
     setForm(emptyForm);
+    setFormErrors({});
   };
 
   const handleCreateLecturer = async (event) => {
     event.preventDefault();
+    const errors = validateLecturerForm(form);
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the highlighted lecturer fields.');
+      return;
+    }
     setSaving(true);
 
     try {
@@ -242,6 +274,13 @@ export default function ManageLecturers() {
   const handleUpdateLecturer = async (event) => {
     event.preventDefault();
     if (!editingLecturer) {
+      return;
+    }
+
+    const errors = validateLecturerForm(form, { emailRequired: false, staffIdRequired: false });
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast.error('Please fix the highlighted lecturer fields.');
       return;
     }
 
@@ -365,6 +404,7 @@ export default function ManageLecturers() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.name && <p className="mt-2 text-sm font-medium text-error">{formErrors.name}</p>}
               </label>
 
               <label className="block">
@@ -377,6 +417,7 @@ export default function ManageLecturers() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.email && <p className="mt-2 text-sm font-medium text-error">{formErrors.email}</p>}
               </label>
 
               <label className="block">
@@ -388,6 +429,7 @@ export default function ManageLecturers() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.staffId && <p className="mt-2 text-sm font-medium text-error">{formErrors.staffId}</p>}
               </label>
 
               <label className="block">
@@ -402,6 +444,7 @@ export default function ManageLecturers() {
                   <option value="ET">ET</option>
                   <option value="BST">BST</option>
                 </select>
+                {formErrors.department && <p className="mt-2 text-sm font-medium text-error">{formErrors.department}</p>}
               </label>
 
               <label className="block md:col-span-2">
@@ -413,6 +456,7 @@ export default function ManageLecturers() {
                   onChange={handleChange}
                   required
                 />
+                {formErrors.designation && <p className="mt-2 text-sm font-medium text-error">{formErrors.designation}</p>}
               </label>
 
               <div className="md:col-span-2 flex justify-end">
@@ -592,6 +636,7 @@ export default function ManageLecturers() {
       <LecturerFormModal
         lecturer={editingLecturer}
         form={form}
+        formErrors={formErrors}
         saving={saving}
         onClose={closeEditModal}
         onChange={handleChange}
