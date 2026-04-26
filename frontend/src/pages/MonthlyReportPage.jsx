@@ -63,7 +63,7 @@ export default function MonthlyReportPage() {
 
   useEffect(() => {
     fetchReport(year, month);
-  }, []);
+  }, [year, month]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

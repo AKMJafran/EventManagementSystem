@@ -1,20 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import heroImage from '../assets/hero.png';
 
 export default function EventImage({ src, alt, className = '', fallbackSrc = heroImage }) {
-  const [currentSrc, setCurrentSrc] = useState(src || fallbackSrc);
-
-  useEffect(() => {
-    setCurrentSrc(src || fallbackSrc);
-  }, [src, fallbackSrc]);
+  const initialSrc = src || fallbackSrc;
+  const [imgSrc, setImgSrc] = useState(initialSrc);
 
   return (
     <img
-      src={currentSrc}
+      src={src || imgSrc}
       alt={alt}
       className={className}
       loading="lazy"
-      onError={() => setCurrentSrc(fallbackSrc)}
+      onError={() => setImgSrc(fallbackSrc)}
     />
   );
 }
