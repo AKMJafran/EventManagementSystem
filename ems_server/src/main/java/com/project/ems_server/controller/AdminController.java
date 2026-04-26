@@ -2,9 +2,11 @@ package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.AdminLecturerCreateRequest;
 import com.project.ems_server.dto.request.AdminStudentCreateRequest;
+import com.project.ems_server.dto.request.LecturerProfileBulkItemRequest;
 import com.project.ems_server.dto.request.StudentProfileBulkItemRequest;
 import com.project.ems_server.dto.response.AdminLecturerResponse;
 import com.project.ems_server.dto.response.AdminStudentResponse;
+import com.project.ems_server.dto.response.BulkLecturerImportResponse;
 import com.project.ems_server.dto.response.BulkStudentImportResponse;
 import com.project.ems_server.service.AdminLecturerService;
 import com.project.ems_server.service.AdminStudentService;
@@ -71,6 +73,12 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AdminLecturerResponse> createLecturer(@Valid @RequestBody AdminLecturerCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(adminLecturerService.createLecturer(request));
+    }
+
+    @PostMapping("/lecturers/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BulkLecturerImportResponse> bulkImportLecturers(@RequestBody List<LecturerProfileBulkItemRequest> lecturers) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(adminLecturerService.bulkImportLecturers(lecturers));
     }
 
     @GetMapping("/lecturers")

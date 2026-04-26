@@ -7,16 +7,51 @@ const emptyForm = {
   name: '',
   email: '',
   staffId: '',
-  department: '',
+  department: 'ICT',
   designation: '',
+};
+
+const sampleColumns = ['staffId', 'email', 'name', 'department', 'designation'];
+
+const normalizeImportedRow = (row) => ({
+  staffId: String(row.staffId || row.StaffId || row.staff_id || '').trim(),
+  email: String(row.email || row.Email || row.officialEmail || row.OfficialEmail || '').trim(),
+  name: String(row.name || row.Name || row.fullName || row.FullName || '').trim(),
+  department: String(row.department || row.Department || '').trim(),
+  designation: String(row.designation || row.Designation || '').trim(),
+});
+
+const cleanCsvValue = (value) => value.trim().replace(/^"|"$/g, '').replace(/""/g, '"');
+
+const parseCsv = (text) => {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headers = lines[0].split(',').map(cleanCsvValue);
+  return lines.slice(1).map((line) => {
+    const values = line.split(',').map(cleanCsvValue);
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] ?? '';
+    });
+    return normalizeImportedRow(row);
+  });
 };
 
 export default function ManageLecturers() {
   const [lecturers, setLecturers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [editingLecturer, setEditingLecturer] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [importSummary, setImportSummary] = useState(null);
 
   const activeCount = useMemo(
     () => lecturers.filter((l) => l.isActive).length,
@@ -56,6 +91,42 @@ export default function ManageLecturers() {
       toast.error(error?.response?.data?.message || 'Failed to create lecturer account');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleBulkImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setBulkLoading(true);
+
+    try {
+      const text = await file.text();
+      const payload = parseCsv(text);
+
+      if (payload.length === 0) {
+        toast.error('The selected CSV does not contain any lecturer rows.');
+        return;
+      }
+
+      const response = await axiosInstance.post('/admin/lecturers/bulk', payload);
+      setImportSummary(response.data);
+
+      if (response.data.failed > 0) {
+        toast.success(`Imported ${response.data.success} lecturers with ${response.data.failed} row issues.`);
+      } else {
+        toast.success(`Imported ${response.data.success} lecturers successfully.`);
+      }
+
+      await fetchLecturers();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Bulk import failed');
+      console.error(error);
+    } finally {
+      event.target.value = '';
+      setBulkLoading(false);
     }
   };
 
@@ -194,6 +265,62 @@ export default function ManageLecturers() {
                 </button>
               </div>
             </form>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">Bulk Import Lecturers</h2>
+            <p className="text-sm text-slate-600 mb-4">
+              Upload a CSV file using these headers: <span className="font-semibold">{sampleColumns.join(', ')}</span>
+            </p>
+            <label className="flex items-center justify-center w-full border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center cursor-pointer hover:border-teal-500 transition-colors">
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleBulkImport}
+                disabled={bulkLoading}
+              />
+              <div>
+                <p className="text-lg font-semibold text-slate-900">{bulkLoading ? 'Importing...' : 'Select CSV to Import'}</p>
+                <p className="text-sm text-slate-500 mt-2">Each valid row creates both a user account and a lecturer profile.</p>
+              </div>
+            </label>
+
+            {importSummary && (
+              <div className="mt-6 rounded-2xl bg-slate-50 border border-slate-200 p-5">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Total</p>
+                    <p className="text-2xl font-bold text-slate-900">{importSummary.total}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Success</p>
+                    <p className="text-2xl font-bold text-emerald-600">{importSummary.success}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Failed</p>
+                    <p className="text-2xl font-bold text-rose-600">{importSummary.failed}</p>
+                  </div>
+                </div>
+
+                {importSummary.failures?.length > 0 && (
+                  <div className="mt-5">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-3">Failure Reasons</h3>
+                    <div className="space-y-2 max-h-56 overflow-y-auto">
+                      {importSummary.failures.map((failure) => (
+                        <div key={`${failure.rowNumber}-${failure.staffId}-${failure.email}`} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                          <p className="text-sm font-semibold text-rose-800">Row {failure.rowNumber}</p>
+                          <p className="text-sm text-rose-700">{failure.reason}</p>
+                          <p className="text-xs text-rose-600 mt-1">
+                            {failure.staffId || 'No staff ID'} - {failure.email || 'No email'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
 
