@@ -11,6 +11,7 @@ import com.project.ems_server.enums.OtpType;
 import com.project.ems_server.enums.Role;
 import com.project.ems_server.repository.LecturerProfileRepository;
 import com.project.ems_server.repository.RefreshTokenRepository;
+import com.project.ems_server.repository.StudentProfileRepository;
 import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +28,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final LecturerProfileRepository lecturerProfileRepository;
+    private final StudentProfileRepository studentProfileRepository;
     private final OtpService otpService;
     private final EmailService emailService;
     private final JwtService jwtService;
@@ -35,9 +37,9 @@ public class AuthService {
     private final FileServerService fileServerService;
 
     public AuthResponse login(LoginRequest loginRequest) {
-        // AuthService.java line 34
-        // AuthService.java line 34
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        String resolvedEmail = resolveEmailFromIdentifier(loginRequest.getEmail());
+
+        User user = userRepository.findByEmail(resolvedEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -46,7 +48,7 @@ public class AuthService {
 
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
+                        resolvedEmail,
                         loginRequest.getPassword()));
 
         if (!Boolean.TRUE.equals(user.getIsVerified())) {
@@ -122,20 +124,22 @@ public class AuthService {
                 .build();
     }
 
-    public void sendResetOtp(String email) {
-        if (userRepository.findByEmail(email).isEmpty()) {
-            throw new RuntimeException("User not found with email: " + email);
+    public void sendResetOtp(String identifier) {
+        String resolvedEmail = resolveEmailFromIdentifier(identifier);
+        if (userRepository.findByEmail(resolvedEmail).isEmpty()) {
+            throw new RuntimeException("User not found with identifier: " + identifier);
         }
 
         String otp = otpService.generateOtp();
-        otpService.saveOtp(email, otp, OtpType.RESET_PASSWORD);
-        emailService.sendPasswordResetEmail(email, otp);
+        otpService.saveOtp(resolvedEmail, otp, OtpType.RESET_PASSWORD);
+        emailService.sendPasswordResetEmail(resolvedEmail, otp);
     }
 
     public void resetPassword(ResetPasswordRequest resetPasswordRequest) {
-        otpService.validateOtp(resetPasswordRequest.getEmail(), resetPasswordRequest.getOtp(), OtpType.RESET_PASSWORD);
+        String resolvedEmail = resolveEmailFromIdentifier(resetPasswordRequest.getEmail());
+        otpService.validateOtp(resolvedEmail, resetPasswordRequest.getOtp(), OtpType.RESET_PASSWORD);
 
-        User user = userRepository.findByEmail(resetPasswordRequest.getEmail())
+        User user = userRepository.findByEmail(resolvedEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         user.setPassword(passwordEncoder.encode(resetPasswordRequest.getNewPassword()));
@@ -175,5 +179,30 @@ public class AuthService {
         return lecturerProfileRepository.findByUserId(user.getId())
                 .map(LecturerProfile::getDepartment)
                 .orElse(null);
+    }
+
+    private String resolveEmailFromIdentifier(String identifier) {
+        if (identifier == null) return null;
+        String trimmed = identifier.trim();
+        if (trimmed.contains("@")) {
+            return trimmed;
+        }
+
+        // Try as student number
+        java.util.Optional<com.project.ems_server.entity.StudentProfile> studentProfile = studentProfileRepository.findByStudentNumber(trimmed);
+        if (studentProfile.isPresent()) {
+            return studentProfile.get().getOfficialEmail();
+        }
+
+        // Try as staff ID
+        java.util.Optional<LecturerProfile> lecturerProfile = lecturerProfileRepository.findByStaffId(trimmed);
+        if (lecturerProfile.isPresent()) {
+            java.util.Optional<User> user = userRepository.findById(lecturerProfile.get().getUserId());
+            if (user.isPresent()) {
+                return user.get().getEmail();
+            }
+        }
+
+        return trimmed;
     }
 }
