@@ -49,7 +49,7 @@ public class AdminController {
     }
 
     @GetMapping("/students")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT')")
     public ResponseEntity<List<AdminStudentResponse>> getAllStudents() {
         return ResponseEntity.ok(adminStudentService.getAllStudents());
     }
@@ -82,7 +82,7 @@ public class AdminController {
     }
 
     @GetMapping("/lecturers")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT')")
     public ResponseEntity<List<AdminLecturerResponse>> getAllLecturers() {
         return ResponseEntity.ok(adminLecturerService.getAllLecturers());
     }

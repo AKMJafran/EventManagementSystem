@@ -21,9 +21,17 @@ public class ClubResponse {
     private Long presidentId;
     private String presidentName;
     private String presidentEmail;
+    private String presidentStudentNumber;
     private Long seniorTreasurerLecturerId;
     private String seniorTreasurerLecturerName;
     private String seniorTreasurerLecturerEmail;
+    private String seniorTreasurerStaffId;
+    private Long secretaryUserId;
+    private String secretaryName;
+    private String secretaryStudentNumber;
+    private Long studentTreasurerUserId;
+    private String studentTreasurerName;
+    private String studentTreasurerStudentNumber;
     private String status;
     private String rejectionReason;
     private long memberCount;

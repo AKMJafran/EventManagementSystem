@@ -1,6 +1,7 @@
 package com.project.ems_server.repository;
 
 import com.project.ems_server.entity.ClubMembership;
+import com.project.ems_server.enums.ClubMemberRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,6 +16,8 @@ public interface ClubMembershipRepository extends JpaRepository<ClubMembership, 
     boolean existsByClubIdAndUserId(Long clubId, Long userId);
 
     Optional<ClubMembership> findByClubIdAndUserId(Long clubId, Long userId);
+
+    Optional<ClubMembership> findByClubIdAndMemberRole(Long clubId, ClubMemberRole memberRole);
 
     List<ClubMembership> findByClubIdOrderByJoinedAtAsc(Long clubId);
 }

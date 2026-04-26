@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { getAllClubs, deanApproveClub, deanRejectClub, getClubMembers } from '../api/clubApi';
+import { getAllClubsForAdmin, deanApproveClub, deanRejectClub, getClubMembers } from '../api/clubApi';
 import AdminLayout from '../components/layout/AdminLayout';
 import ClubTypeTag from '../components/ui/ClubTypeTag';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -28,14 +28,12 @@ export default function ManageClubs() {
   const fetchClubs = async () => {
     setLoading(true);
     try {
-      const response = await getAllClubs();
+      const response = await getAllClubsForAdmin();
       let filtered = response.data || [];
       if (activeTab === 'pending') {
-        filtered = filtered.filter(c => c.status === 'PENDING_DEAN');
+        filtered = filtered.filter((club) => club.status === 'PENDING_DEAN');
       } else {
-        // Assume 'all' shows ACTIVE and maybe others, or specifically ACTIVE
-        // Requirements say: "Tab 2: "All Clubs" - Fetch GET /clubs (shows ACTIVE clubs)"
-        filtered = filtered.filter(c => c.status === 'ACTIVE');
+        filtered = filtered.filter((club) => club.status === 'ACTIVE');
       }
       setClubs(filtered);
     } catch (error) {
@@ -146,7 +144,7 @@ export default function ManageClubs() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-slate-900">{club.seniorTreasurerName}</span>
+                        <span className="text-slate-900">{club.seniorTreasurerLecturerName}</span>
                         <span className="text-xs text-slate-500">{club.seniorTreasurerStaffId}</span>
                       </div>
                     </td>
@@ -219,18 +217,31 @@ export default function ManageClubs() {
                   <p className="text-slate-600 text-sm">{viewDetailsModal.description}</p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">President</p>
-                    <p className="font-semibold text-slate-900">{viewDetailsModal.presidentName}</p>
-                    <p className="text-sm text-slate-500">{viewDetailsModal.presidentStudentNumber}</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">President</p>
+                      <p className="font-semibold text-slate-900">{viewDetailsModal.presidentName}</p>
+                      <p className="text-sm text-slate-500">{viewDetailsModal.presidentStudentNumber}</p>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Senior Treasurer</p>
+                      <p className="font-semibold text-slate-900">{viewDetailsModal.seniorTreasurerLecturerName}</p>
+                      <p className="text-sm text-slate-500">{viewDetailsModal.seniorTreasurerStaffId}</p>
+                    </div>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Senior Treasurer</p>
-                    <p className="font-semibold text-slate-900">{viewDetailsModal.seniorTreasurerName}</p>
-                    <p className="text-sm text-slate-500">{viewDetailsModal.seniorTreasurerStaffId}</p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Secretary</p>
+                      <p className="font-semibold text-slate-900">{viewDetailsModal.secretaryName || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">{viewDetailsModal.secretaryStudentNumber || 'Student number N/A'}</p>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Student Treasurer</p>
+                      <p className="font-semibold text-slate-900">{viewDetailsModal.studentTreasurerName || 'N/A'}</p>
+                      <p className="text-sm text-slate-500">{viewDetailsModal.studentTreasurerStudentNumber || 'Student number N/A'}</p>
+                    </div>
                   </div>
-                </div>
 
                 <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
                   <button
@@ -326,9 +337,9 @@ export default function ManageClubs() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {clubMembers.map((member) => (
-                          <tr key={member.userId} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-slate-900">{member.fullName}</td>
-                            <td className="px-4 py-3 text-slate-600">{member.studentNumber}</td>
+                          <tr key={member.id || member.userId} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-900">{member.fullName || member.userName}</td>
+                            <td className="px-4 py-3 text-slate-600">{member.studentNumber || 'N/A'}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded text-[10px] font-bold ${
                                 member.memberRole === 'PRESIDENT' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'

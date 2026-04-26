@@ -27,4 +27,10 @@ public class ClubRequest {
 
     @NotNull(message = "Senior treasurer lecturer ID is required")
     private Long seniorTreasurerLecturerId;
+
+    @NotNull(message = "Secretary is required")
+    private Long secretaryUserId;
+
+    @NotNull(message = "Student treasurer is required")
+    private Long treasurerUserId;
 }

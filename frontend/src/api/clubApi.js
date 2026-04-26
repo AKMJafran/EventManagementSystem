@@ -1,10 +1,20 @@
 import axiosInstance from './axiosInstance';
 
-export const submitClubRegistration = (data) => 
-  axiosInstance.post('/clubs', data);
+export const submitClubRegistration = (data) =>
+  axiosInstance.post('/clubs', {
+    name: data.name,
+    type: data.type,
+    description: data.description,
+    seniorTreasurerLecturerId: data.seniorTreasurerLecturerId,
+    secretaryUserId: data.secretaryUserId,
+    treasurerUserId: data.treasurerUserId,
+  });
 
 export const getAllClubs = () => 
   axiosInstance.get('/clubs');
+
+export const getAllClubsForAdmin = () =>
+  axiosInstance.get('/clubs/admin/all');
 
 export const getMyClub = () => 
   axiosInstance.get('/clubs/my-club');
@@ -29,3 +39,9 @@ export const deanRejectClub = (id, reason) =>
 
 export const getLecturerClubs = () => 
   axiosInstance.get('/lecturer/clubs');
+
+export const getAllLecturers = () =>
+  axiosInstance.get('/admin/lecturers');
+
+export const getAllStudents = () =>
+  axiosInstance.get('/admin/students');

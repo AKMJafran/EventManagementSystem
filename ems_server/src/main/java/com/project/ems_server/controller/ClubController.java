@@ -38,6 +38,12 @@ public class ClubController {
         return ResponseEntity.ok(clubService.getActiveClubs());
     }
 
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<ClubResponse>> getAllClubsForAdmin() {
+        return ResponseEntity.ok(clubService.getAllClubsForAdmin());
+    }
+
     @GetMapping("/my-club")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ClubResponse> getMyClub(Authentication authentication) {

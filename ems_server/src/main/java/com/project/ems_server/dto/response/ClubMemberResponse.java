@@ -17,8 +17,10 @@ public class ClubMemberResponse {
     private Long id;
     private Long clubId;
     private Long userId;
+    private String fullName;
     private String userName;
     private String userEmail;
+    private String studentNumber;
     private String memberRole;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
