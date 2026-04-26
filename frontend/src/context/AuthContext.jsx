@@ -12,7 +12,7 @@ const useAuthStore = create((set) => ({
   login: async (email, password) => {
     try {
       const response = await axiosInstance.post('/auth/login', { email, password });
-      const { accessToken, refreshToken, role } = response.data;
+      const { accessToken, refreshToken, role, mustChangePassword } = response.data;
       
       const decodedToken = jwtDecode(accessToken);
       const user = {
@@ -21,18 +21,36 @@ const useAuthStore = create((set) => ({
         email: decodedToken.email,
         role: role,
         profilePictureUrl: decodedToken.profilePictureUrl,
+        department: decodedToken.department || null,
+        mustChangePassword: !!mustChangePassword,
       };
 
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
 
-      set({ user, accessToken, isAuthenticated: true, authLoaded: true });
-      return { role };
+      set({ user, accessToken, isAuthenticated: true });
+      return { role, mustChangePassword: !!mustChangePassword };
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
     }
+  },
+
+  markPasswordChanged: () => {
+    set((state) => {
+      const updatedUser = { ...state.user, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
+  },
+
+  skipPasswordChange: () => {
+    set((state) => {
+      const updatedUser = { ...state.user, mustChangePassword: false };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
   },
 
   logout: () => {
@@ -58,15 +76,10 @@ const useAuthStore = create((set) => ({
         localStorage.removeItem('user');
       } else {
         // Also update user state from potentially refreshed token properties in localStorage
-        set({
-          user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name },
-          accessToken,
-          isAuthenticated: true,
-          authLoaded: true,
-        });
+        set({ user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name }, accessToken, isAuthenticated: true, authLoaded: true });
       }
     } else {
-      set({ user: null, accessToken: null, isAuthenticated: false, authLoaded: true });
+      set({ authLoaded: true });
     }
   },
 }));

@@ -14,7 +14,7 @@ public class JwtService {
     private String SECRET_KEY="verysecretvalue12345678901234567890";
 
    
-    private long ACCESS_TOKEN_EXPIRY=900000;//15 minutes
+    private long ACCESS_TOKEN_EXPIRY = 86400000; // 1 day
 
    
     private long REFRESH_TOKEN_EXPIRY=604800000;//7 days
@@ -27,11 +27,24 @@ public class JwtService {
      * Generates an access token (15 min expiry) with email, role, name and profile picture as claims
      */
     public String generateAccessToken(String email, String role, String name, String profilePictureUrl) {
-        return Jwts.builder()
+        return generateAccessToken(email, role, name, profilePictureUrl, null);
+    }
+
+    /**
+     * Generates an access token (15 min expiry) with email, role, name, profile picture, and optional department as claims
+     */
+    public String generateAccessToken(String email, String role, String name, String profilePictureUrl, String department) {
+        var builder = Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
                 .claim("name", name)
-                .claim("profilePictureUrl", profilePictureUrl)
+                .claim("profilePictureUrl", profilePictureUrl);
+
+        if (department != null) {
+            builder.claim("department", department);
+        }
+
+        return builder
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)

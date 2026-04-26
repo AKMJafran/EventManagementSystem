@@ -65,7 +65,14 @@ public class SecurityConfig {
     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
     .authorizeHttpRequests(authz -> authz
         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-        .requestMatchers("/auth/**").permitAll()
+        .requestMatchers(
+                "/auth/login",
+                "/auth/refresh-token",
+                "/auth/send-reset-otp",
+                "/auth/reset-password"
+        ).permitAll()
+        .requestMatchers(HttpMethod.GET, "/files/content/**").permitAll()
+        .requestMatchers("/lecturer/**").hasRole("LECTURER")
         .anyRequest().authenticated()
     )
     

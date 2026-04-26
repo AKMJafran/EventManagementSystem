@@ -15,12 +15,22 @@ import java.time.LocalDateTime;
 public class NotificationResponse {
     
     private Long id;
+
+    private Long userId;
+
+    private String title;
     
     private String message;
     
     private String type;
     
     private Boolean isRead;
+
+    private String recipientName;
+
+    private String recipientEmail;
+
+    private String recipientRole;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

@@ -64,6 +64,18 @@ public class Event {
 
     @Column(name = "image_id", length = 255)
     private String imageId;
+
+    @Column(name = "image_original_filename", length = 255)
+    private String imageOriginalFilename;
+
+    @Column(name = "image_content_type", length = 100)
+    private String imageContentType;
+
+    @Column(name = "image_uploaded_at")
+    private LocalDateTime imageUploadedAt;
+
+    @Column(name = "image_checksum", length = 64)
+    private String imageChecksum;
     
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

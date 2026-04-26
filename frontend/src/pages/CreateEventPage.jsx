@@ -1,440 +1,372 @@
-import React, { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useNavigate, useParams } from 'react-router-dom';
-import axiosInstance from '../api/axiosInstance';
-import useAuthStore from '../context/AuthContext';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import StudentLayout from '../components/layout/StudentLayout';
+import EventFormShell from '../components/events/EventFormShell';
+import {
+  clubEventSchema,
+  individualEventSchema,
+} from '../components/events/eventFormShared';
+import { createEvent as createEventRequest } from '../api/eventApi';
+import { getMyClub } from '../api/clubApi';
+import useAuthStore from '../context/AuthContext';
 
-const schema = z.object({
-  title: z.string().min(2, 'Title required'),
-  description: z.string().min(5, 'Description required'),
-  categoryId: z.string().min(1, 'Category required'),
-  subCategoryId: z.string().optional(),
-  eventType: z.string().min(1, 'Event type required'),
-  venue: z.string().min(2, 'Venue required'),
-  startTime: z.string(),
-  endTime: z.string(),
-  imageId: z.string().optional(),
-});
+function formatClubStatus(status) {
+  if (!status) {
+    return 'not registered';
+  }
+
+  return status
+    .toLowerCase()
+    .split('_')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+function OrganizerTypeCard({
+  icon,
+  title,
+  description,
+  steps,
+  buttonLabel,
+  accentClass,
+  iconClass,
+  onClick,
+  loading = false,
+}) {
+  return (
+    <article
+      className={`flex h-full flex-col rounded-3xl border bg-white p-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg ${accentClass}`}
+    >
+      <div className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${iconClass}`}>
+        <span className="material-symbols-outlined text-[28px]">{icon}</span>
+      </div>
+
+      <h2 className="mt-6 serif-heading text-3xl font-bold text-on-surface">{title}</h2>
+      <p className="mt-3 text-sm leading-6 text-on-surface-variant">{description}</p>
+
+      <div className="mt-6 flex-1 rounded-3xl bg-surface-container-low px-5 py-4">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-on-surface-variant">
+          Approval Flow
+        </p>
+        <ol className="mt-4 space-y-2 text-sm text-on-surface">
+          {steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+
+      <button
+        className="mt-6 inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={loading}
+        onClick={onClick}
+        type="button"
+      >
+        {loading ? 'Checking club status...' : buttonLabel}
+      </button>
+    </article>
+  );
+}
+
+function SummaryBanner({
+  badgeLabel,
+  badgeClass,
+  title,
+  description,
+  detailLabel,
+  detailValue,
+  onReset,
+}) {
+  return (
+    <section className="rounded-3xl border border-outline-variant/10 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <span className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] ${badgeClass}`}>
+            {badgeLabel}
+          </span>
+          <h2 className="mt-4 serif-heading text-3xl font-bold text-on-surface">{title}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant">{description}</p>
+          {detailValue && (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-sm text-on-surface">
+              <span className="font-semibold text-on-surface-variant">{detailLabel}</span>
+              <span className="font-semibold">{detailValue}</span>
+            </div>
+          )}
+        </div>
+
+        <button
+          className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/30 px-4 py-2.5 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
+          onClick={onReset}
+          type="button"
+        >
+          Change Type
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ApprovalCard({ title, toneClass, items }) {
+  return (
+    <section className={`rounded-3xl border px-5 py-5 ${toneClass}`}>
+      <h3 className="text-base font-semibold">{title}</h3>
+      <ol className="mt-3 space-y-2 text-sm">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
 export default function CreateEventPage() {
-  const { user } = useAuthStore();
   const navigate = useNavigate();
-  const { id } = useParams();
-  const isEditMode = Boolean(id);
-  const [categories, setCategories] = useState([]);
-  const [subCategories, setSubCategories] = useState([]);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [existingImageId, setExistingImageId] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageError, setImageError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+  const { user } = useAuthStore();
+  const [organizerType, setOrganizerType] = useState('');
+  const [checkingClub, setCheckingClub] = useState(false);
+  const [clubData, setClubData] = useState(null);
+  const [clubWarning, setClubWarning] = useState(null);
 
-  const normalizeCategories = (items) => {
-    return items.map((item) => ({
-      ...item,
-      name: item.name || item.categoryName || item.label || `Category ${item.id}`,
-    }));
-  };
+  async function handleClubSelection() {
+    setCheckingClub(true);
+    setClubWarning(null);
 
-  const toDateTimeLocalValue = (dateString) => {
-    if (!dateString) return '';
-    const normalized = dateString.replace(' ', 'T');
-    const date = new Date(normalized);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-    const timezoneOffsetMs = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
-  };
+    try {
+      const response = await getMyClub();
+      const club = response.data;
 
-  const handleImageChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('');
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Please select a valid image file.');
-      toast.error('Please select an image file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setSelectedImage(null);
-      setImagePreview(null);
-      setImageError('Image size must be 5MB or less.');
-      toast.error('File size should not exceed 5MB.');
-      return;
-    }
-
-    setImageError('');
-    setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result?.toString() || null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm({
-    resolver: zodResolver(schema),
-  });
-
-  const selectedCategory = watch('categoryId');
-
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await axiosInstance.get('/categories');
-        setCategories(normalizeCategories(res.data));
-      } catch (e) {
-        toast.error('Failed to load categories');
-        console.error(e);
-      } finally {
-        setCategoriesLoading(false);
-      }
-    }
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchEvent = async () => {
-      try {
-        const res = await axiosInstance.get(`/events/${id}`);
-        const event = res.data;
-
-        reset({
-          title: event.title || '',
-          description: event.description || '',
-          categoryId: event.categoryId?.toString() || '',
-          subCategoryId: '',
-          eventType: event.eventType || '',
-          venue: event.venue || '',
-          startTime: toDateTimeLocalValue(event.startTime),
-          endTime: toDateTimeLocalValue(event.endTime),
-          imageId: event.imageId || '',
+      if (club?.status !== 'ACTIVE') {
+        setOrganizerType('');
+        setClubData(null);
+        setClubWarning({
+          status: club?.status || 'NOT_REGISTERED',
+          clubName: club?.name || '',
         });
-
-        setExistingImageId(event.imageId || null);
-        setSelectedImage(null);
-        setImagePreview(event.imageUrl || null);
-      } catch (e) {
-        toast.error('Failed to load event for editing');
-        console.error(e);
-      }
-    };
-
-    fetchEvent();
-  }, [id, reset]);
-
-  useEffect(() => {
-    async function fetchSubCategories() {
-      if (!selectedCategory) {
-        setSubCategories([]);
-        setSubCategoriesLoading(false);
         return;
       }
-      setSubCategoriesLoading(true);
-      try {
-        const res = await axiosInstance.get(`/categories/${selectedCategory}/sub`);
-        setSubCategories(normalizeCategories(res.data));
-      } catch (e) {
-        toast.error('Failed to load sub-categories');
-        console.error(e);
-      } finally {
-        setSubCategoriesLoading(false);
-      }
-    }
-    fetchSubCategories();
-  }, [selectedCategory]);
 
-  const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      let imageId = existingImageId;
-      
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('file', selectedImage);
-        
-        try {
-          const uploadRes = await axiosInstance.post('/files/upload', formData);
-          imageId = uploadRes.data.fileId;
-        } catch (uploadError) {
-          const status = uploadError?.response?.status;
-          const serverData = uploadError?.response?.data;
-          console.error('Image upload failed', { status, serverData, uploadError });
-          toast.error(
-            serverData?.error
-              ? `${serverData.error}${serverData.details ? `: ${serverData.details}` : ''}`
-              : 'Failed to upload image. Event will be saved without a new upload.'
-          );
-        }
-      }
-
-      const payload = {
-        title: data.title,
-        description: data.description,
-        categoryId: data.subCategoryId || data.categoryId,
-        eventType: data.eventType,
-        venue: data.venue,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        imageId: imageId,
-      };
-
-      if (isEditMode) {
-        await axiosInstance.put(`/events/${id}`, payload);
-        toast.success('Event updated successfully!');
+      setClubData(club);
+      setOrganizerType('CLUB_EVENT');
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        setClubWarning({ status: 'NOT_REGISTERED', clubName: '' });
       } else {
-        await axiosInstance.post('/events', payload);
-        toast.success('Event created successfully!');
+        toast.error(error?.response?.data?.message || 'Failed to load your club details.');
+        console.error(error);
       }
-      navigate('/student/my-events');
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to create event');
-      console.error(e);
     } finally {
-      setLoading(false);
+      setCheckingClub(false);
     }
-  };
+  }
+
+  async function submitStudentEvent(payload) {
+    return createEventRequest({
+      title: payload.title,
+      description: payload.description,
+      categoryId: payload.categoryId,
+      subCategoryId: payload.subCategoryId || null,
+      venue: payload.venue,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      organizerType,
+      clubId: organizerType === 'CLUB_EVENT' ? clubData?.id || null : null,
+      isMultiDay: payload.isMultiDay,
+      isPublic: payload.isPublic,
+      imageId: payload.imageId || null,
+    });
+  }
+
+  async function handleSuccess() {
+    toast.success(
+      organizerType === 'CLUB_EVENT'
+        ? 'Event submitted successfully. It is now pending Senior Treasurer approval.'
+        : 'Event submitted successfully. It is now pending Dean approval.'
+    );
+    navigate('/student/my-events');
+  }
+
+  const organizerHeader =
+    organizerType === 'CLUB_EVENT' ? (
+      <SummaryBanner
+        badgeClass="bg-secondary-container text-on-secondary-fixed"
+        badgeLabel="Club Event"
+        description="This request will move through Senior Treasurer review before it reaches the Dean."
+        detailLabel="Club"
+        detailValue={clubData?.name || 'Active Club'}
+        onReset={() => {
+          setOrganizerType('');
+          setClubData(null);
+          setClubWarning(null);
+        }}
+        title="Create an event under your club"
+      />
+    ) : (
+      <SummaryBanner
+        badgeClass="bg-primary/10 text-primary"
+        badgeLabel="Personal Event"
+        description="This request is submitted in your own name and goes directly to the Dean for approval."
+        detailLabel=""
+        detailValue=""
+        onReset={() => {
+          setOrganizerType('');
+          setClubWarning(null);
+        }}
+        title="Create a personal event request"
+      />
+    );
+
+  const approvalContent =
+    organizerType === 'CLUB_EVENT' ? (
+      <ApprovalCard
+        items={[
+          '1. Your event request is submitted for review.',
+          `2. ${clubData?.seniorTreasurerLecturerName || 'The Senior Treasurer'} reviews it first.`,
+          '3. The Dean gives the final approval decision.',
+          '4. You receive notifications at each stage.',
+          '5. Once approved, the event becomes visible to students.',
+        ]}
+        title="What happens after submission"
+        toneClass="border-secondary-container bg-secondary-container/35 text-on-surface"
+      />
+    ) : (
+      <ApprovalCard
+        items={[
+          '1. Your event request is submitted for Dean review.',
+          '2. The Dean approves or rejects the request.',
+          '3. You receive updates through notifications.',
+          '4. Once approved, the event becomes visible to students.',
+        ]}
+        title="What happens after submission"
+        toneClass="border-primary/10 bg-primary/5 text-on-surface"
+      />
+    );
 
   return (
     <StudentLayout user={user}>
-      <header className="mb-12">
-        <h1 className="text-4xl font-bold text-on-surface mb-2 serif-heading">{isEditMode ? 'Edit Pending Event' : 'Create New Event'}</h1>
-        <p className="text-on-surface-variant max-w-2xl">
-          {isEditMode ? 'Update the event details before faculty review.' : 'Submit a detailed proposal for your upcoming event. Our coordination committee reviews submissions every Tuesday and Thursday.'}
-        </p>
-      </header>
-      
-      <div className="flex flex-col lg:flex-row gap-12">
-        <div className="flex-1 space-y-12">
-          <section className="bg-surface-container-lowest p-8 rounded-xl shadow-2xl shadow-primary/5">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-            
-              <div className="grid grid-cols-1 gap-8">
-                <div className="relative">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Title</label>
-                  <input 
-                    {...register('title')} 
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 text-lg font-bold placeholder:opacity-30 rounded-t-lg" 
-                    placeholder="e.g., Annual Symposium on Digital Ethics" 
-                    type="text"
-                  />
-                  {errors.title && <p className="text-error text-xs mt-1 font-bold">{errors.title.message}</p>}
-                </div>
-                
-                <div className="relative">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Description</label>
-                  <textarea 
-                    {...register('description')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 resize-none placeholder:opacity-30 rounded-t-lg" 
-                    placeholder="Describe the purpose, target audience, and key highlights..." 
-                    rows="4"
-                  />
-                  {errors.description && <p className="text-error text-xs mt-1 font-bold">{errors.description.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-8">
-                <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Image</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="w-full bg-surface-container-high border-0 focus:ring-0 rounded-t-lg text-sm file:bg-primary-container/20 file:border-0 file:px-4 file:py-3 file:text-sm file:font-semibold file:text-on-surface file:rounded-xl"
-                  />
-                  {imageError && (
-                    <p className="text-error text-xs mt-2 font-bold">{imageError}</p>
-                  )}
-                  {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Event preview"
-                      className="mt-4 h-48 w-full rounded-2xl object-cover border border-primary/10"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Category</label>
-                  <select 
-                    {...register('categoryId')}
-                    disabled={categoriesLoading}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
-                  >
-                    <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                  {errors.categoryId && <p className="text-error text-xs mt-1 font-bold">{errors.categoryId.message}</p>}
-                </div>
-                
-                {subCategories.length > 0 ? (
-                  <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Sub-Category</label>
-                    <select 
-                      {...register('subCategoryId')}
-                      disabled={subCategoriesLoading}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
-                    >
-                      <option value="">{subCategoriesLoading ? 'Loading...' : 'Select Sub-Category'}</option>
-                      {subCategories.map(sub => (
-                        <option key={sub.id} value={sub.id}>{sub.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
-                    <select 
-                      {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
-                    >
-                      <option value="">Select Event Type</option>
-                      <option value="CULTURAL">Cultural</option>
-                      <option value="TECHNICAL">Technical</option>
-                      <option value="ACADEMIC">Academic</option>
-                      <option value="SPORTS">Sports</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
-                  </div>
-                )}
-              </div>
-
-              {subCategories.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Event Type</label>
-                    <select 
-                      {...register('eventType')}
-                      className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium"
-                    >
-                      <option value="">Select Event Type</option>
-                      <option value="CULTURAL">Cultural</option>
-                      <option value="TECHNICAL">Technical</option>
-                      <option value="ACADEMIC">Academic</option>
-                      <option value="SPORTS">Sports</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                    {errors.eventType && <p className="text-error text-xs mt-1 font-bold">{errors.eventType.message}</p>}
-                  </div>
-                  <div></div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Venue</label>
-                  <input 
-                    {...register('venue')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
-                    placeholder="Enter Venue Name"
-                  />
-                  {errors.venue && <p className="text-error text-xs mt-1 font-bold">{errors.venue.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">Start Date & Time</label>
-                  <input 
-                    {...register('startTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
-                    type="datetime-local"
-                  />
-                  {errors.startTime && <p className="text-error text-xs mt-1 font-bold">{errors.startTime.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-on-surface-variant mb-2 uppercase tracking-wider">End Date & Time</label>
-                  <input 
-                    {...register('endTime')}
-                    className="w-full bg-surface-container-high border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all p-4 rounded-t-lg font-medium" 
-                    type="datetime-local"
-                  />
-                  {errors.endTime && <p className="text-error text-xs mt-1 font-bold">{errors.endTime.message}</p>}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-6 pt-6">
-                <button 
-                  type="button"
-                  onClick={() => navigate('/student')}
-                  className="px-8 py-4 text-on-surface-variant font-bold hover:bg-surface-container-high rounded-xl transition-all active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting || loading}
-                  className="px-10 py-4 academic-gradient text-white font-bold rounded-xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-70"
-                >
-                  {isSubmitting || loading ? 'Submitting...' : (isEditMode ? 'Update Request' : 'Submit Request')}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
-
-        <aside className="w-full lg:w-80 space-y-8">
-          <div className="bg-surface-container-low p-8 rounded-xl border-l-4 border-tertiary">
-            <h3 className="text-xl font-bold mb-4 text-primary serif-heading">Submission Guidelines</h3>
-            <ul className="space-y-6">
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">info</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Ensure all event venues are booked at least <strong className="text-on-surface">2 weeks</strong> in advance.</p>
-              </li>
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">verified_user</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Risk assessment forms must be attached for outdoor events.</p>
-              </li>
-              <li className="flex gap-4">
-                <span className="material-symbols-outlined text-tertiary shrink-0">group</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">Events exceeding <strong className="text-on-surface">200 attendees</strong> require security clearance.</p>
-              </li>
-            </ul>
+      {!organizerType && !clubWarning && (
+        <section className="rounded-[2rem] border border-outline-variant/10 bg-gradient-to-br from-primary/8 via-white to-secondary-container/35 p-8 shadow-sm md:p-10">
+          <div className="max-w-3xl">
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary">Create Event</p>
+            <h1 className="mt-4 serif-heading text-5xl font-bold tracking-tight text-on-surface">
+              Choose how you want to organize this event
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-on-surface-variant">
+              We will prepare the correct approval path, club checks, and event form based on whether
+              this request is personal or submitted under a club.
+            </p>
           </div>
-          
-          <div className="relative overflow-hidden group rounded-xl aspect-4/5">
-            <img 
-              alt="Academic Campus" 
-              className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCokpOP5O0X7kVdS3rFhFSjWwQZNGmfy4v2Y7WrNufEG2FBoLo0nffJONmtdImpO6PJw1nHX2DucAqVTvZzUOtY-0Yfe-B-T7a3cB_uTWnfqmCuG76NvijQ7II8cNpeRzSsN6nzhHrQvGffDLdRPLYaRR2-fA7GRHwNqrCR1bb3sG9_PwywyRbVB8RvbkrlZ898XAmHIlbuetffdkqiQKgLzo--WUoIsOU4Roe5-HXoWyc81R45uxV0F4iKLcWv5hY0MTiGqwGEawc"
+
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            <OrganizerTypeCard
+              accentClass="border-primary/15"
+              buttonLabel="Continue as Personal"
+              description="Use this when the event is being organized by you directly rather than by a registered club."
+              icon="person"
+              iconClass="bg-primary/10 text-primary"
+              onClick={() => {
+                setClubWarning(null);
+                setClubData(null);
+                setOrganizerType('INDIVIDUAL_STUDENT');
+              }}
+              steps={[
+                '1. Submit request',
+                '2. Dean reviews the request',
+                '3. Approved events are published',
+              ]}
+              title="Personal Event"
             />
-            <div className="absolute inset-0 bg-linear-to-t from-primary/90 to-transparent flex flex-col justify-end p-6">
-              <h4 className="text-white text-lg font-bold mb-1 serif-heading">Tradition of Excellence</h4>
-              <p className="text-white/80 text-xs">Curating events that define our academic legacy.</p>
-            </div>
+
+            <OrganizerTypeCard
+              accentClass="border-secondary/20"
+              buttonLabel="Continue as Club"
+              description="Use this when the event is officially organized under one of your active student clubs."
+              icon="groups"
+              iconClass="bg-secondary-container text-on-secondary-fixed"
+              loading={checkingClub}
+              onClick={handleClubSelection}
+              steps={[
+                '1. Submit request',
+                '2. Senior Treasurer reviews first',
+                '3. Dean reviews next',
+                '4. Approved events are published',
+              ]}
+              title="Club Event"
+            />
           </div>
-          
-          <div className="p-4 bg-primary-container/10 border border-primary-container/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-primary text-sm mt-0.5">lightbulb</span>
-              <div className="text-xs text-on-surface-variant italic">
-                "Events with rich descriptions and clear categories are 40% more likely to be approved on the first review."
-              </div>
-            </div>
+        </section>
+      )}
+
+      {!organizerType && clubWarning && (
+        <section className="mx-auto max-w-3xl rounded-[2rem] border border-tertiary-container/30 bg-white p-8 shadow-sm">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-tertiary-container/20 text-on-tertiary-container">
+            <span className="material-symbols-outlined text-[28px]">warning</span>
           </div>
-        </aside>
-      </div>
+          <h1 className="mt-5 serif-heading text-4xl font-bold text-on-surface">
+            You need an active club to create a club event
+          </h1>
+          <p className="mt-3 text-base leading-7 text-on-surface-variant">
+            Your club status is{' '}
+            <span className="font-semibold text-on-surface">
+              {formatClubStatus(clubWarning.status)}
+            </span>
+            {clubWarning.clubName ? ` for ${clubWarning.clubName}` : ''}. Activate or register a club
+            first, then return here to submit a club event.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary/90"
+              to="/student/clubs"
+            >
+              Go to Clubs Page
+            </Link>
+            <button
+              className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/30 px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
+              onClick={() => setClubWarning(null)}
+              type="button"
+            >
+              Back
+            </button>
+          </div>
+        </section>
+      )}
+
+      {organizerType && (
+        <EventFormShell
+          approvalContent={approvalContent}
+          cancelLabel="Cancel"
+          conflictMessage={
+            organizerType === 'CLUB_EVENT'
+              ? `Venue conflict. ${
+                  clubData?.name
+                    ? `Please update the request for ${clubData.name} with a new venue or time.`
+                    : 'Please choose a different venue or time.'
+                }`
+              : 'Venue conflict. This venue is already booked for an approved event at this time.'
+          }
+          defaultValues={{
+            isMultiDay: false,
+            isPublic: false,
+          }}
+          generalErrorMessage="Failed to submit event."
+          headerContent={organizerHeader}
+          hiddenFields={
+            organizerType === 'CLUB_EVENT'
+              ? { organizerType: 'CLUB_EVENT', clubId: clubData?.id || '' }
+              : { organizerType: 'INDIVIDUAL_STUDENT' }
+          }
+          onCancel={() => navigate('/student/my-events')}
+          onSuccess={handleSuccess}
+          pageDescription="Add the key event details below. Clear schedules, venue choices, and descriptions help reviewers approve faster."
+          pageTitle="Create Event Request"
+          schema={organizerType === 'CLUB_EVENT' ? clubEventSchema : individualEventSchema}
+          submitLabel={
+            organizerType === 'CLUB_EVENT' ? 'Submit for Treasurer Review' : 'Submit for Dean Approval'
+          }
+          submitRequest={submitStudentEvent}
+          submittingLabel="Submitting..."
+        />
+      )}
     </StudentLayout>
   );
 }

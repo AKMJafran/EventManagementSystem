@@ -1,10 +1,13 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.request.NotificationCreateRequest;
 import com.project.ems_server.dto.response.NotificationResponse;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.NotificationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +23,7 @@ public class NotificationController {
     private final UserRepository userRepository;
 
     /**
-     * Gets all notifications for the authenticated user
+     * Gets all notifications for the authenticated user.
      * GET /notifications
      */
     @GetMapping
@@ -31,21 +34,18 @@ public class NotificationController {
     }
 
     /**
-     * Marks a single notification as read
+     * Marks a single notification as read.
      * PATCH /notifications/{id}/read
      */
     @PatchMapping("/{id}/read")
-    public ResponseEntity<Void> markAsRead(
-            @PathVariable Long id,
-            Authentication authentication) {
-        
+    public ResponseEntity<Void> markAsRead(@PathVariable Long id, Authentication authentication) {
         Long userId = extractUserIdFromAuthentication(authentication);
         notificationService.markAsRead(id, userId);
         return ResponseEntity.noContent().build();
     }
 
     /**
-     * Marks all notifications as read for the authenticated user
+     * Marks all notifications as read for the authenticated user.
      * PATCH /notifications/read-all
      */
     @PatchMapping("/read-all")
@@ -56,7 +56,7 @@ public class NotificationController {
     }
 
     /**
-     * Gets the count of unread notifications for the authenticated user
+     * Gets the count of unread notifications for the authenticated user.
      * GET /notifications/count
      */
     @GetMapping("/count")
@@ -67,7 +67,32 @@ public class NotificationController {
     }
 
     /**
-     * Helper method to extract user ID from Authentication
+     * Gets all notifications across the system for admin monitoring.
+     * GET /notifications/admin/all
+     */
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<NotificationResponse>> getAllNotificationsForAdmin() {
+        return ResponseEntity.ok(notificationService.getAllNotificationsForAdmin());
+    }
+
+    /**
+     * Creates and sends notifications as admin.
+     * POST /notifications/admin/send
+     */
+    @PostMapping("/admin/send")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> createNotificationAsAdmin(
+            @Valid @RequestBody NotificationCreateRequest request) {
+        long createdCount = notificationService.createNotifications(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Notification sent successfully",
+                "createdCount", createdCount
+        ));
+    }
+
+    /**
+     * Helper method to extract user ID from Authentication.
      */
     private Long extractUserIdFromAuthentication(Authentication authentication) {
         String email = authentication.getName();

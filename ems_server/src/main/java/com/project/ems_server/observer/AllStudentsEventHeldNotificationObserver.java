@@ -34,7 +34,7 @@ public class AllStudentsEventHeldNotificationObserver implements EventObserver {
             String venue = event.getVenue();
             String schedule = String.format("%s to %s", event.getStartTime(), event.getEndTime());
             String notificationMessage = String.format(
-                    "🎉 Event '%s' has been approved and will be held at %s (%s). Check the calendar for details.",
+                    "Event '%s' has been approved and will be held at %s (%s). Check the calendar for details.",
                     eventTitle,
                     venue,
                     schedule
@@ -42,9 +42,15 @@ public class AllStudentsEventHeldNotificationObserver implements EventObserver {
 
             for (User student : students) {
                 if (student.getId().equals(event.getUserId())) {
-                    continue; // the creator already receives a dedicated approval notification
+                    continue;
                 }
-                notificationService.createNotification(student.getId(), notificationMessage, NotificationType.GENERAL);
+
+                notificationService.createNotification(
+                        student.getId(),
+                        "New Event Announcement",
+                        notificationMessage,
+                        NotificationType.GENERAL
+                );
             }
         }
     }

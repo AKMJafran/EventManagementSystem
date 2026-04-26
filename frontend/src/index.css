@@ -63,6 +63,57 @@
   body {
     @apply bg-surface text-on-surface font-body antialiased;
   }
+
+  button,
+  [role='button'],
+  a[href],
+  summary {
+    cursor: pointer;
+  }
+
+  button,
+  [role='button'],
+  a[href] {
+    transition:
+      background-color 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease,
+      opacity 180ms ease;
+  }
+
+  button:hover:not(:disabled),
+  [role='button']:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  a[aria-disabled='true'] {
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  button:focus-visible,
+  [role='button']:focus-visible,
+  a[href]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid rgba(0, 101, 101, 0.28);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  textarea {
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
 }
 
 .serif-heading {

@@ -7,8 +7,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
@@ -25,6 +27,30 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findConflictingEvents(@Param("venue") String venue,
                                       @Param("startTime") LocalDateTime startTime,
                                       @Param("endTime") LocalDateTime endTime);
+
+    @Query("SELECT e FROM Event e WHERE e.status IN :statuses " +
+           "AND e.startTime < :endTime AND e.endTime > :startTime " +
+           "AND (:excludeId IS NULL OR e.id <> :excludeId)")
+    List<Event> findActiveEventsWithTimeOverlap(@Param("startTime") LocalDateTime startTime,
+                                                @Param("endTime") LocalDateTime endTime,
+                                                @Param("statuses") Collection<EventStatus> statuses,
+                                                @Param("excludeId") Long excludeId);
+
+    @Query("SELECT e FROM Event e WHERE e.status IN :statuses " +
+           "AND e.startTime < :rangeEnd AND e.endTime > :rangeStart")
+    List<Event> findByStatusInAndTimeRangeOverlap(@Param("statuses") Collection<EventStatus> statuses,
+                                                  @Param("rangeStart") LocalDateTime rangeStart,
+                                                  @Param("rangeEnd") LocalDateTime rangeEnd);
+
+    @Query("SELECT e FROM Event e WHERE LOWER(e.venue) = LOWER(:venue) " +
+           "AND e.status IN :statuses " +
+           "AND e.startTime < :dayEnd AND e.endTime > :dayStart " +
+           "AND (:excludeId IS NULL OR e.id <> :excludeId)")
+    List<Event> findActiveEventsAtVenueOnDate(@Param("venue") String venue,
+                                              @Param("dayStart") LocalDateTime dayStart,
+                                              @Param("dayEnd") LocalDateTime dayEnd,
+                                              @Param("statuses") Collection<EventStatus> statuses,
+                                              @Param("excludeId") Long excludeId);
     
     @Query("SELECT e FROM Event e WHERE e.status = 'APPROVED' " +
            "AND e.startTime >= :now AND e.startTime <= :oneHourLater")
@@ -32,4 +58,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                            @Param("oneHourLater") LocalDateTime oneHourLater);
 
     List<Event> findByStartTimeBetween(LocalDateTime startTime, LocalDateTime endTime);
+
+    Optional<Event> findTopByImageChecksumAndImageIdIsNotNull(String imageChecksum);
 }
