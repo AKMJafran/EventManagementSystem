@@ -59,7 +59,11 @@ public class ClubController {
     @GetMapping("/my-club")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ClubResponse> getMyClub(Authentication authentication) {
-        return ResponseEntity.ok(clubService.getMyClub(extractUserIdFromAuthentication(authentication)));
+        ClubResponse club = clubService.getMyClub(extractUserIdFromAuthentication(authentication));
+        if (club == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(club);
     }
 
     @GetMapping("/{id}")

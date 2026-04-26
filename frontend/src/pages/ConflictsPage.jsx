@@ -80,11 +80,18 @@ export default function ConflictsPage() {
 
   async function rejectEvent(conflict) {
     const reason = window.prompt('Enter a rejection reason');
-    if (!reason) return;
+    const normalizedReason = reason?.trim();
+
+    if (!normalizedReason) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
 
     try {
       setActionLoading(true);
-      await axiosInstance.patch(`/events/${conflict.eventId}/reject`, { reason });
+      await axiosInstance.patch(`/events/${conflict.eventId}/reject`, {
+        reason: normalizedReason,
+      });
       toast.success('Event rejected');
       await fetchConflicts();
     } catch (error) {

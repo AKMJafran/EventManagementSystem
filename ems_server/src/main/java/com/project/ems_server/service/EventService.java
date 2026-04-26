@@ -26,6 +26,7 @@ import com.project.ems_server.factory.EventFactoryInterface;
 import com.project.ems_server.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -63,7 +64,16 @@ public class EventService {
     /**
      * Creates a new event with PENDING status and records conflicts for admin review.
      */
-    public EventResponse createEvent(EventRequest eventRequest, Long userId) {
+    @Transactional
+    public EventResponse createEvent(EventRequest eventRequest, Long userId, Role requesterRole) {
+        if (requesterRole == Role.ADMIN) {
+            return createAdminEvent(eventRequest, userId);
+        }
+
+        if (requesterRole != Role.STUDENT) {
+            throw new RuntimeException("You are not allowed to create events");
+        }
+
         clubService.ensureUserCanOrganizeEvents(userId);
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
@@ -89,6 +99,33 @@ public class EventService {
         Event savedEvent = eventRepository.save(event);
         conflictService.refreshConflictRecords(savedEvent, true);
         notifyAdminsOfNewEventRequest(savedEvent);
+        return mapToResponse(savedEvent);
+    }
+
+    private EventResponse createAdminEvent(EventRequest eventRequest, Long userId) {
+        validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
+
+        Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found with id: " + eventRequest.getCategoryId()));
+        EventType derivedEventType = deriveEventTypeFromCategory(selectedCategory);
+
+        EventFactoryInterface factory = eventAbstractFactory.getFactory(derivedEventType);
+        Event event = factory.createEvent(
+                eventRequest.getTitle(),
+                eventRequest.getDescription(),
+                userId,
+                eventRequest.getCategoryId(),
+                eventRequest.getVenue(),
+                eventRequest.getImageId(),
+                eventRequest.getStartTime(),
+                eventRequest.getEndTime(),
+                derivedEventType
+        );
+        applyEventImage(event, eventRequest, false);
+
+        Event savedEvent = eventRepository.save(event);
+        conflictService.ensureNoUnresolvedConflicts(savedEvent);
+        approvalService.approveEvent(savedEvent);
         return mapToResponse(savedEvent);
     }
 
@@ -118,19 +155,29 @@ public class EventService {
     /**
      * Updates an existing pending event belonging to the requesting student.
      */
-    public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId) {
-        clubService.ensureUserCanOrganizeEvents(userId);
+    @Transactional
+    public EventResponse updateEvent(Long eventId, EventRequest eventRequest, Long userId, Role requesterRole) {
         validateEventWindow(eventRequest.getStartTime(), eventRequest.getEndTime());
 
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        if (!event.getUserId().equals(userId)) {
-            throw new RuntimeException("You are not allowed to edit this event");
-        }
+        if (requesterRole == Role.STUDENT) {
+            clubService.ensureUserCanOrganizeEvents(userId);
 
-        if (event.getStatus() != EventStatus.PENDING) {
-            throw new RuntimeException("Only pending events can be edited");
+            if (!event.getUserId().equals(userId)) {
+                throw new RuntimeException("You are not allowed to edit this event");
+            }
+
+            if (event.getStatus() != EventStatus.PENDING) {
+                throw new RuntimeException("Only pending events can be edited");
+            }
+        } else if (requesterRole == Role.ADMIN) {
+            if (event.getStatus() != EventStatus.PENDING && event.getStatus() != EventStatus.APPROVED) {
+                throw new RuntimeException("Only pending or approved events can be edited by admins");
+            }
+        } else {
+            throw new RuntimeException("You are not allowed to edit this event");
         }
 
         Category selectedCategory = categoryRepository.findById(eventRequest.getCategoryId())
@@ -145,11 +192,16 @@ public class EventService {
         event.setEndTime(eventRequest.getEndTime());
         event.setEventType(derivedEventType);
         applyEventImage(event, eventRequest, true);
-        event.setStatus(EventStatus.PENDING);
         event.setRejectReason(null);
 
+        if (requesterRole == Role.STUDENT) {
+            event.setStatus(EventStatus.PENDING);
+        } else if (requesterRole == Role.ADMIN && event.getStatus() == EventStatus.APPROVED) {
+            conflictService.ensureNoUnresolvedConflicts(event);
+        }
+
         Event updatedEvent = eventRepository.save(event);
-        conflictService.refreshConflictRecords(updatedEvent, true);
+        conflictService.refreshConflictRecords(updatedEvent, requesterRole == Role.STUDENT);
         return mapToResponse(updatedEvent);
     }
 
@@ -549,6 +601,7 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
+        ensurePendingStatus(event, "approved");
         conflictService.ensureNoUnresolvedConflicts(event);
         approvalService.approveEvent(event);
     }
@@ -560,7 +613,11 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + eventId));
 
-        approvalService.rejectEvent(event, reason);
+        ensurePendingStatus(event, "rejected");
+
+        String normalizedReason = normalizeDecisionReason(reason);
+
+        approvalService.rejectEvent(event, normalizedReason);
         conflictService.refreshConflictRecords(event, false);
     }
 
@@ -572,6 +629,20 @@ public class EventService {
                 .map(conflictService::analyzeEvent)
                 .filter(analysis -> !ConflictSeverity.NO_CONFLICT.name().equals(analysis.getConflictStatus()))
                 .collect(Collectors.toList());
+    }
+
+    private void ensurePendingStatus(Event event, String action) {
+        if (event.getStatus() != EventStatus.PENDING) {
+            throw new RuntimeException("Only pending events can be " + action);
+        }
+    }
+
+    private String normalizeDecisionReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Reason is required");
+        }
+
+        return reason.trim();
     }
 
     public EventResponse resolveConflict(Long eventId, ConflictResolutionRequest request, Long adminId) {

@@ -195,10 +195,17 @@ export default function ManageEvents() {
   }
 
   async function submitRejection() {
+    const normalizedReason = rejectReason.trim();
+
+    if (!normalizedReason) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+
     try {
       await axiosInstance.patch(
         `/events/${rejectId}/reject`,
-        { reason: rejectReason }
+        { reason: normalizedReason }
       );
 
       toast.success('Event rejected');
@@ -252,6 +259,7 @@ export default function ManageEvents() {
 
   function openRejectModal(id) {
     setRejectId(id);
+    setRejectReason('');
     setShowRejectModal(true);
   }
 
@@ -614,16 +622,19 @@ export default function ManageEvents() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() =>
-                  setShowRejectModal(false)
-                }
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectReason('');
+                  setRejectId(null);
+                }}
               >
                 Cancel
               </button>
 
               <button
                 onClick={submitRejection}
-                className="rounded-2xl bg-error px-4 py-2 text-white"
+                disabled={!rejectReason.trim()}
+                className="rounded-2xl bg-error px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Confirm Rejection
               </button>

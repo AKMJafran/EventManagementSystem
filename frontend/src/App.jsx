@@ -26,7 +26,6 @@ import ConflictsPage from './pages/ConflictsPage';
 import NotificationManagerPage from './pages/NotificationManagerPage';
 import EventDetailsPage from './pages/EventDetailsPage';
 import LecturerDashboard from './pages/LecturerDashboard';
-import LecturerCreateEventPage from './pages/LecturerCreateEventPage';
 import LecturerEditEventPage from './pages/LecturerEditEventPage';
 import LecturerEventsPage from './pages/LecturerEventsPage';
 import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
@@ -101,7 +100,6 @@ function App() {
 
       <Route element={<ProtectedRoute requiredRole="LECTURER" />}>
         <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
-        <Route path="/lecturer/create-event" element={<LecturerCreateEventPage />} />
         <Route path="/lecturer/edit-event/:id" element={<LecturerEditEventPage />} />
         <Route path="/lecturer/events" element={<LecturerEventsPage />} />
         <Route path="/lecturer/my-clubs" element={<LecturerMyClubsPage />} />

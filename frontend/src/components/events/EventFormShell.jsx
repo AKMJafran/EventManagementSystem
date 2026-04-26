@@ -14,11 +14,11 @@ import {
 
 function fieldClass(hasError, extra = '') {
   return [
-    'w-full rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition',
-    'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
+    'w-full rounded-2xl border border-outline-variant/40 bg-white px-4 py-3 text-sm text-on-surface shadow-sm outline-none transition',
+    'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant',
     hasError
-      ? 'border-red-400 ring-2 ring-red-100 focus:border-red-500'
-      : 'border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100',
+      ? 'border-error ring-2 ring-error/10 focus:border-error'
+      : 'focus:border-primary focus:ring-2 focus:ring-primary/10',
     extra,
   ]
     .filter(Boolean)
@@ -62,6 +62,7 @@ export default function EventFormShell({
   const [subCategories, setSubCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [venuesLoading, setVenuesLoading] = useState(true);
+  const [venuesError, setVenuesError] = useState('');
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(initialEvent?.imageUrl || null);
@@ -144,6 +145,23 @@ export default function EventFormShell({
     return normalizeCategories(response.data);
   }
 
+  async function retryVenueLoad() {
+    setVenuesLoading(true);
+    setVenuesError('');
+
+    try {
+      const response = await axiosInstance.get('/venues');
+      setVenues(normalizeVenues(response.data));
+    } catch (error) {
+      setVenues([]);
+      setVenuesError(extractReadableErrorMessage(error, 'Failed to load venues.'));
+      toast.error('Failed to load venues');
+      console.error(error);
+    } finally {
+      setVenuesLoading(false);
+    }
+  }
+
   async function resolveCategorySelection(categoryId, parentCategories) {
     const normalizedCategoryId = categoryId?.toString();
     if (!normalizedCategoryId) {
@@ -204,10 +222,13 @@ export default function EventFormShell({
       try {
         const response = await axiosInstance.get('/venues');
         if (!cancelled) {
+          setVenuesError('');
           setVenues(normalizeVenues(response.data));
         }
       } catch (error) {
         if (!cancelled) {
+          setVenues([]);
+          setVenuesError(extractReadableErrorMessage(error, 'Failed to load venues.'));
           toast.error('Failed to load venues');
           console.error(error);
         }
@@ -395,9 +416,11 @@ export default function EventFormShell({
     <div className="space-y-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-teal-950 md:text-5xl">{pageTitle}</h1>
+          <h1 className="serif-heading text-4xl font-bold tracking-tight text-primary md:text-5xl">
+            {pageTitle}
+          </h1>
           {pageDescription && (
-            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">{pageDescription}</p>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-on-surface-variant">{pageDescription}</p>
           )}
         </div>
         {headerActions}
@@ -405,20 +428,20 @@ export default function EventFormShell({
 
       {headerContent}
 
-      <section className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-slate-200 md:p-8">
+      <section className="rounded-3xl border border-outline-variant/10 bg-white p-6 shadow-sm md:p-8">
         <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
           {Object.entries(hiddenFields).map(([field]) => (
             <input key={field} type="hidden" {...register(field)} />
           ))}
 
           <div className="grid gap-6">
-            <div className="border-b border-slate-100 pb-6">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border-b border-outline-variant/10 pb-6">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
                 Event Basics
               </h2>
               <div className="mt-5 grid gap-6">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Event Title *</label>
+                  <label className="mb-2 block text-sm font-semibold text-on-surface">Event Title *</label>
                   <input
                     {...register('title')}
                     maxLength={150}
@@ -431,8 +454,8 @@ export default function EventFormShell({
 
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="block text-sm font-semibold text-slate-700">Description *</label>
-                    <span className="text-xs font-medium text-slate-500">{descriptionValue.length}/1000</span>
+                    <label className="block text-sm font-semibold text-on-surface">Description *</label>
+                    <span className="text-xs font-medium text-on-surface-variant">{descriptionValue.length}/1000</span>
                   </div>
                   <textarea
                     {...register('description')}
@@ -448,14 +471,14 @@ export default function EventFormShell({
               </div>
             </div>
 
-            <div className="border-b border-slate-100 pb-6">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border-b border-outline-variant/10 pb-6">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
                 Classification
               </h2>
               <div className="mt-5 grid gap-6 md:grid-cols-2">
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="block text-sm font-semibold text-slate-700">Category *</label>
+                    <label className="block text-sm font-semibold text-on-surface">Category *</label>
                     {categoriesLoading && <Spinner label="Loading categories" />}
                   </div>
                   <select
@@ -477,7 +500,7 @@ export default function EventFormShell({
 
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="block text-sm font-semibold text-slate-700">Sub-Category</label>
+                    <label className="block text-sm font-semibold text-on-surface">Sub-Category</label>
                     {subCategoriesLoading && <Spinner label="Loading sub-categories" />}
                   </div>
                   <select
@@ -503,7 +526,7 @@ export default function EventFormShell({
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Event Type *</label>
+                  <label className="mb-2 block text-sm font-semibold text-on-surface">Event Type *</label>
                   <select {...register('eventType')} className={fieldClass(Boolean(errors.eventType))}>
                     <option value="">Select an event type</option>
                     {allowedEventTypes.map((option) => (
@@ -515,7 +538,7 @@ export default function EventFormShell({
                   {errors.eventType && (
                     <p className="mt-2 text-sm font-medium text-red-600">{errors.eventType.message}</p>
                   )}
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 text-xs text-on-surface-variant">
                     {allowedEventTypes.some((option) => option.value === 'URGENT')
                       ? 'URGENT events will be highlighted with an [URGENT] prefix.'
                       : 'Choose the event type that best matches the activity.'}
@@ -524,7 +547,7 @@ export default function EventFormShell({
 
                 {showDepartmentField && (
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Department *</label>
+                    <label className="mb-2 block text-sm font-semibold text-on-surface">Department *</label>
                     <input
                       {...register('departmentName')}
                       className={fieldClass(Boolean(errors.departmentName))}
@@ -535,7 +558,7 @@ export default function EventFormShell({
                     {(errors.departmentName || departmentHelperText) && (
                       <p
                         className={`mt-2 text-sm ${
-                          errors.departmentName ? 'font-medium text-red-600' : 'text-slate-500'
+                          errors.departmentName ? 'font-medium text-red-600' : 'text-on-surface-variant'
                         }`}
                       >
                         {errors.departmentName?.message || departmentHelperText}
@@ -546,20 +569,20 @@ export default function EventFormShell({
               </div>
             </div>
 
-            <div className="border-b border-slate-100 pb-6">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border-b border-outline-variant/10 pb-6">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
                 Schedule and Venue
               </h2>
               <div className="mt-5 grid gap-6">
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="block text-sm font-semibold text-slate-700">Venue *</label>
+                    <label className="block text-sm font-semibold text-on-surface">Venue *</label>
                     {venuesLoading && <Spinner label="Loading venues" />}
                   </div>
                   <select
                     {...register('venue')}
                     className={fieldClass(Boolean(errors.venue) || hasVenueConflict)}
-                    disabled={venuesLoading}
+                    disabled={venuesLoading || venues.length === 0}
                   >
                     <option value="">{venuesLoading ? 'Loading venues...' : 'Select a venue'}</option>
                     {venues.map((venue) => (
@@ -569,8 +592,29 @@ export default function EventFormShell({
                     ))}
                   </select>
                   {errors.venue && <p className="mt-2 text-sm font-medium text-red-600">{errors.venue.message}</p>}
+                  {!errors.venue && venuesError && (
+                    <div className="mt-3 rounded-2xl border border-error-container bg-error-container/50 px-4 py-3 text-sm text-on-error-container">
+                      <p>{venuesError}</p>
+                      <button
+                        className="mt-3 inline-flex items-center rounded-xl bg-white px-3 py-2 text-xs font-semibold text-primary shadow-sm transition hover:bg-surface-container-low"
+                        onClick={() => void retryVenueLoad()}
+                        type="button"
+                      >
+                        Retry loading venues
+                      </button>
+                    </div>
+                  )}
+                  {!errors.venue && !venuesError && !venuesLoading && venues.length === 0 && (
+                    <p className="mt-2 text-xs text-on-surface-variant">
+                      No venues are available yet. Ask an administrator to add one first.
+                    </p>
+                  )}
                   {!errors.venue && (
-                    <p className={`mt-2 text-xs ${hasVenueConflict ? 'text-red-600' : 'text-slate-500'}`}>
+                    <p
+                      className={`mt-2 text-xs ${
+                        hasVenueConflict ? 'text-red-600' : 'text-on-surface-variant'
+                      }`}
+                    >
                       {hasVenueConflict
                         ? 'Please adjust the venue or event timing before submitting again.'
                         : 'Venue availability is checked automatically.'}
@@ -580,7 +624,7 @@ export default function EventFormShell({
 
                 <div className="grid gap-6 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">Start Date & Time *</label>
+                    <label className="mb-2 block text-sm font-semibold text-on-surface">Start Date & Time *</label>
                     <input
                       {...register('startTime')}
                       className={fieldClass(Boolean(errors.startTime) || hasVenueConflict)}
@@ -592,7 +636,7 @@ export default function EventFormShell({
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">End Date & Time *</label>
+                    <label className="mb-2 block text-sm font-semibold text-on-surface">End Date & Time *</label>
                     <input
                       {...register('endTime')}
                       className={fieldClass(Boolean(errors.endTime) || hasVenueConflict)}
@@ -604,11 +648,11 @@ export default function EventFormShell({
                   </div>
                 </div>
 
-                <label className="inline-flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-                  <input {...register('isMultiDay')} className="mt-1 h-4 w-4 accent-teal-700" type="checkbox" />
+                <label className="inline-flex items-start gap-3 rounded-2xl bg-surface-container-low px-4 py-3">
+                  <input {...register('isMultiDay')} className="mt-1 h-4 w-4 accent-primary" type="checkbox" />
                   <span>
-                    <span className="block text-sm font-semibold text-slate-800">Multi-day Event</span>
-                    <span className="mt-1 block text-xs text-slate-500">
+                    <span className="block text-sm font-semibold text-on-surface">Multi-day Event</span>
+                    <span className="mt-1 block text-xs text-on-surface-variant">
                       End date can be multiple days after the start date.
                     </span>
                   </span>
@@ -616,15 +660,15 @@ export default function EventFormShell({
               </div>
             </div>
 
-            <div className="border-b border-slate-100 pb-6">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="border-b border-outline-variant/10 pb-6">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
                 Media and Visibility
               </h2>
               <div className="mt-5 grid gap-6">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">Event Image</label>
+                  <label className="mb-2 block text-sm font-semibold text-on-surface">Event Image</label>
                   <div
-                    className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-5 transition hover:border-teal-300 hover:bg-teal-50/40"
+                    className="rounded-[1.5rem] border border-dashed border-outline-variant/40 bg-surface-container-low p-5 transition hover:border-primary/35 hover:bg-primary/5"
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                       event.preventDefault();
@@ -648,18 +692,18 @@ export default function EventFormShell({
                     >
                       <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">
+                          <p className="text-sm font-semibold text-on-surface">
                             Drag and drop an image here, or click to upload
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">Accepted: images only, maximum 5MB.</p>
+                          <p className="mt-1 text-xs text-on-surface-variant">Accepted: images only, maximum 5MB.</p>
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-teal-700 shadow-sm">
+                        <span className="inline-flex items-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm">
                           Choose File
                         </span>
                       </div>
                     </button>
                     {selectedImage && (
-                      <p className="mt-3 text-xs font-medium text-slate-600">Selected: {selectedImage.name}</p>
+                      <p className="mt-3 text-xs font-medium text-on-surface-variant">Selected: {selectedImage.name}</p>
                     )}
                     {imageError && <p className="mt-3 text-sm font-medium text-red-600">{imageError}</p>}
                     {imagePreview && (
@@ -672,13 +716,13 @@ export default function EventFormShell({
                   </div>
                 </div>
 
-                <label className="inline-flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3">
-                  <input {...register('isPublic')} className="mt-1 h-4 w-4 accent-teal-700" type="checkbox" />
+                <label className="inline-flex items-start gap-3 rounded-2xl bg-surface-container-low px-4 py-3">
+                  <input {...register('isPublic')} className="mt-1 h-4 w-4 accent-primary" type="checkbox" />
                   <span>
-                    <span className="block text-sm font-semibold text-slate-800">
+                    <span className="block text-sm font-semibold text-on-surface">
                       Open to External Participants
                     </span>
-                    <span className="mt-1 block text-xs text-slate-500">
+                    <span className="mt-1 block text-xs text-on-surface-variant">
                       People outside the faculty can register for this event.
                     </span>
                   </span>
@@ -689,16 +733,16 @@ export default function EventFormShell({
 
           {approvalContent}
 
-          <div className="flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+          <div className="flex flex-col gap-3 border-t border-outline-variant/10 pt-6 sm:flex-row sm:justify-end">
             <button
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center justify-center rounded-2xl border border-outline-variant/30 px-5 py-3 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
               onClick={onCancel}
               type="button"
             >
               {cancelLabel}
             </button>
             <button
-              className="inline-flex items-center justify-center rounded-2xl bg-teal-800 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-800/15 transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/15 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={submitting}
               type="submit"
             >

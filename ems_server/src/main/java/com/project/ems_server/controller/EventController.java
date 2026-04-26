@@ -1,12 +1,14 @@
 package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.ConflictResolutionRequest;
+import com.project.ems_server.dto.request.EventDecisionRequest;
 import com.project.ems_server.dto.request.EventRequest;
 import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.EventConflictAnalysisResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.dto.response.MonthlyReportResponse;
 import com.project.ems_server.dto.response.StudentCalendarFeedResponse;
+import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.EventStatus;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
@@ -21,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/events")
@@ -32,32 +33,32 @@ public class EventController {
     private final UserRepository userRepository;
 
     /**
-     * Creates a new event (student only)
+     * Creates a new event for a student request or an admin-published faculty event.
      * POST /events
      */
     @PostMapping
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ResponseEntity<EventResponse> createEvent(
             @Valid @RequestBody EventRequest eventRequest,
             Authentication authentication) {
-        
-        Long userId = extractUserIdFromAuthentication(authentication);
-        EventResponse response = eventService.createEvent(eventRequest, userId);
+
+        User user = extractUserFromAuthentication(authentication);
+        EventResponse response = eventService.createEvent(eventRequest, user.getId(), user.getRole());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
-     * Updates an existing pending event (student only)
+     * Updates an existing event.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ResponseEntity<EventResponse> updateEvent(
             @PathVariable Long id,
             @Valid @RequestBody EventRequest eventRequest,
             Authentication authentication) {
 
-        Long userId = extractUserIdFromAuthentication(authentication);
-        EventResponse response = eventService.updateEvent(id, eventRequest, userId);
+        User user = extractUserFromAuthentication(authentication);
+        EventResponse response = eventService.updateEvent(id, eventRequest, user.getId(), user.getRole());
         return ResponseEntity.ok(response);
     }
 
@@ -211,16 +212,16 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> rejectEvent(
             @PathVariable Long id,
-            @RequestBody Map<String, String> request,
+            @Valid @RequestBody(required = false) EventDecisionRequest request,
             Authentication authentication) {
-        
-        String reason = request.get("reason");
-        if (reason == null || reason.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+
+        String reason = request != null ? request.getReason() : null;
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Reason is required");
         }
-        
+
         Long adminId = extractUserIdFromAuthentication(authentication);
-        eventService.rejectEvent(id, reason, adminId);
+        eventService.rejectEvent(id, reason.trim(), adminId);
         return ResponseEntity.noContent().build();
     }
 
@@ -270,9 +271,12 @@ public ResponseEntity<List<EventResponse>> getMyEvents(Authentication authentica
      * Helper method to extract user ID from Authentication
      */
     private Long extractUserIdFromAuthentication(Authentication authentication) {
+        return extractUserFromAuthentication(authentication).getId();
+    }
+
+    private User extractUserFromAuthentication(Authentication authentication) {
         String email = authentication.getName();
         return userRepository.findByEmail(email)
-                .map(user -> user.getId())
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
 }

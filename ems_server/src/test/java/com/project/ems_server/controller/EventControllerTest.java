@@ -1,18 +1,22 @@
 package com.project.ems_server.controller;
 
+import com.project.ems_server.dto.request.EventDecisionRequest;
 import com.project.ems_server.dto.response.AnalyticsReportResponse;
 import com.project.ems_server.dto.response.EventResponse;
 import com.project.ems_server.repository.UserRepository;
 import com.project.ems_server.service.EventService;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.Authentication;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EventControllerTest {
@@ -97,5 +101,46 @@ class EventControllerTest {
         var response = controller.getAnalyticsReport(from, to, null, null, null, null, null);
 
         assertEquals(400, response.getStatusCode().value());
+    }
+
+    @Test
+    void rejectEventTrimsReasonBeforeDelegating() {
+        EventService eventService = mock(EventService.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        EventController controller = new EventController(eventService, userRepository);
+        Authentication authentication = mock(Authentication.class);
+
+        when(authentication.getName()).thenReturn("admin@example.com");
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(java.util.Optional.of(
+                com.project.ems_server.entity.User.builder().id(7L).email("admin@example.com").build()
+        ));
+
+        var response = controller.rejectEvent(
+                3L,
+                EventDecisionRequest.builder().reason("  Schedule conflict  ").build(),
+                authentication
+        );
+
+        assertEquals(204, response.getStatusCode().value());
+        verify(eventService).rejectEvent(3L, "Schedule conflict", 7L);
+    }
+
+    @Test
+    void rejectEventThrowsWhenReasonIsBlank() {
+        EventService eventService = mock(EventService.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        EventController controller = new EventController(eventService, userRepository);
+        Authentication authentication = mock(Authentication.class);
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> controller.rejectEvent(
+                        3L,
+                        EventDecisionRequest.builder().reason("   ").build(),
+                        authentication
+                )
+        );
+
+        assertEquals("Reason is required", exception.getMessage());
     }
 }

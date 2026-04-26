@@ -8,7 +8,6 @@ export default function LecturerSidebar() {
 
   const links = [
     { to: "/lecturer/dashboard", icon: "dashboard", label: "Dashboard" },
-    { to: "/lecturer/create-event", icon: "add_circle", label: "Create Event" },
     { to: "/lecturer/my-events", icon: "event_note", label: "My Events" },
     { to: "/lecturer/events", icon: "event", label: "Events" },
     { to: "/lecturer/my-clubs", icon: "groups", label: "My Clubs" },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import LecturerLayout from '../components/layout/LecturerLayout';
 import ModalPortal from '../components/ui/ModalPortal';
@@ -90,28 +90,16 @@ export default function LecturerMyEventsPage() {
               Review the departmental events you have submitted and track each request through Dean approval.
             </p>
           </div>
-          <Link
-            className="inline-flex items-center justify-center rounded-2xl bg-teal-800 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-800/15 transition hover:bg-teal-700"
-            to="/lecturer/create-event"
-          >
-            Create Event
-          </Link>
         </section>
 
         {loading ? (
           <div className="py-20 text-center text-slate-500">Loading your events...</div>
         ) : events.length === 0 ? (
           <section className="rounded-[2rem] border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-900">You haven't created any departmental events yet.</h2>
+            <h2 className="text-2xl font-bold text-slate-900">No departmental events found.</h2>
             <p className="mt-3 text-base text-slate-600">
-              Start your first departmental event request and send it to the Dean for review.
+              Departmental event creation is no longer available from the lecturer portal.
             </p>
-            <Link
-              className="mt-6 inline-flex items-center justify-center rounded-2xl bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700"
-              to="/lecturer/create-event"
-            >
-              Create Your First Event
-            </Link>
           </section>
         ) : (
           <div className="grid gap-6">

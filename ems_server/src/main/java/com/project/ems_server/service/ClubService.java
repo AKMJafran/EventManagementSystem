@@ -311,8 +311,9 @@ public class ClubService {
 
         ClubMemberRole role = requestedRole != null ? requestedRole : ClubMemberRole.GENERAL_MEMBER;
 
-        if (!ClubRoleConfig.getAvailableRoles(club.getType()).contains(role)) {
-            throw new RuntimeException("This role is not available for " + club.getType().name() + " clubs");
+        if (!getAvailableRolesForClub(club).contains(role)) {
+            String clubTypeName = club.getType() != null ? club.getType().name() : "this";
+            throw new RuntimeException("This role is not available for " + clubTypeName + " clubs");
         }
 
         if (ClubRoleConfig.getSingleOccupancyRoles().contains(role) && isRoleTaken(club, role)) {
@@ -344,7 +345,7 @@ public class ClubService {
         }
 
         List<ClubAvailableRoleResponse> roles = new ArrayList<>();
-        for (ClubMemberRole role : ClubRoleConfig.getAvailableRoles(club.getType())) {
+        for (ClubMemberRole role : getAvailableRolesForClub(club)) {
             RoleOccupant occupant = findRoleOccupant(club, role);
             roles.add(ClubAvailableRoleResponse.builder()
                     .role(role.name())
@@ -464,6 +465,21 @@ public class ClubService {
         return reason.trim();
     }
 
+    private List<ClubMemberRole> getAvailableRolesForClub(Club club) {
+        if (club == null || club.getType() == null) {
+            return List.of(
+                    ClubMemberRole.PRESIDENT,
+                    ClubMemberRole.VICE_PRESIDENT,
+                    ClubMemberRole.SECRETARY,
+                    ClubMemberRole.TREASURER,
+                    ClubMemberRole.EDITOR,
+                    ClubMemberRole.GENERAL_MEMBER
+            );
+        }
+
+        return ClubRoleConfig.getAvailableRoles(club.getType());
+    }
+
     private ClubResponse mapToResponse(Club club) {
         User president = club.getPresident() != null ? club.getPresident() : userRepository.findById(club.getPresidentId()).orElse(null);
         User lecturer = club.getSeniorTreasurerLecturer() != null
@@ -556,7 +572,7 @@ public class ClubService {
             Map<Long, StudentProfile> studentProfilesByUserId) {
         List<ClubMemberRoleSummary> summaries = new ArrayList<>();
 
-        for (ClubMemberRole role : ClubRoleConfig.getAvailableRoles(club.getType())) {
+        for (ClubMemberRole role : getAvailableRolesForClub(club)) {
             if (role == ClubMemberRole.GENERAL_MEMBER) {
                 continue;
             }
