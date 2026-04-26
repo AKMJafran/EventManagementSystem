@@ -10,6 +10,16 @@ export const submitClubRegistration = (data) =>
     treasurerUserId: data.treasurerUserId,
   });
 
+export const updateClub = (id, data) =>
+  axiosInstance.put(`/clubs/${id}`, {
+    name: data.name,
+    type: data.type,
+    description: data.description,
+    seniorTreasurerLecturerId: data.seniorTreasurerLecturerId,
+    secretaryUserId: data.secretaryUserId,
+    treasurerUserId: data.treasurerUserId,
+  });
+
 export const getAllClubs = () => 
   axiosInstance.get('/clubs');
 
@@ -24,6 +34,12 @@ export const getClubMembers = (id) =>
 
 export const joinClub = (id) => 
   axiosInstance.post(`/clubs/${id}/join`);
+
+export const getAvailableRoles = (clubId) =>
+  axiosInstance.get(`/clubs/${clubId}/available-roles`);
+
+export const joinClubWithRole = (clubId, role) =>
+  axiosInstance.post(`/clubs/${clubId}/join`, { role });
 
 export const treasurerApproveClub = (id) => 
   axiosInstance.patch(`/clubs/${id}/treasurer-approve`);

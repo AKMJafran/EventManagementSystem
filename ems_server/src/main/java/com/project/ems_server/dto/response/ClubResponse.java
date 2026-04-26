@@ -35,6 +35,7 @@ public class ClubResponse {
     private String status;
     private String rejectionReason;
     private long memberCount;
+    private java.util.List<ClubMemberRoleSummary> executiveCommittee;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

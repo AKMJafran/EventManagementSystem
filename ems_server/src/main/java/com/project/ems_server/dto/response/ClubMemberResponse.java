@@ -22,6 +22,7 @@ public class ClubMemberResponse {
     private String userEmail;
     private String studentNumber;
     private String memberRole;
+    private String displayName;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime joinedAt;

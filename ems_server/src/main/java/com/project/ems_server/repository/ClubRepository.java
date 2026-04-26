@@ -25,4 +25,6 @@ public interface ClubRepository extends JpaRepository<Club, Long> {
     Optional<Club> findTopByPresidentIdOrderByCreatedAtDesc(Long presidentId);
 
     Optional<Club> findTopByPresidentIdAndStatusInOrderByCreatedAtDesc(Long presidentId, Collection<ClubStatus> statuses);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 }

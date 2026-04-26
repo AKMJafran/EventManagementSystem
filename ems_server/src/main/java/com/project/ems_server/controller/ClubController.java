@@ -2,6 +2,8 @@ package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.ClubDecisionRequest;
 import com.project.ems_server.dto.request.ClubRequest;
+import com.project.ems_server.dto.request.JoinClubRequest;
+import com.project.ems_server.dto.response.ClubAvailableRoleResponse;
 import com.project.ems_server.dto.response.ClubMemberResponse;
 import com.project.ems_server.dto.response.ClubResponse;
 import com.project.ems_server.repository.UserRepository;
@@ -31,6 +33,16 @@ public class ClubController {
             Authentication authentication) {
         ClubResponse response = clubService.createClub(request, extractUserIdFromAuthentication(authentication));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ClubResponse> updateClub(
+            @PathVariable Long id,
+            @Valid @RequestBody ClubRequest request,
+            Authentication authentication) {
+        ClubResponse response = clubService.updateClub(id, request, extractUserIdFromAuthentication(authentication));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -86,12 +98,23 @@ public class ClubController {
         return ResponseEntity.ok(clubService.rejectByDean(id, request));
     }
 
+    @GetMapping("/{id}/available-roles")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<List<ClubAvailableRoleResponse>> getAvailableRoles(@PathVariable Long id) {
+        return ResponseEntity.ok(clubService.getAvailableRoles(id));
+    }
+
     @PostMapping("/{id}/join")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<Void> joinClub(
             @PathVariable Long id,
+            @RequestBody(required = false) JoinClubRequest request,
             Authentication authentication) {
-        clubService.joinClub(id, extractUserIdFromAuthentication(authentication));
+        clubService.joinClub(
+                id,
+                extractUserIdFromAuthentication(authentication),
+                request != null ? request.getRole() : null
+        );
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

@@ -1,23 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import axiosInstance from '../api/axiosInstance';
-import { getClubMembers, treasurerApproveClub, treasurerRejectClub } from '../api/clubApi';
+import { getClubMembers, getLecturerClubs, treasurerApproveClub, treasurerRejectClub } from '../api/clubApi';
 import LecturerLayout from '../components/layout/LecturerLayout';
+import MemberRolePill from '../components/clubs/MemberRolePill';
+import { getExecutiveCommitteeEntries, getGeneralMembers } from '../utils/clubRoles';
 
-function MemberRolePill({ role }) {
-  const className =
-    role === 'PRESIDENT'
-      ? 'bg-amber-100 text-amber-700'
-      : role === 'SECRETARY' || role === 'TREASURER'
-        ? 'bg-blue-100 text-blue-700'
-        : 'bg-slate-100 text-slate-700';
+function formatDate(value) {
+  if (!value) {
+    return 'N/A';
+  }
 
-  return (
-    <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${className}`}>
-      {role}
-    </span>
-  );
+  return new Date(value).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export default function LecturerMyClubsPage() {
@@ -34,10 +32,25 @@ export default function LecturerMyClubsPage() {
     void fetchClubs();
   }, []);
 
+  const expandedClubData = useMemo(
+    () => clubs.find((club) => club.id === expandedClub) || null,
+    [clubs, expandedClub]
+  );
+
+  const executiveCommittee = useMemo(
+    () => getExecutiveCommitteeEntries(expandedClubData),
+    [expandedClubData]
+  );
+
+  const generalMembers = useMemo(
+    () => getGeneralMembers(clubMembers),
+    [clubMembers]
+  );
+
   const fetchClubs = async () => {
     setLoading(true);
     try {
-      const response = await axiosInstance.get('/lecturer/clubs');
+      const response = await getLecturerClubs();
       setClubs(response.data || []);
     } catch (error) {
       toast.error('Failed to load clubs');
@@ -47,17 +60,17 @@ export default function LecturerMyClubsPage() {
     }
   };
 
-  const toggleMembers = async (clubId) => {
-    if (expandedClub === clubId) {
+  const toggleMembers = async (club) => {
+    if (expandedClub === club.id) {
       setExpandedClub(null);
       setClubMembers([]);
       return;
     }
 
-    setExpandedClub(clubId);
+    setExpandedClub(club.id);
     setLoadingMembers(true);
     try {
-      const response = await getClubMembers(clubId);
+      const response = await getClubMembers(club.id);
       setClubMembers(response.data || []);
     } catch (error) {
       toast.error('Failed to load members');
@@ -93,6 +106,10 @@ export default function LecturerMyClubsPage() {
       setRejectModal(null);
       setRejectReason('');
       await fetchClubs();
+      if (expandedClub === rejectModal.id) {
+        setExpandedClub(null);
+        setClubMembers([]);
+      }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to reject club');
     } finally {
@@ -104,7 +121,7 @@ export default function LecturerMyClubsPage() {
     <LecturerLayout>
       <section className="mb-8">
         <Link to="/lecturer/dashboard" className="text-sm font-semibold text-on-surface-variant hover:text-primary">
-          ← Back to Dashboard
+          &lt; Back to Dashboard
         </Link>
         <h1 className="mt-3 text-5xl font-bold text-primary serif-heading">My Clubs</h1>
         <p className="mt-3 max-w-3xl text-lg text-on-surface-variant">
@@ -126,6 +143,7 @@ export default function LecturerMyClubsPage() {
         <div className="grid gap-6">
           {clubs.map((club) => {
             const pendingTreasurerApproval = club.status === 'PENDING_TREASURER';
+            const isExpanded = expandedClub === club.id;
 
             return (
               <div key={club.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -133,17 +151,19 @@ export default function LecturerMyClubsPage() {
                   <div className="flex-1">
                     <div className="mb-3 flex flex-wrap items-center gap-3">
                       <h3 className="text-xl font-bold text-slate-900">{club.name}</h3>
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                        club.status === 'ACTIVE'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : club.status === 'PENDING_DEAN'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : club.status === 'PENDING_TREASURER'
-                              ? 'bg-orange-100 text-orange-700'
-                              : club.status === 'REJECTED'
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-slate-100 text-slate-700'
-                      }`}>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                          club.status === 'ACTIVE'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : club.status === 'PENDING_DEAN'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : club.status === 'PENDING_TREASURER'
+                                ? 'bg-orange-100 text-orange-700'
+                                : club.status === 'REJECTED'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
                         {club.status || 'UNKNOWN'}
                       </span>
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700">
@@ -151,9 +171,7 @@ export default function LecturerMyClubsPage() {
                       </span>
                     </div>
 
-                    <p className="mb-4 text-sm text-slate-600">
-                      {club.description || 'No description available.'}
-                    </p>
+                    <p className="mb-4 text-sm text-slate-600">{club.description || 'No description available.'}</p>
 
                     {pendingTreasurerApproval && (
                       <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -168,38 +186,35 @@ export default function LecturerMyClubsPage() {
                         <p className="text-xs text-slate-500">{club.presidentStudentNumber || 'Student number N/A'}</p>
                       </div>
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Secretary</p>
-                        <p className="mt-1 font-semibold text-slate-900">{club.secretaryName || 'N/A'}</p>
-                        <p className="text-xs text-slate-500">{club.secretaryStudentNumber || 'Student number N/A'}</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Senior Treasurer</p>
+                        <p className="mt-1 font-semibold text-slate-900">{club.seniorTreasurerLecturerName || 'N/A'}</p>
+                        <p className="text-xs text-slate-500">{club.seniorTreasurerStaffId || 'Staff ID N/A'}</p>
                       </div>
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Student Treasurer</p>
-                        <p className="mt-1 font-semibold text-slate-900">{club.studentTreasurerName || 'N/A'}</p>
-                        <p className="text-xs text-slate-500">{club.studentTreasurerStudentNumber || 'Student number N/A'}</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Executive Roles</p>
+                        <p className="mt-1 font-semibold text-slate-900">{club.executiveCommittee?.length || 0}</p>
+                        <p className="text-xs text-slate-500">Student committee members</p>
                       </div>
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Members</p>
                         <p className="mt-1 font-semibold text-slate-900">{club.memberCount ?? 0}</p>
-                        <p className="text-xs text-slate-500">{club.seniorTreasurerStaffId || 'Staff ID N/A'}</p>
+                        <p className="text-xs text-slate-500">Total current roster</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-3 lg:min-w-[190px]">
                     <button
-                      onClick={() => toggleMembers(club.id)}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 whitespace-nowrap"
+                      onClick={() => void toggleMembers(club)}
+                      className="whitespace-nowrap rounded-xl bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
                     >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {expandedClub === club.id ? 'expand_less' : 'expand_more'}
-                      </span>
-                      {expandedClub === club.id ? 'Hide Members' : 'View Members'}
+                      {isExpanded ? 'Hide Members' : 'View Members'}
                     </button>
 
                     {pendingTreasurerApproval && (
                       <>
                         <button
-                          onClick={() => handleApproveClub(club.id)}
+                          onClick={() => void handleApproveClub(club.id)}
                           disabled={processingClubId === club.id}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
                         >
@@ -220,44 +235,89 @@ export default function LecturerMyClubsPage() {
                   </div>
                 </div>
 
-                {expandedClub === club.id && (
-                  <div className="mt-6 border-t border-slate-100 pt-6">
-                    <h4 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-800">
-                      <span className="material-symbols-outlined text-[18px]">list_alt</span>
-                      Club Roster
-                    </h4>
-                    {loadingMembers ? (
-                      <div className="py-8 text-center text-sm text-slate-500">Loading members...</div>
-                    ) : clubMembers.length === 0 ? (
-                      <div className="rounded-xl bg-slate-50 py-8 text-center text-sm text-slate-500">No members found.</div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                {isExpanded && (
+                  <div className="mt-6 space-y-8 border-t border-slate-100 pt-6">
+                    <section>
+                      <div className="mb-4">
+                        <h4 className="text-lg font-bold text-slate-900">Executive Committee</h4>
+                        <p className="mt-1 text-sm text-slate-500">Senior Treasurer is listed first, followed by the student leadership team.</p>
+                      </div>
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
                         <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                             <tr>
-                              <th className="px-4 py-3 font-medium">Name</th>
-                              <th className="px-4 py-3 font-medium">Student No</th>
                               <th className="px-4 py-3 font-medium">Role</th>
-                              <th className="px-4 py-3 font-medium">Joined Date</th>
+                              <th className="px-4 py-3 font-medium">Member Name</th>
+                              <th className="px-4 py-3 font-medium">Identifier</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 bg-white">
-                            {clubMembers.map((member) => (
-                              <tr key={member.id || member.userId} className="transition-colors hover:bg-slate-50">
-                                <td className="px-4 py-3 font-medium text-slate-900">{member.fullName || member.userName || 'Unknown Member'}</td>
-                                <td className="px-4 py-3 text-slate-600">{member.studentNumber || 'N/A'}</td>
+                            <tr className="bg-slate-50/60">
+                              <td className="px-4 py-3">
+                                <MemberRolePill role="SENIOR_TREASURER" displayName="Senior Treasurer (You)" compact />
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-900">{club.seniorTreasurerLecturerName || 'N/A'}</td>
+                              <td className="px-4 py-3 text-slate-600">{club.seniorTreasurerStaffId || club.seniorTreasurerLecturerEmail || 'Lecturer'}</td>
+                            </tr>
+                            {executiveCommittee.map((member) => (
+                              <tr key={`${member.role}-${member.memberName}`} className="transition-colors hover:bg-slate-50">
                                 <td className="px-4 py-3">
-                                  <MemberRolePill role={member.memberRole} />
+                                  <MemberRolePill role={member.role} displayName={member.displayName} compact />
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
-                                  {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : '-'}
-                                </td>
+                                <td className="px-4 py-3 font-medium text-slate-900">{member.memberName || 'N/A'}</td>
+                                <td className="px-4 py-3 text-slate-600">{member.memberStudentNumber || 'N/A'}</td>
                               </tr>
                             ))}
+                            {executiveCommittee.length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                                  No executive committee assignments available yet.
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
-                    )}
+                    </section>
+
+                    <section>
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-slate-900">General Members</h4>
+                          <p className="mt-1 text-sm text-slate-500">Students who joined through the open membership role.</p>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                          {generalMembers.length} members
+                        </span>
+                      </div>
+
+                      {loadingMembers ? (
+                        <div className="rounded-xl bg-slate-50 py-8 text-center text-sm text-slate-500">Loading members...</div>
+                      ) : generalMembers.length === 0 ? (
+                        <div className="rounded-xl bg-slate-50 py-8 text-center text-sm text-slate-500">No general members found.</div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                              <tr>
+                                <th className="px-4 py-3 font-medium">Name</th>
+                                <th className="px-4 py-3 font-medium">Student No</th>
+                                <th className="px-4 py-3 font-medium">Joined Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {generalMembers.map((member) => (
+                                <tr key={member.id || member.userId} className="transition-colors hover:bg-slate-50">
+                                  <td className="px-4 py-3 font-medium text-slate-900">{member.fullName || member.userName || 'Unknown Member'}</td>
+                                  <td className="px-4 py-3 text-slate-600">{member.studentNumber || 'N/A'}</td>
+                                  <td className="px-4 py-3 text-slate-600">{formatDate(member.joinedAt)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </section>
                   </div>
                 )}
               </div>
@@ -296,7 +356,7 @@ export default function LecturerMyClubsPage() {
               </button>
               <button
                 type="button"
-                onClick={handleRejectClub}
+                onClick={() => void handleRejectClub()}
                 disabled={processingClubId === rejectModal.id}
                 className="rounded-xl bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
               >

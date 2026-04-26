@@ -2,7 +2,9 @@ package com.project.ems_server.service;
 
 import com.project.ems_server.dto.request.ClubDecisionRequest;
 import com.project.ems_server.dto.request.ClubRequest;
+import com.project.ems_server.dto.response.ClubAvailableRoleResponse;
 import com.project.ems_server.dto.response.ClubMemberResponse;
+import com.project.ems_server.dto.response.ClubMemberRoleSummary;
 import com.project.ems_server.dto.response.ClubResponse;
 import com.project.ems_server.entity.Club;
 import com.project.ems_server.entity.ClubMembership;
@@ -18,11 +20,15 @@ import com.project.ems_server.repository.ClubRepository;
 import com.project.ems_server.repository.LecturerProfileRepository;
 import com.project.ems_server.repository.StudentProfileRepository;
 import com.project.ems_server.repository.UserRepository;
+import com.project.ems_server.util.ClubRoleConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -71,7 +77,6 @@ public class ClubService {
 
         Club savedClub = clubRepository.save(club);
 
-        saveMembership(savedClub.getId(), presidentId, ClubMemberRole.PRESIDENT);
         saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
         saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
 
@@ -80,6 +85,63 @@ public class ClubService {
                 "Club Registration Awaiting Treasurer Approval",
                 String.format(
                         "%s submitted the club '%s' and assigned you as Senior Treasurer. Please review the request.",
+                        president.getName(),
+                        savedClub.getName()
+                ),
+                NotificationType.GENERAL
+        );
+
+        return mapToResponse(savedClub);
+    }
+
+    @Transactional
+    public ClubResponse updateClub(Long clubId, ClubRequest request, Long presidentId) {
+        Club club = getClubEntity(clubId);
+
+        if (!club.getPresidentId().equals(presidentId)) {
+            throw new RuntimeException("Only the president can edit this club");
+        }
+
+        if (club.getStatus() != ClubStatus.PENDING_TREASURER && club.getStatus() != ClubStatus.PENDING_DEAN) {
+            throw new RuntimeException("Club can only be edited while in pending approval state");
+        }
+
+        User lecturer = getUserById(request.getSeniorTreasurerLecturerId());
+        validateLecturerTreasurer(lecturer);
+        User secretary = getUserById(request.getSecretaryUserId());
+        validateExecutiveStudent(secretary, "Secretary");
+        User studentTreasurer = getUserById(request.getTreasurerUserId());
+        validateExecutiveStudent(studentTreasurer, "Student treasurer");
+        validateExecutiveAssignments(presidentId, secretary.getId(), studentTreasurer.getId());
+
+        String clubName = request.getName().trim();
+        if (!club.getName().equalsIgnoreCase(clubName) && clubRepository.existsByNameIgnoreCaseAndIdNot(clubName, clubId)) {
+            throw new RuntimeException("Club already exists with name: " + clubName);
+        }
+
+        club.setName(clubName);
+        club.setDescription(normalizeNullableText(request.getDescription()));
+        club.setType(request.getType());
+        club.setSeniorTreasurerLecturerId(lecturer.getId());
+        club.setStatus(ClubStatus.PENDING_TREASURER);
+        club.setRejectionReason(null);
+
+        Club savedClub = clubRepository.save(club);
+
+        clubMembershipRepository.deleteByClubIdAndMemberRoleIn(
+                savedClub.getId(),
+                List.of(ClubMemberRole.SECRETARY, ClubMemberRole.TREASURER)
+        );
+
+        saveMembership(savedClub.getId(), secretary.getId(), ClubMemberRole.SECRETARY);
+        saveMembership(savedClub.getId(), studentTreasurer.getId(), ClubMemberRole.TREASURER);
+
+        User president = getUserById(presidentId);
+        notificationService.createNotification(
+                lecturer.getId(),
+                "Club Registration Updated — Awaiting Treasurer Approval",
+                String.format(
+                        "%s updated the club '%s' and assigned you as Senior Treasurer. Please review the request.",
                         president.getName(),
                         savedClub.getName()
                 ),
@@ -190,6 +252,10 @@ public class ClubService {
         club.setRejectionReason(null);
         Club savedClub = clubRepository.save(club);
 
+        if (!clubMembershipRepository.existsByClubIdAndUserId(savedClub.getId(), savedClub.getPresidentId())) {
+            saveMembership(savedClub.getId(), savedClub.getPresidentId(), ClubMemberRole.PRESIDENT);
+        }
+
         notificationService.createNotification(
                 savedClub.getPresidentId(),
                 "Club Approved",
@@ -230,7 +296,7 @@ public class ClubService {
     }
 
     @Transactional
-    public void joinClub(Long clubId, Long userId) {
+    public void joinClub(Long clubId, Long userId, ClubMemberRole requestedRole) {
         Club club = getClubEntity(clubId);
         User user = getUserById(userId);
         validateStudentMember(user);
@@ -239,14 +305,24 @@ public class ClubService {
             throw new RuntimeException("Only active clubs can accept new members");
         }
 
-        if (clubMembershipRepository.existsByClubIdAndUserId(clubId, userId)) {
-            throw new RuntimeException("User already exists in this club");
+        if (clubMembershipRepository.existsByClubIdAndUserId(clubId, userId) || club.getPresidentId().equals(userId)) {
+            throw new RuntimeException("You are already a member of this club");
+        }
+
+        ClubMemberRole role = requestedRole != null ? requestedRole : ClubMemberRole.GENERAL_MEMBER;
+
+        if (!ClubRoleConfig.getAvailableRoles(club.getType()).contains(role)) {
+            throw new RuntimeException("This role is not available for " + club.getType().name() + " clubs");
+        }
+
+        if (ClubRoleConfig.getSingleOccupancyRoles().contains(role) && isRoleTaken(club, role)) {
+            throw new RuntimeException("The role " + ClubRoleConfig.getDisplayName(role) + " is already filled in this club");
         }
 
         clubMembershipRepository.save(ClubMembership.builder()
                 .clubId(clubId)
                 .userId(userId)
-                .memberRole(ClubMemberRole.MEMBER)
+                .memberRole(role)
                 .build());
     }
 
@@ -257,6 +333,28 @@ public class ClubService {
         return clubMembershipRepository.findByClubIdOrderByJoinedAtAsc(clubId).stream()
                 .map(this::mapMemberToResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClubAvailableRoleResponse> getAvailableRoles(Long clubId) {
+        Club club = getClubEntity(clubId);
+
+        if (club.getStatus() != ClubStatus.ACTIVE) {
+            throw new RuntimeException("Only active clubs can accept new members");
+        }
+
+        List<ClubAvailableRoleResponse> roles = new ArrayList<>();
+        for (ClubMemberRole role : ClubRoleConfig.getAvailableRoles(club.getType())) {
+            RoleOccupant occupant = findRoleOccupant(club, role);
+            roles.add(ClubAvailableRoleResponse.builder()
+                    .role(role.name())
+                    .displayName(ClubRoleConfig.getDisplayName(role))
+                    .available(occupant == null)
+                    .takenBy(occupant != null ? occupant.memberName() : null)
+                    .build());
+        }
+
+        return roles;
     }
 
     @Transactional(readOnly = true)
@@ -373,12 +471,35 @@ public class ClubService {
                 : userRepository.findById(club.getSeniorTreasurerLecturerId()).orElse(null);
         StudentProfile presidentProfile = findStudentProfile(president);
         LecturerProfile lecturerProfile = findLecturerProfile(club.getSeniorTreasurerLecturerId());
-        ClubMembership secretaryMembership = clubMembershipRepository.findByClubIdAndMemberRole(club.getId(), ClubMemberRole.SECRETARY).orElse(null);
-        ClubMembership treasurerMembership = clubMembershipRepository.findByClubIdAndMemberRole(club.getId(), ClubMemberRole.TREASURER).orElse(null);
-        User secretary = secretaryMembership != null ? userRepository.findById(secretaryMembership.getUserId()).orElse(null) : null;
-        User studentTreasurer = treasurerMembership != null ? userRepository.findById(treasurerMembership.getUserId()).orElse(null) : null;
-        StudentProfile secretaryProfile = findStudentProfile(secretary);
-        StudentProfile studentTreasurerProfile = findStudentProfile(studentTreasurer);
+        List<ClubMembership> memberships = clubMembershipRepository.findByClubIdOrderByJoinedAtAsc(club.getId());
+        Map<ClubMemberRole, ClubMembership> membershipsByRole = new HashMap<>();
+        Map<Long, User> usersById = new HashMap<>();
+        Map<Long, StudentProfile> studentProfilesByUserId = new HashMap<>();
+
+        if (president != null) {
+            usersById.put(president.getId(), president);
+            studentProfilesByUserId.put(president.getId(), presidentProfile);
+        }
+
+        for (ClubMembership membership : memberships) {
+            membershipsByRole.putIfAbsent(membership.getMemberRole(), membership);
+            User member = membership.getUser() != null
+                    ? membership.getUser()
+                    : userRepository.findById(membership.getUserId()).orElse(null);
+            if (member != null) {
+                usersById.put(member.getId(), member);
+                studentProfilesByUserId.put(member.getId(), findStudentProfile(member));
+            }
+        }
+
+        ClubMembership secretaryMembership = membershipsByRole.get(ClubMemberRole.SECRETARY);
+        ClubMembership treasurerMembership = membershipsByRole.get(ClubMemberRole.TREASURER);
+        User secretary = secretaryMembership != null ? usersById.get(secretaryMembership.getUserId()) : null;
+        User studentTreasurer = treasurerMembership != null ? usersById.get(treasurerMembership.getUserId()) : null;
+        StudentProfile secretaryProfile = secretaryMembership != null ? studentProfilesByUserId.get(secretaryMembership.getUserId()) : null;
+        StudentProfile studentTreasurerProfile = treasurerMembership != null ? studentProfilesByUserId.get(treasurerMembership.getUserId()) : null;
+        boolean hasPresidentMembership = membershipsByRole.containsKey(ClubMemberRole.PRESIDENT);
+        long displayedMemberCount = memberships.size() + (!hasPresidentMembership && club.getPresidentId() != null ? 1 : 0);
 
         return ClubResponse.builder()
                 .id(club.getId())
@@ -386,7 +507,7 @@ public class ClubService {
                 .description(club.getDescription())
                 .type(club.getType() != null ? club.getType().name() : null)
                 .presidentId(club.getPresidentId())
-                .presidentName(president != null ? president.getName() : null)
+                .presidentName(resolveMemberName(president, presidentProfile))
                 .presidentEmail(president != null ? president.getEmail() : null)
                 .presidentStudentNumber(presidentProfile != null ? presidentProfile.getStudentNumber() : null)
                 .seniorTreasurerLecturerId(club.getSeniorTreasurerLecturerId())
@@ -394,14 +515,15 @@ public class ClubService {
                 .seniorTreasurerLecturerEmail(lecturer != null ? lecturer.getEmail() : null)
                 .seniorTreasurerStaffId(lecturerProfile != null ? lecturerProfile.getStaffId() : null)
                 .secretaryUserId(secretaryMembership != null ? secretaryMembership.getUserId() : null)
-                .secretaryName(secretary != null ? secretary.getName() : null)
+                .secretaryName(resolveMemberName(secretary, secretaryProfile))
                 .secretaryStudentNumber(secretaryProfile != null ? secretaryProfile.getStudentNumber() : null)
                 .studentTreasurerUserId(treasurerMembership != null ? treasurerMembership.getUserId() : null)
-                .studentTreasurerName(studentTreasurer != null ? studentTreasurer.getName() : null)
+                .studentTreasurerName(resolveMemberName(studentTreasurer, studentTreasurerProfile))
                 .studentTreasurerStudentNumber(studentTreasurerProfile != null ? studentTreasurerProfile.getStudentNumber() : null)
                 .status(club.getStatus() != null ? club.getStatus().name() : null)
                 .rejectionReason(club.getRejectionReason())
-                .memberCount(clubMembershipRepository.countByClubId(club.getId()))
+                .memberCount(displayedMemberCount)
+                .executiveCommittee(buildExecutiveCommittee(club, president, presidentProfile, membershipsByRole, usersById, studentProfilesByUserId))
                 .createdAt(club.getCreatedAt())
                 .build();
     }
@@ -420,8 +542,87 @@ public class ClubService {
                 .userEmail(user != null ? user.getEmail() : null)
                 .studentNumber(profile != null ? profile.getStudentNumber() : null)
                 .memberRole(membership.getMemberRole() != null ? membership.getMemberRole().name() : null)
+                .displayName(membership.getMemberRole() != null ? ClubRoleConfig.getDisplayName(membership.getMemberRole()) : null)
                 .joinedAt(membership.getJoinedAt())
                 .build();
+    }
+
+    private List<ClubMemberRoleSummary> buildExecutiveCommittee(
+            Club club,
+            User president,
+            StudentProfile presidentProfile,
+            Map<ClubMemberRole, ClubMembership> membershipsByRole,
+            Map<Long, User> usersById,
+            Map<Long, StudentProfile> studentProfilesByUserId) {
+        List<ClubMemberRoleSummary> summaries = new ArrayList<>();
+
+        for (ClubMemberRole role : ClubRoleConfig.getAvailableRoles(club.getType())) {
+            if (role == ClubMemberRole.GENERAL_MEMBER) {
+                continue;
+            }
+
+            if (role == ClubMemberRole.PRESIDENT) {
+                if (president != null) {
+                    summaries.add(buildRoleSummary(role, resolveMemberName(president, presidentProfile), presidentProfile));
+                }
+                continue;
+            }
+
+            ClubMembership membership = membershipsByRole.get(role);
+            if (membership == null) {
+                continue;
+            }
+
+            User user = usersById.get(membership.getUserId());
+            StudentProfile profile = studentProfilesByUserId.get(membership.getUserId());
+            summaries.add(buildRoleSummary(role, resolveMemberName(user, profile), profile));
+        }
+
+        return summaries;
+    }
+
+    private ClubMemberRoleSummary buildRoleSummary(ClubMemberRole role, String memberName, StudentProfile profile) {
+        return ClubMemberRoleSummary.builder()
+                .role(role.name())
+                .displayName(ClubRoleConfig.getDisplayName(role))
+                .memberName(memberName)
+                .memberStudentNumber(profile != null ? profile.getStudentNumber() : null)
+                .build();
+    }
+
+    private boolean isRoleTaken(Club club, ClubMemberRole role) {
+        if (role == ClubMemberRole.PRESIDENT) {
+            return club.getPresidentId() != null;
+        }
+        return clubMembershipRepository.existsByClubIdAndMemberRole(club.getId(), role);
+    }
+
+    private RoleOccupant findRoleOccupant(Club club, ClubMemberRole role) {
+        if (role == ClubMemberRole.PRESIDENT && club.getPresidentId() != null) {
+            User president = club.getPresident() != null
+                    ? club.getPresident()
+                    : userRepository.findById(club.getPresidentId()).orElse(null);
+            StudentProfile profile = findStudentProfile(president);
+            return new RoleOccupant(resolveMemberName(president, profile), profile != null ? profile.getStudentNumber() : null);
+        }
+
+        ClubMembership membership = clubMembershipRepository.findByClubIdAndMemberRole(club.getId(), role).orElse(null);
+        if (membership == null) {
+            return null;
+        }
+
+        User user = membership.getUser() != null
+                ? membership.getUser()
+                : userRepository.findById(membership.getUserId()).orElse(null);
+        StudentProfile profile = findStudentProfile(user);
+        return new RoleOccupant(resolveMemberName(user, profile), profile != null ? profile.getStudentNumber() : null);
+    }
+
+    private String resolveMemberName(User user, StudentProfile profile) {
+        if (profile != null && profile.getFullName() != null && !profile.getFullName().isBlank()) {
+            return profile.getFullName();
+        }
+        return user != null ? user.getName() : null;
     }
 
     private StudentProfile findStudentProfile(User user) {
@@ -436,5 +637,8 @@ public class ClubService {
             return null;
         }
         return lecturerProfileRepository.findByUserId(userId).orElse(null);
+    }
+
+    private record RoleOccupant(String memberName, String studentNumber) {
     }
 }
