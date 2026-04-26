@@ -6,6 +6,7 @@ import com.project.ems_server.entity.LecturerProfile;
 import com.project.ems_server.entity.User;
 import com.project.ems_server.enums.Role;
 import com.project.ems_server.repository.LecturerProfileRepository;
+import com.project.ems_server.repository.RefreshTokenRepository;
 import com.project.ems_server.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +28,7 @@ public class AdminLecturerService {
 
     private final UserRepository userRepository;
     private final LecturerProfileRepository lecturerProfileRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final TransactionTemplate transactionTemplate;
@@ -83,6 +85,49 @@ public class AdminLecturerService {
                 .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
                 .map(user -> mapToResponse(user, profilesByUserId.get(user.getId())))
                 .toList();
+    }
+
+    public AdminLecturerResponse getLecturer(Long userId) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.LECTURER)
+                .orElseThrow(() -> new RuntimeException("Lecturer not found"));
+
+        LecturerProfile profile = lecturerProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Lecturer profile not found"));
+
+        return mapToResponse(user, profile);
+    }
+
+    public AdminLecturerResponse updateLecturer(Long userId, AdminLecturerCreateRequest request) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.LECTURER)
+                .orElseThrow(() -> new RuntimeException("Lecturer not found"));
+
+        LecturerProfile profile = lecturerProfileRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Lecturer profile not found"));
+
+        user.setName(request.getName().trim());
+        userRepository.save(user);
+
+        profile.setDepartment(request.getDepartment().trim());
+        profile.setDesignation(request.getDesignation().trim());
+        lecturerProfileRepository.save(profile);
+
+        return mapToResponse(user, profile);
+    }
+
+    public void deactivateLecturer(Long userId) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.LECTURER)
+                .orElseThrow(() -> new RuntimeException("Lecturer not found"));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            return;
+        }
+
+        user.setIsActive(false);
+        userRepository.save(user);
+        refreshTokenRepository.deleteByUserId(user.getId());
     }
 
     private AdminLecturerResponse mapToResponse(User user, LecturerProfile profile) {

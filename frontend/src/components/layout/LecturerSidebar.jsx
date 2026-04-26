@@ -9,7 +9,10 @@ export default function LecturerSidebar() {
   const links = [
     { to: "/lecturer/dashboard", icon: "dashboard", label: "Dashboard" },
     { to: "/lecturer/events", icon: "event", label: "Events" },
+    { to: "/lecturer/my-clubs", icon: "groups", label: "My Clubs" },
+    { to: "/lecturer/pending-approvals", icon: "pending_actions", label: "Pending Approvals" },
     { to: "/lecturer/calendar", icon: "calendar_month", label: "Calendar" },
+    { to: "/lecturer/profile", icon: "person", label: "My Profile" },
   ];
 
   return (
@@ -57,7 +60,7 @@ export default function LecturerSidebar() {
         </nav>
       </div>
 
-      {/* Logout Button - pinned to bottom */}
+      {/* Logout Button */}
       <button
         onClick={logout}
         className="w-full flex items-center gap-3 px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all rounded-lg"

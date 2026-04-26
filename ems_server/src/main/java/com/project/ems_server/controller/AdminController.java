@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,6 +31,8 @@ public class AdminController {
 
     private final AdminStudentService adminStudentService;
     private final AdminLecturerService adminLecturerService;
+
+    // ─── Student Endpoints ───────────────────────────────────────────────
 
     @PostMapping("/students")
     @PreAuthorize("hasRole('ADMIN')")
@@ -62,6 +65,8 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // ─── Lecturer Endpoints ──────────────────────────────────────────────
+
     @PostMapping("/lecturers")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AdminLecturerResponse> createLecturer(@Valid @RequestBody AdminLecturerCreateRequest request) {
@@ -72,5 +77,26 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AdminLecturerResponse>> getAllLecturers() {
         return ResponseEntity.ok(adminLecturerService.getAllLecturers());
+    }
+
+    @GetMapping("/lecturers/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminLecturerResponse> getLecturer(@PathVariable Long id) {
+        return ResponseEntity.ok(adminLecturerService.getLecturer(id));
+    }
+
+    @PutMapping("/lecturers/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminLecturerResponse> updateLecturer(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminLecturerCreateRequest request) {
+        return ResponseEntity.ok(adminLecturerService.updateLecturer(id, request));
+    }
+
+    @DeleteMapping("/lecturers/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deactivateLecturer(@PathVariable Long id) {
+        adminLecturerService.deactivateLecturer(id);
+        return ResponseEntity.noContent().build();
     }
 }

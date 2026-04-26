@@ -5,6 +5,7 @@ import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import StudentLayout from '../components/layout/StudentLayout';
 import AdminLayout from '../components/layout/AdminLayout';
+import LecturerLayout from '../components/layout/LecturerLayout';
 
 function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -52,7 +53,8 @@ function formatEventWindow(event) {
 export default function CalendarPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
-  const dashboardLink = isAdmin ? '/admin/dashboard' : '/student/dashboard';
+  const isLecturer = user?.role === 'LECTURER';
+  const dashboardLink = isAdmin ? '/admin/dashboard' : isLecturer ? '/lecturer/dashboard' : '/student/dashboard';
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [events, setEvents] = useState([]);
   const [reminders, setReminders] = useState([]);
@@ -69,7 +71,7 @@ export default function CalendarPage() {
         const start = startOfMonth(currentMonth).toISOString().slice(0, 10);
         const end = endOfMonth(currentMonth).toISOString().slice(0, 10);
 
-        if (isAdmin) {
+        if (isAdmin || isLecturer) {
           const response = await axiosInstance.get('/events/calendar', { params: { start, end } });
           setEvents(response.data || []);
           setReminders([]);
@@ -89,7 +91,7 @@ export default function CalendarPage() {
     }
 
     fetchCalendar();
-  }, [currentMonth, isAdmin]);
+    }, [currentMonth, isAdmin, isLecturer]);
 
   const content = (
     <div className="mx-auto w-full max-w-[1440px] p-8 md:p-12">
@@ -138,8 +140,8 @@ export default function CalendarPage() {
               <p className="text-sm text-on-surface-variant">Click any event to inspect its details.</p>
             </div>
             <div className="flex flex-wrap gap-3 text-[11px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
-              {!isAdmin && <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /> My event</span>}
-              {!isAdmin && <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-secondary" /> Registered</span>}
+              {!isAdmin && !isLecturer && <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /> My event</span>}
+              {!isAdmin && !isLecturer && <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-secondary" /> Registered</span>}
               <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-tertiary" /> Approved</span>
               <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-error" /> Hard conflict</span>
             </div>
@@ -186,7 +188,7 @@ export default function CalendarPage() {
         </section>
 
         <div className="space-y-6">
-          {!isAdmin && (
+          {!isAdmin && !isLecturer && (
             <>
               <section className="rounded-3xl bg-white p-6 shadow-sm">
                 <h2 className="text-2xl font-serif font-bold text-teal-900">Reminders</h2>
@@ -233,7 +235,7 @@ export default function CalendarPage() {
                   <span>Events in month</span>
                   <span className="font-semibold text-on-surface">{events.length}</span>
                 </div>
-                {!isAdmin && (
+              {!isAdmin && !isLecturer && (
                   <>
                     <div className="flex items-center justify-between">
                       <span>My pending requests</span>
@@ -295,6 +297,10 @@ export default function CalendarPage() {
 
   if (isAdmin) {
     return <AdminLayout>{content}</AdminLayout>;
+  }
+
+  if (isLecturer) {
+    return <LecturerLayout>{content}</LecturerLayout>;
   }
 
   return <StudentLayout user={user}>{content}</StudentLayout>;

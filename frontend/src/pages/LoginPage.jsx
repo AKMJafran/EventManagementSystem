@@ -29,7 +29,7 @@ export default function LoginPage() {
         return;
       }
 
-      navigate(role === 'ADMIN' ? '/admin/dashboard' : '/student/dashboard');
+      navigate(role === 'ADMIN' ? '/admin/dashboard' : role === 'LECTURER' ? '/lecturer/dashboard' : '/student/dashboard');
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Login failed');
     }
