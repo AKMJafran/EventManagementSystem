@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
+import useAuthStore from '../context/AuthContext';
 import LecturerLayout from '../components/layout/LecturerLayout';
 
 export default function LecturerProfilePage() {
+  const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -34,6 +36,7 @@ export default function LecturerProfilePage() {
     try {
       const response = await axiosInstance.put('/lecturer/profile', form);
       setProfile(response.data);
+      updateUserProfile({ name: response.data?.name || form.name });
       setEditing(false);
       toast.success('Profile updated');
     } catch (error) {

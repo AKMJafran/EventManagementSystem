@@ -60,6 +60,7 @@ public class AuthService {
                 : null;
         String department = resolveLecturerDepartment(user);
         String accessToken = jwtService.generateAccessToken(
+                user.getId(),
                 user.getEmail(),
                 user.getRole().name(),
                 user.getName(),
@@ -109,6 +110,7 @@ public class AuthService {
                 : null;
         String department = resolveLecturerDepartment(user);
         String newAccessToken = jwtService.generateAccessToken(
+                user.getId(),
                 user.getEmail(),
                 user.getRole().name(),
                 user.getName(),

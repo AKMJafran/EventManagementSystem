@@ -5,9 +5,19 @@ import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
 import StudentLayout from '../components/layout/StudentLayout';
 import AdminLayout from '../components/layout/AdminLayout';
+import LecturerLayout from '../components/layout/LecturerLayout';
 import EventImage from '../components/EventImage';
 
 function EventDetailsContent({ event, loading, role }) {
+  const backLink =
+    role === 'ADMIN'
+      ? '/manage-events'
+      : role === 'LECTURER'
+        ? '/lecturer/events'
+        : event?.status === 'PENDING'
+          ? '/student/my-events'
+          : '/student/dashboard';
+
   if (loading) {
     return <div className="py-16 text-center text-on-surface-variant">Loading event details...</div>;
   }
@@ -25,7 +35,7 @@ function EventDetailsContent({ event, loading, role }) {
           <p className="mt-3 max-w-3xl text-on-surface-variant">{event.description || 'No event description was provided.'}</p>
         </div>
         <Link
-          to={role === 'ADMIN' ? '/manage-events' : (event.status === 'PENDING' ? '/student/my-events' : '/student/dashboard')}
+          to={backLink}
           className="rounded-xl border border-outline-variant/30 px-4 py-3 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high"
         >
           Back
@@ -225,6 +235,14 @@ export default function EventDetailsPage() {
       <AdminLayout>
         <EventDetailsContent event={event} loading={loading} role={user?.role} />
       </AdminLayout>
+    );
+  }
+
+  if (user?.role === 'LECTURER') {
+    return (
+      <LecturerLayout>
+        <EventDetailsContent event={event} loading={loading} role={user?.role} />
+      </LecturerLayout>
     );
   }
 

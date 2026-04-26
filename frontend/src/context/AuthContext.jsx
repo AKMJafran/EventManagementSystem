@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import axiosInstance from '../api/axiosInstance';
 import { jwtDecode } from 'jwt-decode';
 
+const normalizeUserId = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const useAuthStore = create((set) => ({
 
   user: null,
@@ -16,9 +21,9 @@ const useAuthStore = create((set) => ({
       
       const decodedToken = jwtDecode(accessToken);
       const user = {
-        id: decodedToken.sub,
+        id: normalizeUserId(decodedToken.userId),
         name: decodedToken.name,
-        email: decodedToken.email,
+        email: response.data.email || decodedToken.sub,
         role: role,
         profilePictureUrl: decodedToken.profilePictureUrl,
         department: decodedToken.department || null,
@@ -53,6 +58,18 @@ const useAuthStore = create((set) => ({
     });
   },
 
+  updateUserProfile: (updates) => {
+    set((state) => {
+      if (!state.user) {
+        return {};
+      }
+
+      const updatedUser = { ...state.user, ...updates };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
+  },
+
   logout: () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
@@ -75,8 +92,17 @@ const useAuthStore = create((set) => ({
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       } else {
-        // Also update user state from potentially refreshed token properties in localStorage
-        set({ user: { ...user, profilePictureUrl: decodedToken.profilePictureUrl, name: decodedToken.name }, accessToken, isAuthenticated: true, authLoaded: true });
+        set({
+          user: {
+            ...user,
+            id: normalizeUserId(decodedToken.userId ?? user.id),
+            profilePictureUrl: user.profilePictureUrl ?? decodedToken.profilePictureUrl,
+            name: user.name || decodedToken.name,
+          },
+          accessToken,
+          isAuthenticated: true,
+          authLoaded: true,
+        });
       }
     } else {
       set({ authLoaded: true });

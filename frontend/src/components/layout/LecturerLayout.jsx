@@ -1,55 +1,62 @@
-import React from 'react';
-import LecturerSidebar from './LecturerSidebar';
-import NotificationBell from '../NotificationBell';
+import React, { useState } from 'react';
 import useAuthStore from '../../context/AuthContext';
+import NotificationBell from '../NotificationBell';
+import ProfileAvatarUploader from '../ProfileAvatarUploader';
+import LecturerSidebar from './LecturerSidebar';
 
 export default function LecturerLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuthStore();
 
   return (
-    <div className="bg-background font-body text-on-surface antialiased min-h-screen">
-      <LecturerSidebar />
+    <div className="min-h-screen bg-surface text-on-surface">
+      <LecturerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-white/85 dark:bg-stone-900/85 backdrop-blur-xl shadow-[0_20px_40px_rgba(0,101,101,0.05)] pl-72">
-        <div className="flex justify-between items-center px-12 h-20 w-full">
-          <div className="flex items-center gap-12">
-            <span className="text-2xl font-serif italic text-teal-800 dark:text-teal-200">Scholastic Ledger</span>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <NotificationBell />
-            <div className="flex items-center gap-3 pl-4 border-l border-outline-variant/20">
-              <div className="text-right">
-                <p className="text-xs font-bold text-on-surface leading-none">{user?.name || 'Lecturer'}</p>
-                <p className="text-[10px] text-on-surface-variant">
-                  {user?.department ? `${user.department} Department` : 'Lecturer'}
-                </p>
+      <main className="min-h-screen lg:ml-72">
+        <header className="sticky top-0 z-30 border-b border-outline-variant/30 bg-surface/95 backdrop-blur">
+          <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-10">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant/40 bg-white text-primary shadow-sm lg:hidden"
+              aria-label="Open lecturer navigation"
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+
+            <div className="hidden rounded-2xl border border-outline-variant/30 bg-white/80 px-4 py-2 text-left shadow-sm sm:block">
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-on-surface-variant">
+                Lecturer Workspace
+              </p>
+              <p className="text-sm font-semibold text-on-surface">Event Management System</p>
+            </div>
+
+            <div className="ml-auto flex items-center gap-3">
+              <div className="rounded-2xl border border-outline-variant/30 bg-white/80 p-2 shadow-sm">
+                <NotificationBell />
               </div>
-              <div className="w-10 h-10 rounded-full bg-teal-100 overflow-hidden flex items-center justify-center text-teal-800 font-bold">
-                {user?.profilePictureUrl ? (
-                  <img src={user.profilePictureUrl} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <span>{user?.name ? user.name.charAt(0).toUpperCase() : 'L'}</span>
-                )}
+              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/30 bg-white/80 px-3 py-2 shadow-sm">
+                <div className="text-right">
+                  <p className="text-xs font-bold leading-none text-on-surface">{user?.name || 'Lecturer'}</p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    {user?.department ? `${user.department} Department` : 'Lecturer Portal'}
+                  </p>
+                </div>
+                <ProfileAvatarUploader user={user} />
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="pl-72 pt-20 min-h-screen">
-        <div className="max-w-7xl mx-auto px-12 py-12">
-          {children}
-        </div>
-        
-        <footer className="mt-12 px-12 pb-12">
-          <div className="border-t border-outline-variant/10 pt-8 flex flex-col md:flex-row justify-between items-center text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">
-            <p>© 2024 Scholastic Ledger University System</p>
-            <div className="flex gap-8 mt-4 md:mt-0">
-              <a href="#" className="hover:text-primary">Terms of Use</a>
-              <a href="#" className="hover:text-primary">Privacy Policy</a>
-              <a href="#" className="hover:text-primary">System Status</a>
+        <div className="px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</div>
+
+        <footer className="px-4 pb-8 pt-4 sm:px-6 lg:px-10">
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-outline-variant/10 pt-6 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant md:flex-row">
+            <p>© 2026 Event Management System</p>
+            <div className="flex flex-wrap items-center gap-6">
+              <a href="#" className="transition hover:text-primary">Terms of Use</a>
+              <a href="#" className="transition hover:text-primary">Privacy Policy</a>
+              <a href="#" className="transition hover:text-primary">System Status</a>
             </div>
           </div>
         </footer>

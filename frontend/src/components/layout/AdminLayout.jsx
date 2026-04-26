@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import AdminSidebar from './AdminSidebar';
+import useAuthStore from '../../context/AuthContext';
 import NotificationBell from '../NotificationBell';
+import ProfileAvatarUploader from '../ProfileAvatarUploader';
+import AdminSidebar from './AdminSidebar';
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
@@ -30,6 +33,13 @@ export default function AdminLayout({ children }) {
               </div>
               <div className="rounded-2xl border border-outline-variant/30 bg-white/80 p-2 shadow-sm">
                 <NotificationBell />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant/30 bg-white/80 px-3 py-2 shadow-sm">
+                <div className="text-right">
+                  <p className="text-xs font-bold leading-none text-on-surface">{user?.name || 'Admin'}</p>
+                  <p className="text-[10px] text-on-surface-variant">Admin Portal</p>
+                </div>
+                <ProfileAvatarUploader user={user} />
               </div>
             </div>
           </div>

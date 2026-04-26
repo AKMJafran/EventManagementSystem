@@ -217,6 +217,22 @@ public class AdminLecturerService {
         refreshTokenRepository.deleteByUserId(user.getId());
     }
 
+    public AdminLecturerResponse setLecturerActive(Long userId, boolean active) {
+        User user = userRepository.findById(userId)
+                .filter(existing -> existing.getRole() == Role.LECTURER)
+                .orElseThrow(() -> new RuntimeException("Lecturer not found"));
+
+        user.setIsActive(active);
+        userRepository.save(user);
+
+        if (!active) {
+            refreshTokenRepository.deleteByUserId(user.getId());
+        }
+
+        LecturerProfile profile = lecturerProfileRepository.findByUserId(user.getId()).orElse(null);
+        return mapToResponse(user, profile);
+    }
+
     private AdminLecturerResponse mapToResponse(User user, LecturerProfile profile) {
         return AdminLecturerResponse.builder()
                 .id(user.getId())

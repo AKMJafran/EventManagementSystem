@@ -257,7 +257,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-              <Link to="/student/calendar" className="block text-center w-full py-3 border border-outline-variant rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors">
+              <Link to="/admin/calendar" className="block text-center w-full py-3 border border-outline-variant rounded-xl text-sm font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors">
                 Full Calendar View
               </Link>
             </div>

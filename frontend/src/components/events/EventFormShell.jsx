@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../../api/axiosInstance';
+import EventImage from '../EventImage';
 import {
   extractReadableErrorMessage,
   isVenueConflictError,
@@ -10,6 +11,7 @@ import {
   normalizeVenues,
   toDateTimeLocalValue,
 } from './eventFormShared';
+import { resolveAssetUrl } from '../../utils/assetUrl';
 
 function fieldClass(hasError, extra = '') {
   return [
@@ -63,7 +65,7 @@ export default function EventFormShell({
   const [venuesError, setVenuesError] = useState('');
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(initialEvent?.imageUrl || null);
+  const [imagePreview, setImagePreview] = useState(resolveAssetUrl(initialEvent?.imageUrl) || null);
   const [imageError, setImageError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hasVenueConflict, setHasVenueConflict] = useState(false);
@@ -105,14 +107,14 @@ export default function EventFormShell({
   function processSelectedFile(file) {
     if (!file) {
       setSelectedImage(null);
-      setImagePreview(initialEvent?.imageUrl || null);
+      setImagePreview(resolveAssetUrl(initialEvent?.imageUrl) || null);
       setImageError('');
       return;
     }
 
     if (!file.type.startsWith('image/')) {
       setSelectedImage(null);
-      setImagePreview(initialEvent?.imageUrl || null);
+      setImagePreview(resolveAssetUrl(initialEvent?.imageUrl) || null);
       setImageError('Please select a valid image file.');
       toast.error('Please select an image file.');
       return;
@@ -120,7 +122,7 @@ export default function EventFormShell({
 
     if (file.size > 5 * 1024 * 1024) {
       setSelectedImage(null);
-      setImagePreview(initialEvent?.imageUrl || null);
+      setImagePreview(resolveAssetUrl(initialEvent?.imageUrl) || null);
       setImageError('Image size must be 5MB or less.');
       toast.error('File size should not exceed 5MB.');
       return;
@@ -276,7 +278,7 @@ export default function EventFormShell({
           ...hiddenFields,
         });
         setSelectedImage(null);
-        setImagePreview(initialEvent.imageUrl || null);
+        setImagePreview(resolveAssetUrl(initialEvent.imageUrl) || null);
       } catch (error) {
         if (!cancelled) {
           toast.error('Failed to prepare the event form');
@@ -683,7 +685,7 @@ export default function EventFormShell({
                     )}
                     {imageError && <p className="mt-3 text-sm font-medium text-red-600">{imageError}</p>}
                     {imagePreview && (
-                      <img
+                      <EventImage
                         alt="Event preview"
                         className="mt-4 h-56 w-full rounded-[1.5rem] object-cover ring-1 ring-slate-200"
                         src={imagePreview}

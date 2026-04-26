@@ -1,6 +1,7 @@
 package com.project.ems_server.controller;
 
 import com.project.ems_server.dto.request.AdminLecturerCreateRequest;
+import com.project.ems_server.dto.request.AdminAccountStatusRequest;
 import com.project.ems_server.dto.request.AdminStudentCreateRequest;
 import com.project.ems_server.dto.request.LecturerProfileBulkItemRequest;
 import com.project.ems_server.dto.request.StudentProfileBulkItemRequest;
@@ -18,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,11 +62,27 @@ public class AdminController {
         return ResponseEntity.ok(adminStudentService.getStudent(id));
     }
 
+    @PutMapping("/students/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminStudentResponse> updateStudent(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminStudentCreateRequest request) {
+        return ResponseEntity.ok(adminStudentService.updateStudent(id, request));
+    }
+
     @DeleteMapping("/students/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deactivateStudent(@PathVariable Long id) {
         adminStudentService.deactivateStudent(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/students/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminStudentResponse> setStudentStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminAccountStatusRequest request) {
+        return ResponseEntity.ok(adminStudentService.setStudentActive(id, Boolean.TRUE.equals(request.getActive())));
     }
 
     // ─── Lecturer Endpoints ──────────────────────────────────────────────
@@ -106,5 +124,13 @@ public class AdminController {
     public ResponseEntity<Void> deactivateLecturer(@PathVariable Long id) {
         adminLecturerService.deactivateLecturer(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/lecturers/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminLecturerResponse> setLecturerStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminAccountStatusRequest request) {
+        return ResponseEntity.ok(adminLecturerService.setLecturerActive(id, Boolean.TRUE.equals(request.getActive())));
     }
 }

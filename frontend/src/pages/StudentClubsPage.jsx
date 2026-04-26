@@ -745,10 +745,22 @@ export default function StudentClubsPage() {
   const { user } = useAuthStore();
 
   const currentUserId = user?.id != null ? Number(user.id) : null;
+  const currentUserEmail = user?.email?.toLowerCase() || '';
 
   const availableStudents = useMemo(
-    () => students.filter((student) => Number(student.id) !== currentUserId && student.isActive !== false),
-    [students, currentUserId]
+    () =>
+      students.filter((student) => {
+        if (student.isActive === false) {
+          return false;
+        }
+
+        if (currentUserId != null) {
+          return Number(student.id) !== currentUserId;
+        }
+
+        return String(student.officialEmail || '').toLowerCase() !== currentUserEmail;
+      }),
+    [students, currentUserEmail, currentUserId]
   );
 
   const canRegisterNewClub = !myClub || myClub.status === 'REJECTED' || myClub.status === 'INACTIVE';
@@ -790,7 +802,7 @@ export default function StudentClubsPage() {
   }, [activeTab, myClub]);
 
   const fetchJoinedClubIds = useCallback(async (clubList) => {
-    if (!currentUserId || clubList.length === 0) {
+    if ((!currentUserId && !currentUserEmail) || clubList.length === 0) {
       return [];
     }
 
@@ -801,21 +813,31 @@ export default function StudentClubsPage() {
 
     membershipResponses.forEach((result, index) => {
       const club = clubList[index];
-      if (club.presidentId === currentUserId) {
+      const isPresident =
+        (currentUserId != null && club.presidentId === currentUserId) ||
+        (currentUserEmail && String(club.presidentEmail || '').toLowerCase() === currentUserEmail);
+
+      if (isPresident) {
         memberIds.add(club.id);
         return;
       }
 
       if (result.status === 'fulfilled') {
         const members = result.value.data || [];
-        if (members.some((member) => Number(member.userId) === currentUserId)) {
+        if (
+          members.some(
+            (member) =>
+              (currentUserId != null && Number(member.userId) === currentUserId) ||
+              (currentUserEmail && String(member.userEmail || '').toLowerCase() === currentUserEmail)
+          )
+        ) {
           memberIds.add(club.id);
         }
       }
     });
 
     return [...memberIds];
-  }, [currentUserId]);
+  }, [currentUserEmail, currentUserId]);
 
   const fetchPageData = useCallback(async () => {
     setLoading(true);
@@ -935,7 +957,10 @@ export default function StudentClubsPage() {
   };
 
   const openJoinClubModal = (club) => {
-    const isOwnClub = myClub?.id === club.id && myClub?.presidentId === currentUserId;
+    const isOwnClub =
+      myClub?.id === club.id &&
+      ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+        (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail));
     if (isOwnClub || joinedClubSet.has(club.id)) {
       return;
     }
@@ -948,11 +973,22 @@ export default function StudentClubsPage() {
       return;
     }
 
+    if (
+      joinedClubSet.has(joinModalClub.id) ||
+      (myClub?.id === joinModalClub.id &&
+        ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+          (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail)))
+    ) {
+      toast.error('Your membership for this club is already active.');
+      setJoinModalClub(null);
+      return;
+    }
+
     setJoiningClubId(joinModalClub.id);
     try {
       await joinClubWithRole(joinModalClub.id, selectedJoinRole);
       const selectedRoleOption = joinRoleOptions.find((role) => role.role === selectedJoinRole);
-      toast.success(`You joined ${joinModalClub.name} as ${selectedRoleOption?.displayName || getRoleDisplayName(selectedJoinRole)}! 🎉`);
+      toast.success(`You joined ${joinModalClub.name} as ${selectedRoleOption?.displayName || getRoleDisplayName(selectedJoinRole)}.`);
       setJoinModalClub(null);
       await fetchPageData();
     } catch (error) {
@@ -1071,9 +1107,13 @@ export default function StudentClubsPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {clubs.map((club) => {
-              const isOwnClub = myClub?.id === club.id && myClub?.presidentId === currentUserId;
+              const isOwnClub =
+                myClub?.id === club.id &&
+                ((currentUserId != null && myClub?.presidentId === currentUserId) ||
+                  (currentUserEmail && String(myClub?.presidentEmail || '').toLowerCase() === currentUserEmail));
               const isJoined = joinedClubSet.has(club.id);
               const openRoles = getOpenRoleCount(club);
+              const isJoinDisabled = isOwnClub || isJoined;
 
               return (
                 <article key={club.id} className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1105,10 +1145,14 @@ export default function StudentClubsPage() {
                   <button
                     type="button"
                     onClick={() => openJoinClubModal(club)}
-                    disabled={isOwnClub || isJoined}
-                    className="rounded-2xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isJoinDisabled}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                      isJoinDisabled
+                        ? 'cursor-not-allowed bg-slate-100 text-slate-500 opacity-60'
+                        : 'bg-primary/10 text-primary hover:bg-primary/20'
+                    }`}
                   >
-                    {isOwnClub ? 'You lead this club' : isJoined ? 'Joined ✓' : 'Join Club'}
+                    {isOwnClub ? 'You Lead This Club' : isJoined ? 'Membership Active' : 'Join Club'}
                   </button>
                 </article>
               );

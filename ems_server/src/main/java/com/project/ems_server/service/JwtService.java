@@ -26,16 +26,17 @@ public class JwtService {
     /**
      * Generates an access token (15 min expiry) with email, role, name and profile picture as claims
      */
-    public String generateAccessToken(String email, String role, String name, String profilePictureUrl) {
-        return generateAccessToken(email, role, name, profilePictureUrl, null);
+    public String generateAccessToken(Long userId, String email, String role, String name, String profilePictureUrl) {
+        return generateAccessToken(userId, email, role, name, profilePictureUrl, null);
     }
 
     /**
      * Generates an access token (15 min expiry) with email, role, name, profile picture, and optional department as claims
      */
-    public String generateAccessToken(String email, String role, String name, String profilePictureUrl, String department) {
+    public String generateAccessToken(Long userId, String email, String role, String name, String profilePictureUrl, String department) {
         var builder = Jwts.builder()
                 .setSubject(email)
+                .claim("userId", userId)
                 .claim("role", role)
                 .claim("name", name)
                 .claim("profilePictureUrl", profilePictureUrl);
