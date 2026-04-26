@@ -10,12 +10,12 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 
 const emailSchema = z.object({
-  email: z.string().email('Invalid email'),
+  email: z.string().min(1, 'Email, student ID, or lecturer ID is required'),
 });
 
 const resetSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
-  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 export default function ResetPasswordPage() {
@@ -69,7 +69,7 @@ return (
         </CardTitle>
         <CardDescription className="text-on-surface-variant">
           {step === 1 
-            ? "Enter your email and get OTP." 
+            ? "Enter your email, student ID, or lecturer ID to get an OTP." 
             : "Enter OTP and new password"}
         </CardDescription>
       </CardHeader>
@@ -79,11 +79,11 @@ return (
           <form onSubmit={handleEmailSubmit(onEmailSubmit)} className="space-y-4">
             
             <Input
-              label="Email"
-              type="email"
+              label="Email, Student ID, or Lecturer ID"
+              type="text"
               {...registerEmail('email')}
               error={emailErrors.email?.message}
-              placeholder="john@example.com"
+              placeholder="Enter your login identifier"
               className="focus:ring-2 focus:ring-primary/40"
             />
 

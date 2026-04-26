@@ -1,16 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { resolveAssetUrl } from '../utils/assetUrl';
 
 export default function EventImage({ src, alt, className = '', fallbackSrc = null }) {
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [src, fallbackSrc]);
-
-  const resolvedSrc = !hasError ? resolveAssetUrl(src) : null;
+  const [failedSrc, setFailedSrc] = useState(null);
+  const resolvedSrc = resolveAssetUrl(src);
   const resolvedFallback = resolveAssetUrl(fallbackSrc);
-  const finalSrc = resolvedSrc || resolvedFallback;
+  const primarySrc = resolvedSrc && failedSrc !== resolvedSrc ? resolvedSrc : null;
+  const finalSrc = primarySrc || resolvedFallback;
 
   if (!finalSrc) {
     return (
@@ -37,7 +33,7 @@ export default function EventImage({ src, alt, className = '', fallbackSrc = nul
       alt={alt}
       className={className}
       loading="lazy"
-      onError={() => setHasError(true)}
+      onError={() => setFailedSrc(resolvedSrc)}
     />
   );
 }

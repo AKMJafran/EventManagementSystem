@@ -110,8 +110,24 @@ export function getGeneralMembers(members = []) {
   return members.filter((member) => member.memberRole === 'GENERAL_MEMBER');
 }
 
+export function getRoleRoster(club) {
+  const roles = getRolesForClubType(club?.type).filter((role) => role !== 'GENERAL_MEMBER');
+  const membersByRole = new Map(
+    (club?.executiveCommittee || []).map((member) => [member.role, member])
+  );
+
+  return roles.map((role) => {
+    const match = membersByRole.get(role);
+    return {
+      role,
+      displayName: getRoleDisplayName(role, match?.displayName),
+      memberName: match?.memberName || '',
+      memberStudentNumber: match?.memberStudentNumber || '',
+      filled: Boolean(match?.memberName),
+    };
+  });
+}
+
 export function getOpenRoleCount(club) {
-  const allSingleRoles = getRolesForClubType(club?.type).filter((role) => role !== 'GENERAL_MEMBER');
-  const occupiedRoles = new Set((club?.executiveCommittee || []).map((member) => member.role));
-  return allSingleRoles.filter((role) => !occupiedRoles.has(role)).length;
+  return getRoleRoster(club).filter((role) => !role.filled).length;
 }

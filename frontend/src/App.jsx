@@ -5,7 +5,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Unauthorized from './pages/Unauthorized';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import ChangePasswordPage from './pages/ChangePasswordPage';
 import StudentDashboard from './pages/StudentDashboard';
 import CreateEventPage from './pages/CreateEventPage';
 import EditEventPage from './pages/EditEventPage';
@@ -27,12 +26,17 @@ import NotificationManagerPage from './pages/NotificationManagerPage';
 import EventDetailsPage from './pages/EventDetailsPage';
 import LecturerDashboard from './pages/LecturerDashboard';
 import LecturerEditEventPage from './pages/LecturerEditEventPage';
-import LecturerEventsPage from './pages/LecturerEventsPage';
 import LecturerMyClubsPage from './pages/LecturerMyClubsPage';
 import LecturerPendingApprovalsPage from './pages/LecturerPendingApprovalsPage';
 import StudentClubsPage from './pages/StudentClubsPage';
 import ManageClubs from './pages/ManageClubs';
 import ProfilePage from './pages/ProfilePage';
+import { getProfileRoute } from './utils/profileRoutes';
+
+const ChangePasswordRedirect = () => {
+  const user = useAuthStore((state) => state.user);
+  return <Navigate to={`${getProfileRoute(user?.role)}?tab=password&required=1`} replace />;
+};
 
 const Home = () => {
   const { isAuthenticated, user } = useAuthStore.getState();
@@ -40,7 +44,7 @@ const Home = () => {
     return <LandingPage />;
   }
   if (user.mustChangePassword) {
-    return <Navigate to="/change-password" replace />;
+    return <Navigate to={`${getProfileRoute(user.role)}?tab=password&required=1`} replace />;
   }
   return user.role === 'ADMIN'
     ? <Navigate to="/admin/dashboard" replace />
@@ -67,7 +71,7 @@ function App() {
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/change-password" element={<ChangePasswordRedirect />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
       </Route>
 
@@ -102,7 +106,6 @@ function App() {
       <Route element={<ProtectedRoute requiredRole="LECTURER" />}>
         <Route path="/lecturer/dashboard" element={<LecturerDashboard />} />
         <Route path="/lecturer/edit-event/:id" element={<LecturerEditEventPage />} />
-        <Route path="/lecturer/events" element={<LecturerEventsPage />} />
         <Route path="/lecturer/my-clubs" element={<LecturerMyClubsPage />} />
         <Route path="/lecturer/pending-approvals" element={<LecturerPendingApprovalsPage />} />
         <Route path="/lecturer/calendar" element={<CalendarPage />} />

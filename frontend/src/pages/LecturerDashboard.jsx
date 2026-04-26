@@ -166,9 +166,9 @@ export default function LecturerDashboard() {
 
       {/* Upcoming Events */}
       <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
+        <div className="mb-5 flex items-center justify-between">
           <h2 className="text-2xl font-serif font-bold text-teal-900">Upcoming Events (Next 7 Days)</h2>
-          <Link to="/lecturer/events" className="text-sm font-semibold text-primary">Browse all events</Link>
+          <Link to="/lecturer/calendar" className="text-sm font-semibold text-primary">Open calendar</Link>
         </div>
         <div className="space-y-3">
           {upcomingEvents.length === 0 ? (

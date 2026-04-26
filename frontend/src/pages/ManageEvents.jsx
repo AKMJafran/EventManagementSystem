@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import AdminLayout from '../components/layout/AdminLayout';
 import EventImage from '../components/EventImage';
 import ModalPortal from '../components/ui/ModalPortal';
+import { normalizeEventCollection } from '../utils/eventData';
 
 const STATUS_FILTERS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'];
 const APPROVED_ACTION_TOOLTIP = 'Action unavailable for approved events';
@@ -413,7 +414,7 @@ export default function ManageEvents() {
     adminMessage: '',
   });
 
-  async function loadEvents(nextStatus = status) {
+  const loadEvents = useCallback(async (nextStatus = status) => {
     if (startDate && endDate && endDate < startDate) {
       toast.error('End date must be on or after start date.');
       return;
@@ -428,7 +429,7 @@ export default function ManageEvents() {
       if (endDate) params.endDate = endDate;
 
       const response = await axiosInstance.get('/events', { params });
-      setEvents(response.data || []);
+      setEvents(normalizeEventCollection(response.data));
       setLastSynced(new Date());
     } catch (error) {
       toast.error('Failed to load events.');
@@ -436,11 +437,11 @@ export default function ManageEvents() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [endDate, startDate, status]);
 
   useEffect(() => {
-    loadEvents(status);
-  }, [status, startDate, endDate]);
+    void loadEvents(status);
+  }, [loadEvents, status]);
 
   const summary = useMemo(
     () => ({
@@ -656,18 +657,18 @@ export default function ManageEvents() {
   function renderActions(event) {
     const isApproved = event.status === 'APPROVED';
     const isPending = event.status === 'PENDING';
-    const canApproveDirectly = isPending && event.conflictStatus !== 'HARD_CONFLICT';
+    const isActionLocked = !isPending && !isApproved;
 
     return (
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex min-w-[220px] flex-col items-stretch gap-2">
         {isPending && (
-          <>
+          <div className="flex flex-wrap justify-end gap-2">
             <ActionButton
               tone="success"
-              disabled={!canApproveDirectly || approvalLoading}
+              disabled={approvalLoading}
               onClick={() => openApprovalCheck(event)}
             >
-              Approve
+              {event.conflictStatus === 'HARD_CONFLICT' ? 'Resolve & Approve' : 'Approve'}
             </ActionButton>
             <ActionButton tone="primary" onClick={() => openApprovalCheck(event)} disabled={approvalLoading}>
               Review
@@ -678,41 +679,43 @@ export default function ManageEvents() {
             <ActionButton tone="neutral" onClick={() => navigate(`/admin/edit-event/${event.id}`)}>
               Edit
             </ActionButton>
-          </>
+          </div>
         )}
 
         {isApproved && (
           <>
-            <ActionButton tone="success" disabled tooltip={APPROVED_ACTION_TOOLTIP}>
-              Approve
-            </ActionButton>
-            <ActionButton tone="primary" disabled tooltip={APPROVED_ACTION_TOOLTIP}>
-              Review
-            </ActionButton>
-            <ActionButton tone="danger" disabled tooltip={APPROVED_ACTION_TOOLTIP}>
-              Reject
-            </ActionButton>
-            <ActionButton tone="neutral" disabled tooltip={APPROVED_ACTION_TOOLTIP}>
-              Delete
-            </ActionButton>
-            <ActionButton tone="danger" onClick={() => openRemoveModal(event)}>
-              Remove Approved
-            </ActionButton>
-            <ActionButton tone="neutral" onClick={() => navigate(`/admin/edit-event/${event.id}`)}>
-              Edit
-            </ActionButton>
+            <p className="text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {APPROVED_ACTION_TOOLTIP}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <ActionButton tone="neutral" onClick={() => navigate(`/admin/edit-event/${event.id}`)}>
+                Edit
+              </ActionButton>
+              <ActionButton tone="danger" onClick={() => openRemoveModal(event)}>
+                Remove Approved
+              </ActionButton>
+            </div>
           </>
         )}
 
-        {!isPending && !isApproved && (
-          <ActionButton tone="neutral" onClick={() => navigate(`/admin/edit-event/${event.id}`)} disabled>
-            Edit Locked
-          </ActionButton>
+        {isActionLocked && (
+          <>
+            <p className="text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Action history locked
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <ActionButton tone="neutral" onClick={() => navigate(`/admin/edit-event/${event.id}`)} disabled>
+                Edit Locked
+              </ActionButton>
+            </div>
+          </>
         )}
 
-        <ActionButton tone="dark" onClick={() => navigate(`/events/${event.id}`)}>
-          View
-        </ActionButton>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-outline-variant/10 pt-2">
+          <ActionButton tone="dark" onClick={() => navigate(`/events/${event.id}`)}>
+            View
+          </ActionButton>
+        </div>
       </div>
     );
   }

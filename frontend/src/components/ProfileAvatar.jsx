@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { getInitials, resolveAssetUrl } from '../utils/assetUrl';
 
 export default function ProfileAvatar({
@@ -10,13 +10,9 @@ export default function ProfileAvatar({
   imageClassName = 'h-full w-full object-cover',
   initialsFallback = '?',
 }) {
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [src]);
-
-  const resolvedSrc = !hasError ? resolveAssetUrl(src) : null;
+  const [failedSrc, setFailedSrc] = useState(null);
+  const resolvedSrc = resolveAssetUrl(src);
+  const finalSrc = resolvedSrc && failedSrc !== resolvedSrc ? resolvedSrc : null;
   const initials = getInitials(name, initialsFallback);
 
   return (
@@ -29,13 +25,13 @@ export default function ProfileAvatar({
         .filter(Boolean)
         .join(' ')}
     >
-      {resolvedSrc ? (
+      {finalSrc ? (
         <img
-          src={resolvedSrc}
+          src={finalSrc}
           alt={alt || `${name || 'User'} avatar`}
           className={imageClassName}
           loading="lazy"
-          onError={() => setHasError(true)}
+          onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : (
         <span className="text-sm">{initials}</span>

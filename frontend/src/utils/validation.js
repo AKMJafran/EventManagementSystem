@@ -51,6 +51,17 @@ export function validateEmail(value, label = 'Email') {
   return '';
 }
 
+export function validatePassword(value, label = 'Password') {
+  const normalized = String(value ?? '');
+  if (!normalized.trim()) {
+    return `${label} is required.`;
+  }
+  if (normalized.length < 8) {
+    return `${label} must be at least 8 characters.`;
+  }
+  return '';
+}
+
 export function validatePhone(value, label = 'Contact number') {
   const normalized = normalize(value);
   if (!normalized) {

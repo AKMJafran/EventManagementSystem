@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../context/AuthContext';
+import { getProfileRoute } from '../utils/profileRoutes';
 
 const schema = z.object({
   username: z.string().min(1, 'Email, student ID, or lecturer ID is required'),
@@ -25,7 +26,7 @@ export default function LoginPage() {
       toast.success('Login successful!');
 
       if (mustChangePassword) {
-        navigate('/change-password');
+        navigate(`${getProfileRoute(role)}?tab=password&required=1`);
         return;
       }
 
@@ -84,7 +85,7 @@ export default function LoginPage() {
             <header className="mb-10 text-center md:text-left">
               <h2 className="text-3xl font-bold text-on-surface mb-2 tracking-tight">Institutional Login</h2>
               <p className="text-on-surface-variant font-body text-sm leading-relaxed">
-                Use your official account email and password to access the event management system.
+                Use your email, student ID, or lecturer ID together with your password to access the event management system.
               </p>
             </header>
 

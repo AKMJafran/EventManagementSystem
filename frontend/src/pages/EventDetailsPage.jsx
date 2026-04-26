@@ -13,7 +13,7 @@ function EventDetailsContent({ event, loading, role }) {
     role === 'ADMIN'
       ? '/manage-events'
       : role === 'LECTURER'
-        ? '/lecturer/events'
+        ? '/lecturer/dashboard'
         : event?.status === 'PENDING'
           ? '/student/my-events'
           : '/student/dashboard';

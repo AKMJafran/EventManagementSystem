@@ -6,7 +6,7 @@ import ClubTypeTag from '../components/ui/ClubTypeTag';
 import StatusBadge from '../components/ui/StatusBadge';
 import ModalPortal from '../components/ui/ModalPortal';
 import MemberRolePill from '../components/clubs/MemberRolePill';
-import { getExecutiveCommitteeEntries, getGeneralMembers, getRoleDisplayName } from '../utils/clubRoles';
+import { getGeneralMembers, getRoleDisplayName, getRoleRoster } from '../utils/clubRoles';
 import { validateReason } from '../utils/validation';
 
 function formatDate(value) {
@@ -34,7 +34,7 @@ export default function ManageClubs() {
   const [rejectError, setRejectError] = useState('');
 
   const executiveCommittee = useMemo(
-    () => getExecutiveCommitteeEntries(membersModal),
+    () => getRoleRoster(membersModal),
     [membersModal]
   );
 
@@ -399,8 +399,12 @@ export default function ManageClubs() {
                               <MemberRolePill role={member.role} displayName={member.displayName} compact />
                             </td>
                             <td className="px-4 py-3 text-slate-700">{member.displayName || getRoleDisplayName(member.role)}</td>
-                            <td className="px-4 py-3 font-medium text-slate-900">{member.memberName || 'N/A'}</td>
-                            <td className="px-4 py-3 text-slate-600">{member.memberStudentNumber || 'N/A'}</td>
+                            <td className={`px-4 py-3 font-medium ${member.filled ? 'text-slate-900' : 'text-amber-700'}`}>
+                              {member.filled ? member.memberName : 'Vacant'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {member.filled ? member.memberStudentNumber || 'N/A' : 'Open position'}
+                            </td>
                           </tr>
                         ))}
                         {executiveCommittee.length === 0 && (
