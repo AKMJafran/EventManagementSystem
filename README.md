@@ -167,13 +167,28 @@ VITE_API_BASE_URL=http://localhost:8081
 - **J.Dhanushiya**
 - **T.Dharshika**
 
-<img width="1920" height="1080" alt="Screenshot (208)" src="https://github.com/user-attachments/assets/c33a694d-8786-4ce8-9c64-2bf357620c9b" />
-<img width="1920" height="1080" alt="Screenshot (209)" src="https://github.com/user-attachments/assets/37b1a91e-334b-4252-a08a-cf8f52daa682" />
-<img width="1920" height="1080" alt="Screenshot (207)" src="https://github.com/user-attachments/assets/4cb87c93-4555-45be-85f3-79afb0870ee6" />
-<img width="1920" height="1080" alt="Screenshot (210)" src="https://github.com/user-attachments/assets/546fd794-98d4-4143-8da6-a462399852ba" />
-<img width="1920" height="1080" alt="Screenshot (211)" src="https://github.com/user-attachments/assets/9a5d2061-dd1e-42f7-9eec-99cc1df35821" />
-<img width="1920" height="1080" alt="Screenshot (212)" src="https://github.com/user-attachments/assets/1f9be974-2f6b-4389-b19c-fa7d1c3f4fd1" />
-<img width="540" height="1200" alt="WhatsApp Image 2026-04-27 at 4 34 09 PM" src="https://github.com/user-attachments/assets/d7ab9c2a-4aa6-4e7b-8ebb-e5b5984a2ad3" />
+---
+
+## 📸 Snapshots
+
+Here is a glimpse of the Faculty Event Management System in action:
+
+<details>
+<summary><b>Click to expand screenshots</b></summary>
+<br>
+
+| | |
+| :---: | :---: |
+| <img width="480" alt="Screenshot 1" src="https://github.com/user-attachments/assets/c33a694d-8786-4ce8-9c64-2bf357620c9b" /> | <img width="480" alt="Screenshot 2" src="https://github.com/user-attachments/assets/37b1a91e-334b-4252-a08a-cf8f52daa682" /> |
+| <img width="480" alt="Screenshot 3" src="https://github.com/user-attachments/assets/4cb87c93-4555-45be-85f3-79afb0870ee6" /> | <img width="480" alt="Screenshot 4" src="https://github.com/user-attachments/assets/546fd794-98d4-4143-8da6-a462399852ba" /> |
+| <img width="480" alt="Screenshot 5" src="https://github.com/user-attachments/assets/9a5d2061-dd1e-42f7-9eec-99cc1df35821" /> | <img width="480" alt="Screenshot 6" src="https://github.com/user-attachments/assets/1f9be974-2f6b-4389-b19c-fa7d1c3f4fd1" /> |
+
+<div align="center">
+  <h3>Mobile Responsive View</h3>
+  <img width="250" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" alt="Mobile View" src="https://github.com/user-attachments/assets/d7ab9c2a-4aa6-4e7b-8ebb-e5b5984a2ad3" />
+</div>
+
+</details>
 
 
 
