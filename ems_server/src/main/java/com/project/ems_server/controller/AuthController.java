@@ -54,4 +54,10 @@ public class AuthController {
         authService.changePassword(authentication.getName(), changePasswordRequest);
         return ResponseEntity.ok("Password changed successfully.");
     }
+
+    @PostMapping("/skip-password-change")
+    public ResponseEntity<String> skipPasswordChange(Authentication authentication) {
+        authService.skipPasswordChange(authentication.getName());
+        return ResponseEntity.ok("Password change skipped successfully.");
+    }
 }

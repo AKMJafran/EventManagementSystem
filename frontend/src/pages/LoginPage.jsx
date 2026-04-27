@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 import useAuthStore from '../context/AuthContext';
 import { getProfileRoute } from '../utils/profileRoutes';
+import FirstLoginPrompt from '../components/FirstLoginPrompt';
 
 const schema = z.object({
   username: z.string().min(1, 'Email, student ID, or lecturer ID is required'),
@@ -15,29 +16,57 @@ const schema = z.object({
 export default function LoginPage() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const skipPasswordChange = useAuthStore((state) => state.skipPasswordChange);
   const [showPassword, setShowPassword] = useState(false);
+  const [showFirstLoginPrompt, setShowFirstLoginPrompt] = useState(false);
+  const [loginResult, setLoginResult] = useState(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
   });
+
+  const getDashboardRoute = (role) =>
+    role === 'ADMIN' ? '/admin/dashboard' : role === 'LECTURER' ? '/lecturer/dashboard' : '/student/dashboard';
 
   const onSubmit = async (data) => {
     try {
       const { role, mustChangePassword } = await login(data.username, data.password);
       toast.success('Login successful!');
 
-      if (mustChangePassword) {
-        navigate(`${getProfileRoute(role)}?tab=password&required=1`);
+      if (mustChangePassword && role !== 'ADMIN') {
+        setLoginResult({ role });
+        setShowFirstLoginPrompt(true);
         return;
       }
 
-      navigate(role === 'ADMIN' ? '/admin/dashboard' : role === 'LECTURER' ? '/lecturer/dashboard' : '/student/dashboard');
+      navigate(getDashboardRoute(role));
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Login failed');
     }
   };
 
+  const handleChangePasswordNow = () => {
+    setShowFirstLoginPrompt(false);
+    navigate(`${getProfileRoute(loginResult.role)}?tab=password&required=1`);
+  };
+
+  const handleSkipPasswordChange = async () => {
+    try {
+      await skipPasswordChange();
+      setShowFirstLoginPrompt(false);
+      navigate(getDashboardRoute(loginResult.role));
+    } catch (error) {
+      toast.error('Failed to skip password change. Please try again.');
+    }
+  };
+
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+      {showFirstLoginPrompt && (
+        <FirstLoginPrompt
+          onChangePassword={handleChangePasswordNow}
+          onSkip={handleSkipPasswordChange}
+        />
+      )}
       <div className="absolute inset-0 z-0">
         <img
           alt="University administrative building"

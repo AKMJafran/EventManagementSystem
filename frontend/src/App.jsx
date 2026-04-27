@@ -43,9 +43,6 @@ const Home = () => {
   if (!isAuthenticated || !user) {
     return <LandingPage />;
   }
-  if (user.mustChangePassword) {
-    return <Navigate to={`${getProfileRoute(user.role)}?tab=password&required=1`} replace />;
-  }
   return user.role === 'ADMIN'
     ? <Navigate to="/admin/dashboard" replace />
     : user.role === 'LECTURER'
