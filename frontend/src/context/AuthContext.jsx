@@ -50,12 +50,18 @@ const useAuthStore = create((set) => ({
     });
   },
 
-  skipPasswordChange: () => {
-    set((state) => {
-      const updatedUser = { ...state.user, mustChangePassword: false };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      return { user: updatedUser };
-    });
+  skipPasswordChange: async () => {
+    try {
+      await axiosInstance.post('/auth/skip-password-change');
+      set((state) => {
+        const updatedUser = { ...state.user, mustChangePassword: false };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        return { user: updatedUser };
+      });
+    } catch (error) {
+      console.error('Skip password change failed:', error);
+      throw error;
+    }
   },
 
   updateUserProfile: (updates) => {

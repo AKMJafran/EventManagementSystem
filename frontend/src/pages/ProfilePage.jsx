@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../api/axiosInstance';
 import useAuthStore from '../context/AuthContext';
@@ -72,9 +72,11 @@ function PasswordField({
 }
 
 export default function ProfilePage() {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const markPasswordChanged = useAuthStore((state) => state.markPasswordChanged);
+  const skipPasswordChange = useAuthStore((state) => state.skipPasswordChange);
   const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ name: '', designation: '' });
@@ -312,10 +314,29 @@ export default function ProfilePage() {
 
       {requiredPasswordChange && (
         <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 px-6 py-5">
-          <p className="text-sm font-semibold text-amber-900">Password update required</p>
-          <p className="mt-2 text-sm leading-6 text-amber-800">
-            Finish changing your password here before you continue with the rest of the portal.
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                <span className="material-symbols-outlined mr-1 align-middle text-base">shield_lock</span>
+                Password update recommended
+              </p>
+              <p className="mt-2 text-sm leading-6 text-amber-800">
+                We recommend changing your temporary password. You can do it now or skip and come back later from your profile.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                skipPasswordChange();
+                const dashboard = user?.role === 'ADMIN' ? '/admin/dashboard' : user?.role === 'LECTURER' ? '/lecturer/dashboard' : '/student/dashboard';
+                navigate(dashboard);
+              }}
+              className="inline-flex shrink-0 items-center gap-2 rounded-2xl border border-amber-300 bg-white px-5 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
+            >
+              <span className="material-symbols-outlined text-base">skip_next</span>
+              Skip for Now
+            </button>
+          </div>
         </section>
       )}
 

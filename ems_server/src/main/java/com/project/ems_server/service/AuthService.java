@@ -174,6 +174,18 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    public void skipPasswordChange(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new RuntimeException("Account is inactive. Please contact an administrator.");
+        }
+
+        user.setIsFirstLogin(false);
+        userRepository.save(user);
+    }
+
     private String resolveLecturerDepartment(User user) {
         if (user.getRole() != Role.LECTURER) {
             return null;

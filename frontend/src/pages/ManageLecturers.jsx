@@ -170,6 +170,8 @@ export default function ManageLecturers() {
   const [statusLoadingId, setStatusLoadingId] = useState(null);
   const [editingLecturer, setEditingLecturer] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [importSummary, setImportSummary] = useState(null);
@@ -352,6 +354,22 @@ export default function ManageLecturers() {
       toast.error(error?.response?.data?.message || 'Failed to update lecturer status.');
     } finally {
       setStatusLoadingId(null);
+    }
+  };
+
+  const handleDeleteLecturer = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    try {
+      await axiosInstance.delete(`/admin/lecturers/${deleteTarget.id}`);
+      setLecturers((current) => current.filter((lecturer) => lecturer.id !== deleteTarget.id));
+      toast.success('Lecturer account deleted successfully.');
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to delete lecturer account.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -614,6 +632,13 @@ export default function ManageLecturers() {
                           >
                             {statusLoading ? 'Updating...' : nextActionLabel}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(lecturer)}
+                            className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -656,6 +681,21 @@ export default function ManageLecturers() {
         loading={statusLoadingId === statusTarget?.id}
         onClose={() => setStatusTarget(null)}
         onConfirm={handleConfirmStatusChange}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Lecturer"
+        message={
+          deleteTarget
+            ? `Are you sure you want to delete ${deleteTarget.name || deleteTarget.email}? This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete Lecturer"
+        confirmTone="danger"
+        loading={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteLecturer}
       />
     </AdminLayout>
   );

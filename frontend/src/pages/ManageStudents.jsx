@@ -179,6 +179,8 @@ export default function ManageStudents() {
   const [formErrors, setFormErrors] = useState({});
   const [editingStudent, setEditingStudent] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
 
   const activeCount = useMemo(
@@ -362,6 +364,22 @@ export default function ManageStudents() {
       toast.error(error?.response?.data?.message || 'Failed to update student status.');
     } finally {
       setStatusLoadingId(null);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    try {
+      await axiosInstance.delete(`/admin/students/${deleteTarget.id}`);
+      setStudents((current) => current.filter((student) => student.id !== deleteTarget.id));
+      toast.success('Student account deleted successfully.');
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to delete student account.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -627,6 +645,13 @@ export default function ManageStudents() {
                           >
                             {statusLoading ? 'Updating...' : nextActionLabel}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(student)}
+                            className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -669,6 +694,21 @@ export default function ManageStudents() {
         loading={statusLoadingId === statusTarget?.id}
         onClose={() => setStatusTarget(null)}
         onConfirm={handleConfirmStatusChange}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Student"
+        message={
+          deleteTarget
+            ? `Are you sure you want to delete ${deleteTarget.fullName || deleteTarget.officialEmail}? This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete Student"
+        confirmTone="danger"
+        loading={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteStudent}
       />
     </AdminLayout>
   );
